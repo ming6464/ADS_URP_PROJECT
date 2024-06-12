@@ -47,4 +47,5 @@ public class Singleton<T> : MonoBehaviour where T : MonoBehaviour
     {
         DontDestroyOnLoad(this);
     }
+    
 }
