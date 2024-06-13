@@ -10,8 +10,10 @@ public class ZombieAuthoring : MonoBehaviour
     public float timeDelaySpawn;
     public byte spawnInfinity;
     public int numberSpawn;
-    public Transform Y;
-    public Transform X;
+    public Transform pointRange1;
+    public Transform pointRange2;
+    public Transform pointDir1;
+    public Transform pointDir2;
 }
 
 
@@ -21,17 +23,16 @@ class ZombieBaker : Baker<ZombieAuthoring>
     {
 
         Entity entity = GetEntity(TransformUsageFlags.Dynamic);
-
-        Vector3 posX = authoring.X.position;
-        Vector3 posY = authoring.Y.position;
-        float3 posMin = new float3(posY.x, posX.y, posX.z);
-        float3 posMax = new float3(posX.x, posY.y, posY.z);
-        
+        float3 posMin = authoring.pointRange1.position;
+        float3 posMax = authoring.pointRange2.position;
+        float3 dirNormal = math.normalize(authoring.pointDir2.position - authoring.pointDir1.position);
+        dirNormal.y = 0;
         AddComponent(entity,new GenericZombieProperties
         {
             entity = GetEntity(authoring.zombiePrefab,TransformUsageFlags.Dynamic),
             speed = authoring.speed,
             targetPosition = authoring.target.position,
+            directNormal = dirNormal,
             spawner = new ZombieSpawner
             {
                 numberSpawn = authoring.numberSpawn,

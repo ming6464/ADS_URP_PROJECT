@@ -49,8 +49,11 @@ public partial struct ZombieSpawnSystem : ISystem
         float3 posMax = lt.InverseTransformPoint(zombieProperties.spawner.posMax);
         uint seed = math.max(2, (uint)(math.round(SystemAPI.Time.ElapsedTime / SystemAPI.Time.DeltaTime)));
         lt.Position = Random.CreateFromIndex(seed).NextFloat3(posMin,posMax);
-        ecb.SetComponent(entityNew,lt);
-        ecb.AddComponent<Zombie>(entityNew);
+        ecb.AddComponent(entityNew,lt);
+        ecb.AddComponent(entityNew, new Zombie()
+        {
+            directNormal = zombieProperties.directNormal,
+        });
         
         ecb.Playback(state.EntityManager);
         

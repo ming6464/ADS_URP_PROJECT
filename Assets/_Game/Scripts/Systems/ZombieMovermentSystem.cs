@@ -24,7 +24,6 @@ public partial struct ZombieMovermentSystem : ISystem
             deltaTime = deltaTime,
             targetPosition = genericZombieProperties.targetPosition,
         };
-
         state.Dependency = job.ScheduleParallel(state.Dependency);
     }
     
@@ -39,9 +38,8 @@ public partial struct ZombieMovermentSystem : ISystem
         public void Execute(ZombieAspect aspect,in Zombie zombie)
         {
             if(targetPosition.Equals(aspect.Position)) return;
-            float3 dir = math.normalize(targetPosition - aspect.Position);
-            dir.y = 0;
-            aspect.Position += dir * speed * deltaTime;
+            aspect.Position += zombie.directNormal * speed * deltaTime;
+            aspect.Rotation = quaternion.LookRotation(zombie.directNormal, math.up());
         }
     }
 }

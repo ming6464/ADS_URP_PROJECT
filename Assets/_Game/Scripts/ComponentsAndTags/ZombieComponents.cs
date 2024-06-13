@@ -8,6 +8,7 @@ public struct GenericZombieProperties : IComponentData
     public float speed;
     public float3 targetPosition;
     public ZombieSpawner spawner;
+    public float3 directNormal;
 }
 
 public struct ZombieSpawner
@@ -19,8 +20,9 @@ public struct ZombieSpawner
     public float3 posMax;
 }
 
-public struct Zombie : IComponentData{
-
+public struct Zombie : IComponentData
+{
+    public float3 directNormal;
 }
 
 public readonly partial struct ZombieAspect : IAspect
