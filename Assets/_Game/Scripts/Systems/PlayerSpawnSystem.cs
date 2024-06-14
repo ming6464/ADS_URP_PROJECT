@@ -20,7 +20,12 @@ public partial struct PlayerSpawnSystem : ISystem
         PlayerProperty playerProperty = SystemAPI.GetComponentRO<PlayerProperty>(entity).ValueRO;
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         Entity entityNew = ecb.Instantiate(playerProperty.entity);
-        ecb.AddComponent<LocalTransform>(entityNew);
+        ecb.AddComponent(entityNew,new LocalTransform()
+        {
+            Position = playerProperty.spawnPosition,
+            Rotation = quaternion.identity,
+            Scale = 1,
+        });
         
         ecb.AddComponent<PlayerInfo>(entityNew);
         

@@ -5,7 +5,7 @@ using UnityEngine;
 public class ZombieAuthoring : MonoBehaviour
 {
     public GameObject zombiePrefab;
-    public byte speed;
+    public float speed;
     public Transform target;
     public float timeDelaySpawn;
     public byte spawnInfinity;

@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class PlayerAuthoring : MonoBehaviour
 {
+    public Transform spawnPosition;
     public GameObject playerPrefab;
     public float speed;
 }
@@ -18,6 +19,7 @@ class AuthoringBaker : Baker<PlayerAuthoring>
         {
             entity = GetEntity(authoring.playerPrefab, TransformUsageFlags.Dynamic),
             speed = authoring.speed,
+            spawnPosition = authoring.spawnPosition.position,
         });
         
         AddComponent(entity, new PlayerMoveInput

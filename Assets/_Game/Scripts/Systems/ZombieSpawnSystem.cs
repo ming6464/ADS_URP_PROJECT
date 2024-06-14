@@ -54,7 +54,7 @@ public partial struct ZombieSpawnSystem : ISystem
 
             ActiveZoneProperty activeZoneProperty = SystemAPI.GetSingleton<ActiveZoneProperty>();
             _pointActiveMin = _localTransform.InverseTransformPoint(activeZoneProperty.pointRangeMin);
-            _pointRandomMax = _localTransform.InverseTransformPoint(activeZoneProperty.pointRangeMax);
+            _pointActiveMax = _localTransform.InverseTransformPoint(activeZoneProperty.pointRangeMax);
             
             _isInit = true;
         }
@@ -65,7 +65,7 @@ public partial struct ZombieSpawnSystem : ISystem
         {
             Entity entityNew = ecb.Instantiate(_zombieProperties.entity);
             LocalTransform lt = _localTransform;
-            Random random = Random.CreateFromIndex((uint)(_spawnNumber + _zombieProperties.speed));
+            Random random = Random.CreateFromIndex((uint)(_spawnNumber + 1));
             lt.Position = random.GetRandomRange(_pointRandomMin, _pointRandomMax);
             ecb.AddComponent(entityNew,lt);
             ecb.AddComponent(entityNew,_zombieComponent);

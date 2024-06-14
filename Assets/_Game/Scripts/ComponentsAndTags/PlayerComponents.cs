@@ -6,6 +6,8 @@ public struct PlayerProperty : IComponentData
 {
     public Entity entity;
     public float speed;
+
+    public float3 spawnPosition;
     //Input
     public bool isShot;
     //transform

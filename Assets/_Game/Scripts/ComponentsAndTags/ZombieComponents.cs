@@ -5,7 +5,7 @@ using Unity.Transforms;
 public struct GenericZombieProperties : IComponentData
 {
     public Entity entity;
-    public byte speed;
+    public float speed;
     public float3 targetPosition;
     public ZombieSpawner spawner;
     public float3 directNormal;
