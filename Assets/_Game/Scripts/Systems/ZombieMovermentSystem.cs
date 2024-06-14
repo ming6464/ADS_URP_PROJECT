@@ -35,7 +35,7 @@ public partial struct ZombieMovermentSystem : ISystem
         [ReadOnly] public float deltaTime;
         [ReadOnly] public float3 targetPosition;
         
-        public void Execute(ZombieAspect aspect,in Zombie zombie)
+        public void Execute(ZombieAspect aspect,in ZombieInfo zombie)
         {
             if(targetPosition.Equals(aspect.Position)) return;
             aspect.Position += zombie.directNormal * speed * deltaTime;

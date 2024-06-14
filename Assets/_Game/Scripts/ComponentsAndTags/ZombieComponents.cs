@@ -21,9 +21,10 @@ public struct ZombieSpawner
     public float3 posMax;
 }
 
-public struct Zombie : IComponentData
+public struct ZombieInfo : IComponentData
 {
     public float3 directNormal;
+    public bool isDead;
 }
 
 public readonly partial struct ZombieAspect : IAspect
@@ -49,4 +50,10 @@ public readonly partial struct ZombieAspect : IAspect
         set => _localTransform.ValueRW.Scale = value;
     }
     
+}
+
+public struct ActiveZoneProperty : IComponentData
+{
+    public float3 pointRangeMin;
+    public float3 pointRangeMax;
 }

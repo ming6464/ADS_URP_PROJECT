@@ -11,10 +11,12 @@ public partial struct ZombieSpawnSystem : ISystem
     private float _latestSpawnTime;
     private NativeList<float3> _zombiePositions;
     private LocalTransform _localTransform;
-    private float3 _posMin;
-    private float3 _posMax;
+    private float3 _pointActiveMin;
+    private float3 _pointActiveMax;
+    private float3 _pointRandomMin;
+    private float3 _pointRandomMax;
     private bool _isInit;
-    private Zombie _zombieComponent;
+    private ZombieInfo _zombieComponent;
     private GenericZombieProperties _zombieProperties;
     
     [BurstCompile]
@@ -24,6 +26,7 @@ public partial struct ZombieSpawnSystem : ISystem
         _isInit = false;
         _zombiePositions = new NativeList<float3>(Allocator.Persistent);
         state.RequireForUpdate<GenericZombieProperties>();
+        state.RequireForUpdate<ActiveZoneProperty>();
         
     }
     [BurstCompile]
@@ -40,13 +43,19 @@ public partial struct ZombieSpawnSystem : ISystem
             Entity entity = SystemAPI.GetSingletonEntity<GenericZombieProperties>();
             _zombieProperties = SystemAPI.GetComponentRO<GenericZombieProperties>(entity).ValueRO;
             _localTransform = SystemAPI.GetComponentRO<LocalTransform>(entity).ValueRO;
-            _posMin = _localTransform.InverseTransformPoint(_zombieProperties.spawner.posMin);
-            _posMax = _localTransform.InverseTransformPoint(_zombieProperties.spawner.posMax);
+            _pointRandomMin = _localTransform.InverseTransformPoint(_zombieProperties.spawner.posMin);
+            _pointRandomMax = _localTransform.InverseTransformPoint(_zombieProperties.spawner.posMax);
             _latestSpawnTime = -_zombieProperties.spawner.timeDelay;
-            _zombieComponent = new Zombie
+            _zombieComponent = new ZombieInfo
             {
                 directNormal = _zombieProperties.directNormal,
+                isDead = false,
             };
+
+            ActiveZoneProperty activeZoneProperty = SystemAPI.GetSingleton<ActiveZoneProperty>();
+            _pointActiveMin = _localTransform.InverseTransformPoint(activeZoneProperty.pointRangeMin);
+            _pointRandomMax = _localTransform.InverseTransformPoint(activeZoneProperty.pointRangeMax);
+            
             _isInit = true;
         }
         if((_zombieProperties.spawner.spawnInfinity < 1) && _spawnNumber >= _zombieProperties.spawner.numberSpawn) return;
@@ -57,7 +66,7 @@ public partial struct ZombieSpawnSystem : ISystem
             Entity entityNew = ecb.Instantiate(_zombieProperties.entity);
             LocalTransform lt = _localTransform;
             Random random = Random.CreateFromIndex((uint)(_spawnNumber + _zombieProperties.speed));
-            lt.Position = random.GetRandomRange(_posMin, _posMax);
+            lt.Position = random.GetRandomRange(_pointRandomMin, _pointRandomMax);
             ecb.AddComponent(entityNew,lt);
             ecb.AddComponent(entityNew,_zombieComponent);
             _spawnNumber++;
