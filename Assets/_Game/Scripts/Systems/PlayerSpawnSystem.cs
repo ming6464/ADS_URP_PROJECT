@@ -7,7 +7,6 @@ using Unity.Transforms;
 [BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup))]
 public partial struct PlayerSpawnSystem : ISystem
 {
-    
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {

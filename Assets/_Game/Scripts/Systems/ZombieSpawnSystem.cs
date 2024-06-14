@@ -11,14 +11,20 @@ public partial struct ZombieSpawnSystem : ISystem
     private float _latestSpawnTime;
     private NativeList<float3> _zombiePositions;
     private LocalTransform _localTransform;
+    private float3 _posMin;
+    private float3 _posMax;
+    private bool _isInit;
+    private Zombie _zombieComponent;
+    private GenericZombieProperties _zombieProperties;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         _spawnNumber = 0;
-        _latestSpawnTime = 0;
+        _isInit = false;
         _zombiePositions = new NativeList<float3>(Allocator.Persistent);
         state.RequireForUpdate<GenericZombieProperties>();
+        
     }
     [BurstCompile]
     public void OnDestroy(ref SystemState state)
@@ -29,34 +35,33 @@ public partial struct ZombieSpawnSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        Entity entity = SystemAPI.GetSingletonEntity<GenericZombieProperties>();
-        GenericZombieProperties zombieProperties = SystemAPI.GetComponentRO<GenericZombieProperties>(entity).ValueRO;
-        if((zombieProperties.spawner.spawnInfinity <= 0) && _spawnNumber >= zombieProperties.spawner.numberSpawn) return;
-        if (_latestSpawnTime == 0)
+        if (!_isInit)
         {
+            Entity entity = SystemAPI.GetSingletonEntity<GenericZombieProperties>();
+            _zombieProperties = SystemAPI.GetComponentRO<GenericZombieProperties>(entity).ValueRO;
             _localTransform = SystemAPI.GetComponentRO<LocalTransform>(entity).ValueRO;
-            _latestSpawnTime = -zombieProperties.spawner.timeDelay;
+            _posMin = _localTransform.InverseTransformPoint(_zombieProperties.spawner.posMin);
+            _posMax = _localTransform.InverseTransformPoint(_zombieProperties.spawner.posMax);
+            _latestSpawnTime = -_zombieProperties.spawner.timeDelay;
+            _zombieComponent = new Zombie
+            {
+                directNormal = _zombieProperties.directNormal,
+            };
+            _isInit = true;
         }
-        if((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < zombieProperties.spawner.timeDelay) return;
-
+        if((_zombieProperties.spawner.spawnInfinity < 1) && _spawnNumber >= _zombieProperties.spawner.numberSpawn) return;
+        if((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < _zombieProperties.spawner.timeDelay) return;
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
-
-        Entity entityNew = ecb.Instantiate(zombieProperties.entity);
-
-        LocalTransform lt = _localTransform;
-
-        float3 posMin = lt.InverseTransformPoint(zombieProperties.spawner.posMin);
-        float3 posMax = lt.InverseTransformPoint(zombieProperties.spawner.posMax);
-        uint seed = math.max(2, (uint)(math.round(SystemAPI.Time.ElapsedTime / SystemAPI.Time.DeltaTime)));
-        lt.Position = Random.CreateFromIndex(seed).NextFloat3(posMin,posMax);
-        ecb.AddComponent(entityNew,lt);
-        ecb.AddComponent(entityNew, new Zombie()
+        for (int i = 0; i < _zombieProperties.spawner.numberSpawnPerFrame; i++)
         {
-            directNormal = zombieProperties.directNormal,
-        });
-        
+            Entity entityNew = ecb.Instantiate(_zombieProperties.entity);
+            LocalTransform lt = _localTransform;
+            Random random = Random.CreateFromIndex((uint)(_spawnNumber + _zombieProperties.speed));
+            lt.Position = random.GetRandomRange(_posMin, _posMax);
+            ecb.AddComponent(entityNew,lt);
+            ecb.AddComponent(entityNew,_zombieComponent);
+            _spawnNumber++;
+        }
         ecb.Playback(state.EntityManager);
-        
-        _spawnNumber++;
     }
 }

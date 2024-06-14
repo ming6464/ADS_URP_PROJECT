@@ -5,11 +5,12 @@ using UnityEngine;
 public class ZombieAuthoring : MonoBehaviour
 {
     public GameObject zombiePrefab;
-    public float speed;
+    public byte speed;
     public Transform target;
     public float timeDelaySpawn;
     public byte spawnInfinity;
     public int numberSpawn;
+    public int numberSpawnPerFrame;
     public Transform pointRange1;
     public Transform pointRange2;
     public Transform pointDir1;
@@ -36,6 +37,7 @@ class ZombieBaker : Baker<ZombieAuthoring>
             spawner = new ZombieSpawner
             {
                 numberSpawn = authoring.numberSpawn,
+                numberSpawnPerFrame = authoring.numberSpawnPerFrame,
                 spawnInfinity = authoring.spawnInfinity,
                 timeDelay = authoring.timeDelaySpawn,
                 posMax = posMax,

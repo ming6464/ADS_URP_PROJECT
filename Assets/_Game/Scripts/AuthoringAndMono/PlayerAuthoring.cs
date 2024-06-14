@@ -6,12 +6,6 @@ public class PlayerAuthoring : MonoBehaviour
 {
     public GameObject playerPrefab;
     public float speed;
-
-    [Header("Bullet")] 
-    public GameObject bulletPrefab;
-    public float speedBullet;
-    public float damage;
-    public float cooldown;
 }
 
 class AuthoringBaker : Baker<PlayerAuthoring>
@@ -32,19 +26,5 @@ class AuthoringBaker : Baker<PlayerAuthoring>
             shot = false,
             mousePos = new float2(0, 0),
         });
-        
-        AddComponent(entity,new BulletProperty()
-        {
-            entity = GetEntity(authoring.bulletPrefab,TransformUsageFlags.Dynamic),
-            speed = authoring.speedBullet,
-            damage = authoring.damage,
-        });
-        
-        AddComponent(entity,new BulletRunTime()
-        {
-            cooldown = authoring.cooldown,
-            timeLatest = -authoring.cooldown,
-        });
-        
     }
 }

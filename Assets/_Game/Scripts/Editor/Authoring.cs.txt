@@ -7,7 +7,7 @@ public class #SCRIPTNAME# : MonoBehaviour
 }
 
 
-class AuthoringBaker : Baker<#SCRIPTNAME#>
+partial class AuthoringBaker : Baker<#SCRIPTNAME#>
 {
     public override void Bake(#SCRIPTNAME# authoring)
     {
