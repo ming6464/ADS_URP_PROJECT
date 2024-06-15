@@ -69,14 +69,50 @@ public partial struct WeaponSystem : ISystem
     {
         if((SystemAPI.Time.ElapsedTime - _weaponRunTime.timeLatest) < _weaponRunTime.cooldown) return;
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
-        Entity newBulletEntity = ecb.Instantiate(_bulletEntityPrefab);
-        ecb.AddComponent<BulletInfo>(newBulletEntity);
-        ecb.AddComponent(newBulletEntity, new LocalTransform()
+        int halfNumberPreShot = (int)math.ceil(_weaponProperties.bulletPerShot / 2f);
+
+        LocalTransform  lt = new LocalTransform()
         {
             Position = _weaponAspect.Position,
             Rotation = _weaponAspect.Rotation,
             Scale = 1,
-        });
+        };
+        Entity newBulletEntity;
+        float3 angleRota = MathExt.QuaternionToFloat3(lt.Rotation);
+        float spaceAngleAnyBullet = _weaponProperties.spaceAngleAnyBullet;
+        float subtractIndex = 0.5f;
+        if (halfNumberPreShot % 2 != 0)
+        {
+            --halfNumberPreShot;
+            newBulletEntity = ecb.Instantiate(_bulletEntityPrefab);
+            ecb.AddComponent<BulletInfo>(newBulletEntity);
+            ecb.AddComponent(newBulletEntity, lt);
+            subtractIndex = 0;
+        }
+        
+        for (int i = 1; i <= halfNumberPreShot; i++)
+        {
+            float3 angleRotaNew = angleRota;
+
+            float angle = (i - subtractIndex) * spaceAngleAnyBullet;
+            
+            float angle1 = angleRotaNew.y + angle;
+            float angle2 = angleRotaNew.y - angle;
+            
+            
+            angleRotaNew.y = angle1;
+            lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
+            newBulletEntity = ecb.Instantiate(_bulletEntityPrefab);
+            ecb.AddComponent<BulletInfo>(newBulletEntity);
+            ecb.AddComponent(newBulletEntity, lt);
+
+            angleRotaNew.y = angle2;
+            lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
+            newBulletEntity = ecb.Instantiate(_bulletEntityPrefab);
+            ecb.AddComponent<BulletInfo>(newBulletEntity);
+            ecb.AddComponent(newBulletEntity, lt);
+            
+        } 
         ecb.Playback(state.EntityManager);
         _weaponRunTime.timeLatest = (float)SystemAPI.Time.ElapsedTime;
     }

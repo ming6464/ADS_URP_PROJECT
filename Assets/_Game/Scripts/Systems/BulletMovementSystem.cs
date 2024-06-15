@@ -14,7 +14,6 @@ public partial struct BulletMovementSystem : ISystem
     private bool getConponent;
     private WeaponProperties _weaponProperties;
     
-    
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
@@ -45,7 +44,7 @@ public partial struct BulletMovementSystem : ISystem
 
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         EntityManager entityManager = state.EntityManager;
-
+        
         foreach (var bulletAspect in SystemAPI.Query<BulletAspect>())
         {
             float3 newPosition = bulletAspect.Position + bulletAspect.LocalTransform.Forward() * _weaponProperties.bulletSpeed * SystemAPI.Time.DeltaTime;
@@ -56,24 +55,23 @@ public partial struct BulletMovementSystem : ISystem
                 End = newPosition + bulletAspect.LocalTransform.Forward() * _weaponProperties.length,
                 Filter = new CollisionFilter()
                 {
-                    BelongsTo = 1u << 6, // Đạn thuộc về lớp 6
-                    CollidesWith = 1u << 7 // Đạn sẽ kiểm tra va chạm với các thực thể thuộc lớp 7
+                    BelongsTo = 1u << 6,
+                    CollidesWith = 1u << 7
                 }
             };
             
             if (physicsWorld.CastRay(raycastInput, out RaycastHit hit))
             {
-                Debug.Log("Hit");
-                // Xử lý khi đạn va chạm
-                ecb.DestroyEntity(hit.Entity); // Hủy thực thể đạn
-                ecb.DestroyEntity(bulletAspect.entity); // Hủy thực thể đạn
+                ecb.AddComponent<DisableSP>(hit.Entity);
+                ecb.AddComponent<DisableSP>(bulletAspect.entity);
+                // ecb.DestroyEntity(hit.Entity);
+                // ecb.DestroyEntity(bulletAspect.entity);
             }
             else
             {
-                bulletAspect.Position = newPosition; // Cập nhật vị trí đạn nếu không có va chạm
+                bulletAspect.Position = newPosition;
             }
         }
-        
         ecb.Playback(entityManager);
     }
 }

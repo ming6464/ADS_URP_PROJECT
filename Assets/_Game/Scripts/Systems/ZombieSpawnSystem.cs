@@ -38,6 +38,7 @@ public partial struct ZombieSpawnSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        
         if (!_isInit)
         {
             Entity entity = SystemAPI.GetSingletonEntity<GenericZombieProperties>();

@@ -10,6 +10,9 @@ public struct WeaponProperties : IComponentData
     public float bulletSpeed;
     public float bulletDamage;
     public float length;
+    //
+    public int bulletPerShot;
+    public float spaceAngleAnyBullet;
 }
 
 

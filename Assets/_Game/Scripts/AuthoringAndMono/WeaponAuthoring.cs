@@ -11,6 +11,8 @@ public class WeaponAuthoring : MonoBehaviour
     public float speed;
     public float cooldown;
     public float length;
+    public int bulletPerShot;
+    public float spaceAnglePerBullet;
 }
 
 class WeaponBaker : Baker<WeaponAuthoring>
@@ -26,6 +28,8 @@ class WeaponBaker : Baker<WeaponAuthoring>
             bulletSpeed = authoring.speed,
             offset = authoring.offset,
             length = authoring.length,
+            bulletPerShot = authoring.bulletPerShot,
+            spaceAngleAnyBullet = authoring.spaceAnglePerBullet,
         });
         
         AddComponent(entity,new WeaponRunTime()

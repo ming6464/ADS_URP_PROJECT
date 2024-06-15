@@ -36,7 +36,7 @@ public struct AnimatorEntityRefComponent: IComponentData
 #if RUKHANKA_WITH_NETCODE
 [GhostComponent(PrefabType = GhostPrefabType.Client)]
 #endif
-public struct AnimatedSkinnedMeshComponent: IComponentData
+public struct AnimatedSkinnedMeshComponent: IComponentData,IEnableableComponent
 {
 	public Entity animatedRigEntity;
 	public int rootBoneIndexInRig;
