@@ -8,11 +8,6 @@ public struct PlayerProperty : IComponentData
     public float speed;
 
     public float3 spawnPosition;
-    //Input
-    public bool isShot;
-    //transform
-    public float3 worldPosition;
-    public quaternion rotation;
 }
 
 public struct PlayerInfo : IComponentData

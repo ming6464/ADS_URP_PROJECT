@@ -49,9 +49,6 @@ public partial struct PlayerSystem : ISystem
             dir.y = 0;
             aspect.Position += dir * _playerProperty.speed * SystemAPI.Time.DeltaTime;
             aspect.Rotation = quaternion.LookRotationSafe(dirRota,math.up());
-            _playerProperty.worldPosition = aspect.Position;
-            _playerProperty.rotation = aspect.Rotation;
-            _playerProperty.isShot = _playerMoveInput.shot;
             SystemAPI.SetSingleton(_playerProperty);
         }
     }

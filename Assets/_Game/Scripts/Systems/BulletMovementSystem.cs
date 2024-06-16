@@ -3,15 +3,16 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
-using UnityEngine;
-using RaycastHit = Unity.Physics.RaycastHit;
+using Entity = Unity.Entities.Entity;
 
 [BurstCompile]
 public partial struct BulletMovementSystem : ISystem
 {
-    private float speed;
-    private float damage;
-    private bool getConponent;
+    private float _speed;
+    private float _damage;
+    private float _expired;
+    private bool _isGetComponent;
+    private EntityManager _entityManager;
     private WeaponProperties _weaponProperties;
     
     [BurstCompile]
@@ -23,28 +24,22 @@ public partial struct BulletMovementSystem : ISystem
     }
 
     [BurstCompile]
-    public void OnDestroy(ref SystemState state)
-    {
-        
-    }
-
-    [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        if (!getConponent)
+        _entityManager = state.EntityManager;
+        if (!_isGetComponent)
         {
-            getConponent = true;
+            _isGetComponent = true;
             _weaponProperties = SystemAPI.GetSingleton<WeaponProperties>();
-            speed = _weaponProperties.bulletSpeed;
-            damage = _weaponProperties.bulletDamage;
+            _speed = _weaponProperties.bulletSpeed;
+            _damage = _weaponProperties.bulletDamage;
+            _expired = _weaponProperties.expired;
             return;
         }
-        
         PhysicsWorldSingleton physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
-
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         EntityManager entityManager = state.EntityManager;
-        
+        DisableExpiredBullets(ref state, ref ecb);
         foreach (var bulletAspect in SystemAPI.Query<BulletAspect>())
         {
             float3 newPosition = bulletAspect.Position + bulletAspect.LocalTransform.Forward() * _weaponProperties.bulletSpeed * SystemAPI.Time.DeltaTime;
@@ -73,5 +68,25 @@ public partial struct BulletMovementSystem : ISystem
             }
         }
         ecb.Playback(entityManager);
+    }
+
+
+    private void DisableExpiredBullets(ref SystemState state,ref EntityCommandBuffer ecb)
+    {
+        float curTime = (float)SystemAPI.Time.ElapsedTime;
+        EntityQuery entityQuery = SystemAPI.QueryBuilder().WithNone<Disabled>().WithNone<DisableSP>()
+            .WithAll<BulletInfo>().Build();
+        
+        using (var bulletsSetExpire = entityQuery.ToEntityArray(Allocator.Temp))
+        {
+            foreach (Entity entity in bulletsSetExpire)
+            {
+                BulletInfo bulletInfo = _entityManager.GetComponentData<BulletInfo>(entity);
+                
+                if((curTime - bulletInfo.startTime) < _expired) continue;
+                ecb.AddComponent<DisableSP>(entity);
+            }
+        }
+        
     }
 }

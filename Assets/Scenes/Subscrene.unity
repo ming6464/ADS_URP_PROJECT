@@ -322,6 +322,7 @@ MonoBehaviour:
   length: 0.15
   bulletPerShot: 8
   spaceAnglePerBullet: 2
+  expired: 1
 --- !u!1 &809366255
 GameObject:
   m_ObjectHideFlags: 0
@@ -404,7 +405,7 @@ MonoBehaviour:
   target: {fileID: 182242455}
   timeDelaySpawn: 0.05
   spawnInfinity: 0
-  numberSpawn: 5000
+  numberSpawn: 500
   numberSpawnPerFrame: 25
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}

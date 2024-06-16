@@ -7,10 +7,11 @@ public struct WeaponProperties : IComponentData
     public Entity entityWeapon;
     public Entity entityBullet;
     public float3 offset;
-    public float bulletSpeed;
-    public float bulletDamage;
     public float length;
     //
+    public float expired;
+    public float bulletSpeed;
+    public float bulletDamage;
     public int bulletPerShot;
     public float spaceAngleAnyBullet;
 }
@@ -33,8 +34,8 @@ public readonly partial struct WeaponAspect : IAspect
     public readonly Entity entity;
     private readonly RefRO<WeaponInfo> _weaponInfo;
     private readonly RefRW<LocalTransform> _localTransform;
-    
-    
+    private readonly RefRO<LocalToWorld> _localToWorld;
+
     public float3 Position
     {
         get => _localTransform.ValueRO.Position;
@@ -52,12 +53,18 @@ public readonly partial struct WeaponAspect : IAspect
         get => _localTransform.ValueRO.Scale;
         set => _localTransform.ValueRW.Scale = value;
     }
+
+    public float3 PositionWorld => _localToWorld.ValueRO.Position;
+
+    public quaternion RotationWorld => new quaternion(_localToWorld.ValueRO.Value);
+
+    public float ScaleWorld => math.length(_localToWorld.ValueRO.Value.c0.xyz); // Assuming uniform scale
 }
 
 //Bullet
 public struct BulletInfo : IComponentData
 {
-    
+    public float startTime;
 }
 
 public readonly partial struct BulletAspect : IAspect

@@ -13,6 +13,7 @@ public class WeaponAuthoring : MonoBehaviour
     public float length;
     public int bulletPerShot;
     public float spaceAnglePerBullet;
+    public float expired;
 }
 
 class WeaponBaker : Baker<WeaponAuthoring>
@@ -30,6 +31,7 @@ class WeaponBaker : Baker<WeaponAuthoring>
             length = authoring.length,
             bulletPerShot = authoring.bulletPerShot,
             spaceAngleAnyBullet = authoring.spaceAnglePerBullet,
+            expired = authoring.expired,
         });
         
         AddComponent(entity,new WeaponRunTime()
