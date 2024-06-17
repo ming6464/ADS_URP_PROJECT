@@ -3,7 +3,9 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
+[UpdateInGroup(typeof(InitializationSystemGroup))]
 [BurstCompile]
 public partial struct WeaponSystem : ISystem
 {
@@ -30,13 +32,14 @@ public partial struct WeaponSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        
         if (!_isSpawn)
         {
+            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
             var entity = SystemAPI.GetSingletonEntity<WeaponProperties>();
             _playerEntity = SystemAPI.GetSingletonEntity<PlayerInfo>();
             _weaponProperties = SystemAPI.GetComponentRO<WeaponProperties>(entity).ValueRO;
             Entity entityInstantiate = _weaponProperties.entityWeapon;
-            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
             Entity weaponEntity = ecb.Instantiate(entityInstantiate);
             ecb.AddComponent(weaponEntity, new Parent() { Value = _playerEntity });
             ecb.AddComponent(weaponEntity, new LocalTransform() { Position = _weaponProperties.offset, Rotation = quaternion.identity, Scale = 1 });
@@ -56,12 +59,14 @@ public partial struct WeaponSystem : ISystem
 
     private void Shot(ref SystemState state)
     {
+        // Debug.Log("--------1");
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+        // _weaponRunTime = SystemAPI.GetSingleton<WeaponRunTime>();
         if ((SystemAPI.Time.ElapsedTime - _weaponRunTime.timeLatest) < _weaponRunTime.cooldown) return;
         var entityManager = state.EntityManager;
         var entitiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<BulletInfo>().Build().ToEntityArray(Allocator.Temp);
         byte countUsing = 0;
         _weaponAspect = SystemAPI.GetAspect<WeaponAspect>(_weaponEntitySingleton);
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         int halfNumberPreShot = (int)math.ceil(_weaponProperties.bulletPerShot / 2f);
         var bulletEntityPrefab = _bulletEntityPrefab;
         LocalTransform lt = new LocalTransform()
@@ -94,7 +99,6 @@ public partial struct WeaponSystem : ISystem
 
             float angle1 = angleRotaNew.y + angle;
             float angle2 = angleRotaNew.y - angle;
-
             angleRotaNew.y = angle1;
             lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
             spawnBullet(lt);
@@ -103,34 +107,32 @@ public partial struct WeaponSystem : ISystem
             lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
             spawnBullet(lt);
         }
-
-        ecb.Playback(state.EntityManager);
-        _weaponRunTime.timeLatest = (float)SystemAPI.Time.ElapsedTime;
-
-
-
         void spawnBullet(LocalTransform lt)
         {
+            // Debug.Log("--------2");
             Entity entity;
-            if (countUsing + 1 < entitiesDisable.Length)
+            if (countUsing < entitiesDisable.Length)
             {
                 entity = entitiesDisable[countUsing];
-                ecb.SetComponent(entity,bulletInfo);
                 ecb.RemoveComponent<Disabled>(entity);
-                foreach (LinkedEntityGroup linked in entityManager.GetBuffer<LinkedEntityGroup>(entity))
+                ecb.SetComponent(entity,bulletInfo);
+                ecb.AddComponent(entity,new SetActiveSP()
                 {
-                    Entity entity2 = linked.Value;
-                    ecb.RemoveComponent<Disabled>(entity2);
-                }
-                countUsing++;
+                    status = 4,
+                    startTime = 0,
+                });
             }
             else
             {
                 entity = ecb.Instantiate(bulletEntityPrefab);
                 ecb.AddComponent(entity,bulletInfo);
-                
             }
+            countUsing++;
             ecb.AddComponent(entity,lt);
         }
+        
+        ecb.Playback(entityManager);
+        _weaponRunTime.timeLatest = (float)SystemAPI.Time.ElapsedTime;
+        // SystemAPI.SetSingleton(_weaponRunTime);
     }
 }

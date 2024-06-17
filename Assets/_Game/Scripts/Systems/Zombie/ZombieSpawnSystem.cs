@@ -6,11 +6,10 @@ using Unity.Transforms;
 using UnityEngine;
 using Random = Unity.Mathematics.Random;
 
+[UpdateInGroup(typeof(InitializationSystemGroup))]
 [BurstCompile]
 public partial struct ZombieSpawnSystem : ISystem
 {
-    private int i;
-    private int _spawnNumber;
     private int _seedCount;
     private float _latestSpawnTime;
     private NativeList<float3> _zombiePositions;
@@ -24,8 +23,6 @@ public partial struct ZombieSpawnSystem : ISystem
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
-        Debug.Log("Length i0 : " + i + " | " + _spawnNumber);
-        _spawnNumber = 0;
         _isInit = false;
         _zombiePositions = new NativeList<float3>(Allocator.Persistent);
         state.RequireForUpdate<ZombieProperty>();
@@ -40,7 +37,6 @@ public partial struct ZombieSpawnSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        i++;
         if (!_isInit)
         {
             Entity entity = SystemAPI.GetSingletonEntity<ZombieProperty>();
@@ -62,49 +58,48 @@ public partial struct ZombieSpawnSystem : ISystem
 
     private void SpawnZombie(ref SystemState state, ref EntityCommandBuffer ecb)
     {
-        
-        var zombiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<ZombieInfo>().Build()
-            .ToEntityArray(Allocator.Temp);
-        _spawnNumber -= zombiesDisable.Length;
-        if((_zombieProperties.spawner.spawnInfinity < 1) && _spawnNumber >= _zombieProperties.spawner.numberSpawn) return;
+        int spawnNumber = SystemAPI.QueryBuilder().WithNone<Disabled>().WithNone<SetActiveSP>().WithAll<ZombieInfo>().Build()
+            .ToEntityArray(Allocator.Temp).Length;
+        if((_zombieProperties.spawner.spawnInfinity < 1) && spawnNumber >= _zombieProperties.spawner.numberSpawn) return;
         if((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < _zombieProperties.spawner.timeDelay) return;
         EntityManager entityManager = state.EntityManager;
-        int countUsing = 0;
-        
-        Debug.Log("1");
+        var zombiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<ZombieInfo>().Build()
+            .ToEntityArray(Allocator.Temp);
+        Entity entityNew;
         for (int i = 0; i < _zombieProperties.spawner.numberSpawnPerFrame; i++)
         {
-            Entity entityNew;
-            
-            if (countUsing + 1 < zombiesDisable.Length)
+            if (i < zombiesDisable.Length)
             {
-                Debug.Log("2");
-                entityNew = zombiesDisable[countUsing];
-                foreach (LinkedEntityGroup linked in entityManager.GetBuffer<LinkedEntityGroup>(entityNew))
+                Debug.Log("======== 2");
+                entityNew = zombiesDisable[i];
+
+                ecb.AddComponent(entityNew,new SetActiveSP()
                 {
-                    Entity entity2 = linked.Value;
-                    ecb.RemoveComponent<Disabled>(entity2);
-                }
-                countUsing++;
+                    status = 4,
+                    startTime = 0,
+                });
+                
+                
+                // foreach (LinkedEntityGroup linked in entityManager.GetBuffer<LinkedEntityGroup>(entityNew))
+                // {
+                //     Entity entity2 = linked.Value;
+                //     ecb.RemoveComponent<Disabled>(entity2);
+                // }
             }
             else
             {
-                Debug.Log("3");
                 entityNew = ecb.Instantiate(_zombieProperties.entity);
                 ecb.AddComponent(entityNew,_zombieComponent);
             }
             
-            Debug.Log("4");
-            LocalTransform lt = _localTransform;
             Random random = Random.CreateFromIndex((uint)(_seedCount + 1));
-            lt.Position = random.GetRandomRange(_pointRandomMin, _pointRandomMax);
-            ecb.AddComponent(entityNew,lt);
-            _spawnNumber++;
+            _localTransform.Position = random.GetRandomRange(_pointRandomMin, _pointRandomMax);
+            ecb.AddComponent(entityNew,_localTransform);
+            spawnNumber++;
             _seedCount++;
-            Debug.Log("5");
             if ((_zombieProperties.spawner.spawnInfinity < 1) &&
-                _spawnNumber >= _zombieProperties.spawner.numberSpawn) return;
-            Debug.Log("6");
+                spawnNumber >= _zombieProperties.spawner.numberSpawn) return;
+        
         }
     }
 }

@@ -4,6 +4,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 
+[UpdateInGroup(typeof(PresentationSystemGroup))]
 [BurstCompile]
 public partial struct ZombieMovermentSystem : ISystem
 {
@@ -49,7 +50,7 @@ public partial struct ZombieMovermentSystem : ISystem
     private void CheckZombieToDeadZone(ref SystemState state,ref EntityCommandBuffer ecb)
     {
         EntityQuery entityQuery = SystemAPI.QueryBuilder().WithAll<ZombieInfo>().WithNone<Disabled>()
-            .WithNone<DisableSP>().Build();
+            .WithNone<SetActiveSP>().Build();
         EntityManager entityManager = state.EntityManager;
         var arrayZomSet = entityQuery.ToEntityArray(Allocator.Temp);
         foreach (Entity entity in arrayZomSet)
@@ -57,7 +58,11 @@ public partial struct ZombieMovermentSystem : ISystem
             LocalToWorld ltw = entityManager.GetComponentData<LocalToWorld>(entity);
             if (!CheckInRange(ltw.Position, _pointZoneMin, _pointZoneMax))
             {
-                ecb.AddComponent<DisableSP>(entity);
+                ecb.AddComponent(entity,new SetActiveSP
+                {
+                    status = 3,
+                    startTime = 0,
+                });
             }
         }
 
@@ -76,10 +81,10 @@ public partial struct ZombieMovermentSystem : ISystem
         [ReadOnly] public float speed;
         [ReadOnly] public float deltaTime;
         
-        public void Execute(ZombieAspect aspect,in ZombieInfo zombie)
+        public void Execute(ref LocalTransform lt,in ZombieInfo zombie)
         {
-            aspect.Position += zombie.directNormal * speed * deltaTime;
-            aspect.Rotation = quaternion.LookRotation(zombie.directNormal, math.up());
+            lt.Position += zombie.directNormal * speed * deltaTime;
+            lt.Rotation = quaternion.LookRotation(zombie.directNormal, math.up());
         }
     }
 }

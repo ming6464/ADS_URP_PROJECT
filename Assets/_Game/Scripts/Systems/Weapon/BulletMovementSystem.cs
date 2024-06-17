@@ -5,6 +5,7 @@ using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
 
+[UpdateInGroup(typeof(PresentationSystemGroup))]
 [BurstCompile]
 public partial struct BulletMovementSystem : ISystem
 {
@@ -41,7 +42,7 @@ public partial struct BulletMovementSystem : ISystem
         EntityManager entityManager = state.EntityManager;
         DisableExpiredBullets(ref state, ref ecb);
 
-        DisableSP disableSp = new DisableSP()
+        SetActiveSP disableSp = new SetActiveSP()
         {
             startTime = (float)SystemAPI.Time.ElapsedTime,
         };
@@ -63,11 +64,12 @@ public partial struct BulletMovementSystem : ISystem
             
             if (physicsWorld.CastRay(raycastInput, out RaycastHit hit))
             {
-                disableSp.key = DisableKEY.Wait;
+                // disableSp.key = StateKEY.Wait;
+                disableSp.status = 1;
                 ecb.AddComponent(hit.Entity,disableSp);
                 ecb.RemoveComponent<LocalTransform>(hit.Entity);
                 ecb.RemoveComponent<LocalTransform>(bulletAspect.entity);
-                disableSp.key = DisableKEY.CanDisable;
+                disableSp.status = 3;
                 ecb.AddComponent(bulletAspect.entity,disableSp);
 
             }
@@ -83,7 +85,7 @@ public partial struct BulletMovementSystem : ISystem
     private void DisableExpiredBullets(ref SystemState state,ref EntityCommandBuffer ecb)
     {
         float curTime = (float)SystemAPI.Time.ElapsedTime;
-        EntityQuery entityQuery = SystemAPI.QueryBuilder().WithNone<Disabled>().WithNone<DisableSP>()
+        EntityQuery entityQuery = SystemAPI.QueryBuilder().WithNone<Disabled>().WithNone<SetActiveSP>()
             .WithAll<BulletInfo>().Build();
         
         using (var bulletsSetExpire = entityQuery.ToEntityArray(Allocator.Temp))
@@ -93,7 +95,12 @@ public partial struct BulletMovementSystem : ISystem
                 BulletInfo bulletInfo = _entityManager.GetComponentData<BulletInfo>(entity);
                 
                 if((curTime - bulletInfo.startTime) < _expired) continue;
-                ecb.AddComponent<DisableSP>(entity);
+                ecb.RemoveComponent<LocalTransform>(entity);
+                ecb.AddComponent(entity,new SetActiveSP
+                {
+                    status = 3,
+                    startTime = 0f,
+                });
             }
         }
         

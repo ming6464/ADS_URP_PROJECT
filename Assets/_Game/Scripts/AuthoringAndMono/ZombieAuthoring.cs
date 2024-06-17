@@ -46,10 +46,11 @@ class ZombieBaker : Baker<ZombieAuthoring>
     }
 }
 
-[Serializable]
-public enum DisableKEY
+public enum StateKEY
 {
-    Wait,
-    WaitAnimation,
-    CanDisable,
+    None = 0,
+    Wait = 1,
+    WaitAnimation = 2,
+    CanDisable = 3,
+    CanEnable = 4,
 }
