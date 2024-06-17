@@ -2,11 +2,10 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 
-public struct GenericZombieProperties : IComponentData
+public struct ZombieProperty : IComponentData
 {
     public Entity entity;
     public float speed;
-    public float3 targetPosition;
     public ZombieSpawner spawner;
     public float3 directNormal;
 }
@@ -24,8 +23,9 @@ public struct ZombieSpawner
 public struct ZombieInfo : IComponentData
 {
     public float3 directNormal;
-    public bool isDead;
 }
+
+
 
 public readonly partial struct ZombieAspect : IAspect
 {

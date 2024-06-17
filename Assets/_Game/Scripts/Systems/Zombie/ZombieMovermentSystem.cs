@@ -15,14 +15,13 @@ public partial struct ZombieMovermentSystem : ISystem
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
-        state.RequireForUpdate<GenericZombieProperties>();
+        state.RequireForUpdate<ZombieProperty>();
         state.RequireForUpdate<ActiveZoneProperty>();
     }
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-
         if (!_init)
         {
             _init = true;
@@ -33,8 +32,8 @@ public partial struct ZombieMovermentSystem : ISystem
         }
 
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
-        GenericZombieProperties genericZombieProperties = SystemAPI
-            .GetComponentRO<GenericZombieProperties>(SystemAPI.GetSingletonEntity<GenericZombieProperties>()).ValueRO;
+        ZombieProperty genericZombieProperties = SystemAPI
+            .GetComponentRO<ZombieProperty>(SystemAPI.GetSingletonEntity<ZombieProperty>()).ValueRO;
         
         float deltaTime = SystemAPI.Time.DeltaTime;
         CheckZombieToDeadZone(ref state, ref ecb);
@@ -42,7 +41,6 @@ public partial struct ZombieMovermentSystem : ISystem
         {
             speed = genericZombieProperties.speed,
             deltaTime = deltaTime,
-            targetPosition = genericZombieProperties.targetPosition,
         };
         state.Dependency = job.ScheduleParallel(state.Dependency);
         ecb.Playback(state.EntityManager);
@@ -77,11 +75,9 @@ public partial struct ZombieMovermentSystem : ISystem
     {
         [ReadOnly] public float speed;
         [ReadOnly] public float deltaTime;
-        [ReadOnly] public float3 targetPosition;
         
         public void Execute(ZombieAspect aspect,in ZombieInfo zombie)
         {
-            if(targetPosition.Equals(aspect.Position)) return;
             aspect.Position += zombie.directNormal * speed * deltaTime;
             aspect.Rotation = quaternion.LookRotation(zombie.directNormal, math.up());
         }

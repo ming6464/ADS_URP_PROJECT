@@ -3,6 +3,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
+using Unity.Transforms;
 
 [BurstCompile]
 public partial struct BulletMovementSystem : ISystem
@@ -39,6 +40,12 @@ public partial struct BulletMovementSystem : ISystem
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         EntityManager entityManager = state.EntityManager;
         DisableExpiredBullets(ref state, ref ecb);
+
+        DisableSP disableSp = new DisableSP()
+        {
+            startTime = (float)SystemAPI.Time.ElapsedTime,
+        };
+        
         foreach (var bulletAspect in SystemAPI.Query<BulletAspect>())
         {
             float3 newPosition = bulletAspect.Position + bulletAspect.LocalTransform.Forward() * _weaponProperties.bulletSpeed * SystemAPI.Time.DeltaTime;
@@ -56,8 +63,12 @@ public partial struct BulletMovementSystem : ISystem
             
             if (physicsWorld.CastRay(raycastInput, out RaycastHit hit))
             {
-                ecb.AddComponent<DisableSP>(hit.Entity);
-                ecb.AddComponent<DisableSP>(bulletAspect.entity);
+                disableSp.key = DisableKEY.Wait;
+                ecb.AddComponent(hit.Entity,disableSp);
+                ecb.RemoveComponent<LocalTransform>(hit.Entity);
+                ecb.RemoveComponent<LocalTransform>(bulletAspect.entity);
+                disableSp.key = DisableKEY.CanDisable;
+                ecb.AddComponent(bulletAspect.entity,disableSp);
 
             }
             else

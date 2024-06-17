@@ -1,4 +1,5 @@
-﻿using Unity.Entities;
+﻿using System;
+using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -6,7 +7,6 @@ public class ZombieAuthoring : MonoBehaviour
 {
     public GameObject zombiePrefab;
     public float speed;
-    public Transform target;
     public float timeDelaySpawn;
     public byte spawnInfinity;
     public int numberSpawn;
@@ -28,11 +28,10 @@ class ZombieBaker : Baker<ZombieAuthoring>
         float3 posMax = authoring.pointRange2.position;
         float3 dirNormal = math.normalize(authoring.pointDir2.position - authoring.pointDir1.position);
         dirNormal.y = 0;
-        AddComponent(entity,new GenericZombieProperties
+        AddComponent(entity,new ZombieProperty
         {
             entity = GetEntity(authoring.zombiePrefab,TransformUsageFlags.Dynamic),
             speed = authoring.speed,
-            targetPosition = authoring.target.position,
             directNormal = dirNormal,
             spawner = new ZombieSpawner
             {
@@ -45,4 +44,12 @@ class ZombieBaker : Baker<ZombieAuthoring>
             }
         });
     }
+}
+
+[Serializable]
+public enum DisableKEY
+{
+    Wait,
+    WaitAnimation,
+    CanDisable,
 }

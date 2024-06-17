@@ -116,7 +116,6 @@ public partial struct WeaponSystem : ISystem
             {
                 entity = entitiesDisable[countUsing];
                 ecb.SetComponent(entity,bulletInfo);
-                ecb.SetComponent(entity,lt);
                 ecb.RemoveComponent<Disabled>(entity);
                 foreach (LinkedEntityGroup linked in entityManager.GetBuffer<LinkedEntityGroup>(entity))
                 {
@@ -129,9 +128,9 @@ public partial struct WeaponSystem : ISystem
             {
                 entity = ecb.Instantiate(bulletEntityPrefab);
                 ecb.AddComponent(entity,bulletInfo);
-                ecb.AddComponent(entity,lt);
+                
             }
-            
+            ecb.AddComponent(entity,lt);
         }
     }
 }

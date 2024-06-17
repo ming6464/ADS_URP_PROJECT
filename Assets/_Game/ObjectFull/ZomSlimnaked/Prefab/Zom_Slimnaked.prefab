@@ -844,7 +844,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2fb757bd46edfe349a52b4ea886d67e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  rigConfigSource: 0
+  rigConfigSource: 1
   avatar: {fileID: 9000000, guid: 966470e0f95a2cb41a534729a1ef6552, type: 3}
   applyRootMotion: 0
   animationCulling: 0
