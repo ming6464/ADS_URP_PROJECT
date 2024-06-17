@@ -59,8 +59,7 @@ public partial struct BulletMovementSystem : ISystem
             {
                 ecb.AddComponent<DisableSP>(hit.Entity);
                 ecb.AddComponent<DisableSP>(bulletAspect.entity);
-                // ecb.DestroyEntity(hit.Entity);
-                // ecb.DestroyEntity(bulletAspect.entity);
+
             }
             else
             {

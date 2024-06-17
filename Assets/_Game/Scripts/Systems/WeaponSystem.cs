@@ -76,7 +76,6 @@ public partial struct WeaponSystem : ISystem
             startTime = (float)SystemAPI.Time.ElapsedTime,
         };
         
-        Entity newBulletEntity;
         float3 angleRota = MathExt.QuaternionToFloat3(lt.Rotation);
         float spaceAngleAnyBullet = _weaponProperties.spaceAngleAnyBullet;
         float subtractIndex = 0.5f;
@@ -84,9 +83,6 @@ public partial struct WeaponSystem : ISystem
         {
             spawnBullet(lt);
             --halfNumberPreShot;
-            // newBulletEntity = ecb.Instantiate(_bulletEntityPrefab);
-            // ecb.AddComponent(newBulletEntity,bulletInfo);
-            // ecb.AddComponent(newBulletEntity, lt);
             subtractIndex = 0;
         }
 
@@ -102,16 +98,10 @@ public partial struct WeaponSystem : ISystem
             angleRotaNew.y = angle1;
             lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
             spawnBullet(lt);
-            // newBulletEntity = ecb.Instantiate(_bulletEntityPrefab);
-            // ecb.AddComponent(newBulletEntity,bulletInfo);
-            // ecb.AddComponent(newBulletEntity, lt);
 
             angleRotaNew.y = angle2;
             lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
             spawnBullet(lt);
-            // newBulletEntity = ecb.Instantiate(_bulletEntityPrefab);
-            // ecb.AddComponent(newBulletEntity,bulletInfo);
-            // ecb.AddComponent(newBulletEntity, lt);
         }
 
         ecb.Playback(state.EntityManager);
@@ -122,8 +112,7 @@ public partial struct WeaponSystem : ISystem
         void spawnBullet(LocalTransform lt)
         {
             Entity entity;
-            countUsing++;
-            if (countUsing < entitiesDisable.Length)
+            if (countUsing + 1 < entitiesDisable.Length)
             {
                 entity = entitiesDisable[countUsing];
                 ecb.SetComponent(entity,bulletInfo);
@@ -134,6 +123,7 @@ public partial struct WeaponSystem : ISystem
                     Entity entity2 = linked.Value;
                     ecb.RemoveComponent<Disabled>(entity2);
                 }
+                countUsing++;
             }
             else
             {
@@ -141,6 +131,7 @@ public partial struct WeaponSystem : ISystem
                 ecb.AddComponent(entity,bulletInfo);
                 ecb.AddComponent(entity,lt);
             }
+            
         }
     }
 }

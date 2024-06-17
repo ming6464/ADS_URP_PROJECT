@@ -59,19 +59,47 @@ public partial struct ZombieSpawnSystem : ISystem
             
             _isInit = true;
         }
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+        SpawnZombie(ref state,ref ecb);
+        ecb.Playback(state.EntityManager);
+    }
+
+    private void SpawnZombie(ref SystemState state, ref EntityCommandBuffer ecb)
+    {
         if((_zombieProperties.spawner.spawnInfinity < 1) && _spawnNumber >= _zombieProperties.spawner.numberSpawn) return;
         if((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < _zombieProperties.spawner.timeDelay) return;
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+        EntityManager entityManager = state.EntityManager;
+        int countUsing = 0;
+        var zombiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<ZombieInfo>().Build()
+            .ToEntityArray(Allocator.Temp);
+        
         for (int i = 0; i < _zombieProperties.spawner.numberSpawnPerFrame; i++)
         {
-            Entity entityNew = ecb.Instantiate(_zombieProperties.entity);
+            Entity entityNew;
+            
+            if (countUsing + 1 < zombiesDisable.Length)
+            {
+                entityNew = zombiesDisable[countUsing];
+                foreach (LinkedEntityGroup linked in entityManager.GetBuffer<LinkedEntityGroup>(entityNew))
+                {
+                    Entity entity2 = linked.Value;
+                    ecb.RemoveComponent<Disabled>(entity2);
+                }
+                countUsing++;
+            }
+            else
+            {
+                entityNew = ecb.Instantiate(_zombieProperties.entity);
+                ecb.AddComponent<LocalTransform>(entityNew);
+                ecb.AddComponent(entityNew,_zombieComponent);
+            }
+            
+            
             LocalTransform lt = _localTransform;
             Random random = Random.CreateFromIndex((uint)(_spawnNumber + 1));
             lt.Position = random.GetRandomRange(_pointRandomMin, _pointRandomMax);
-            ecb.AddComponent(entityNew,lt);
-            ecb.AddComponent(entityNew,_zombieComponent);
+            ecb.SetComponent(entityNew,lt);
             _spawnNumber++;
         }
-        ecb.Playback(state.EntityManager);
     }
 }
