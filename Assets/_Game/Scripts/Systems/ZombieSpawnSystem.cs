@@ -8,11 +8,10 @@ using Unity.Transforms;
 public partial struct ZombieSpawnSystem : ISystem
 {
     private int _spawnNumber;
+    private int seedCount;
     private float _latestSpawnTime;
     private NativeList<float3> _zombiePositions;
     private LocalTransform _localTransform;
-    private float3 _pointActiveMin;
-    private float3 _pointActiveMax;
     private float3 _pointRandomMin;
     private float3 _pointRandomMax;
     private bool _isInit;
@@ -26,7 +25,6 @@ public partial struct ZombieSpawnSystem : ISystem
         _isInit = false;
         _zombiePositions = new NativeList<float3>(Allocator.Persistent);
         state.RequireForUpdate<GenericZombieProperties>();
-        state.RequireForUpdate<ActiveZoneProperty>();
         
     }
     [BurstCompile]
@@ -52,11 +50,6 @@ public partial struct ZombieSpawnSystem : ISystem
                 directNormal = _zombieProperties.directNormal,
                 isDead = false,
             };
-
-            ActiveZoneProperty activeZoneProperty = SystemAPI.GetSingleton<ActiveZoneProperty>();
-            _pointActiveMin = _localTransform.InverseTransformPoint(activeZoneProperty.pointRangeMin);
-            _pointActiveMax = _localTransform.InverseTransformPoint(activeZoneProperty.pointRangeMax);
-            
             _isInit = true;
         }
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
@@ -66,12 +59,14 @@ public partial struct ZombieSpawnSystem : ISystem
 
     private void SpawnZombie(ref SystemState state, ref EntityCommandBuffer ecb)
     {
+        var zombiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<ZombieInfo>().Build()
+            .ToEntityArray(Allocator.Temp);
+        _spawnNumber -= zombiesDisable.Length;
         if((_zombieProperties.spawner.spawnInfinity < 1) && _spawnNumber >= _zombieProperties.spawner.numberSpawn) return;
         if((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < _zombieProperties.spawner.timeDelay) return;
         EntityManager entityManager = state.EntityManager;
         int countUsing = 0;
-        var zombiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<ZombieInfo>().Build()
-            .ToEntityArray(Allocator.Temp);
+        
         
         for (int i = 0; i < _zombieProperties.spawner.numberSpawnPerFrame; i++)
         {
@@ -96,10 +91,11 @@ public partial struct ZombieSpawnSystem : ISystem
             
             
             LocalTransform lt = _localTransform;
-            Random random = Random.CreateFromIndex((uint)(_spawnNumber + 1));
+            Random random = Random.CreateFromIndex((uint)(seedCount + 1));
             lt.Position = random.GetRandomRange(_pointRandomMin, _pointRandomMax);
             ecb.SetComponent(entityNew,lt);
             _spawnNumber++;
+            seedCount++;
         }
     }
 }

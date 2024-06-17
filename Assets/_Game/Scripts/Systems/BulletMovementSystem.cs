@@ -3,7 +3,6 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
-using Entity = Unity.Entities.Entity;
 
 [BurstCompile]
 public partial struct BulletMovementSystem : ISystem

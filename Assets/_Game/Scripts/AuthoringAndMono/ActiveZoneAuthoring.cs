@@ -8,7 +8,7 @@ public class ActiveZoneAuthoring : MonoBehaviour
     public Transform pointRangeMax;
 }
 
-partial class ActiveZoneAuthoringBaker : Baker<ActiveZoneAuthoring>
+class ActiveZoneAuthoringBaker : Baker<ActiveZoneAuthoring>
 {
     public override void Bake(ActiveZoneAuthoring authoring)
     {
