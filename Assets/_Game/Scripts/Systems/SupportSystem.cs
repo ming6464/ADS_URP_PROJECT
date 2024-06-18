@@ -2,9 +2,11 @@ using Rukhanka;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Physics;
+using UnityEngine;
 
-[UpdateInGroup(typeof(InitializationSystemGroup))]
-public partial class HandleAnimationSystem : SystemBase
+[UpdateBefore(typeof(ZombieAnimationSystem))]
+public partial class ZombieAnimationSystem : SystemBase
 {
     private FastAnimatorParameter _dyingAnimatorParameter = new FastAnimatorParameter("Die");
     
@@ -46,7 +48,7 @@ public partial struct ProcessAnimZombie : IJobEntity
     }
 }
 
-
+[UpdateAfter(typeof(ZombieAnimationSystem))]
 [BurstCompile]
 public partial struct HandleSetActiveSystem : ISystem
 {
@@ -84,22 +86,10 @@ public partial struct HandleSetActiveJob : IJobEntity
         {
             case StateID.CanDisable:
                 check = true;
-                ecb.RemoveComponent<SetActiveSP>(entityInQueryIndex, entity);
-                ecb.AddComponent<Disabled>(entityInQueryIndex, entity);
-
-                if (linkedGroupBufferFromEntity.HasBuffer(entity))
-                {
-                    var buffer = linkedGroupBufferFromEntity[entity];
-                    for (int i = 0; i < buffer.Length; i++)
-                    {
-                        ecb.AddComponent<Disabled>(entityInQueryIndex, buffer[i].Value);
-                    }
-                }
+                ecb.SetEnabled(entityInQueryIndex,entity,false);
                 break;
             case StateID.CanEnable:
                 check = true;
-                ecb.RemoveComponent<SetActiveSP>(entityInQueryIndex, entity);
-
                 if (linkedGroupBufferFromEntity.HasBuffer(entity))
                 {
                     var buffer = linkedGroupBufferFromEntity[entity];

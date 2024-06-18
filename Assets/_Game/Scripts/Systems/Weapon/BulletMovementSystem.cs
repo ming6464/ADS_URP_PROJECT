@@ -1,11 +1,12 @@
 using Unity.Burst;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
 
-[UpdateInGroup(typeof(PresentationSystemGroup))]
+[UpdateBefore(typeof(ZombieAnimationSystem))]
 [BurstCompile]
 public partial struct BulletMovementSystem : ISystem
 {
@@ -15,6 +16,8 @@ public partial struct BulletMovementSystem : ISystem
     private bool _isGetComponent;
     private EntityManager _entityManager;
     private WeaponProperties _weaponProperties;
+    private EntityTypeHandle _entityTypeHandle;
+    private CollisionFilter _collisionFilter;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -22,6 +25,12 @@ public partial struct BulletMovementSystem : ISystem
         state.RequireForUpdate<WeaponProperties>();
         state.RequireForUpdate<PhysicsWorldSingleton>();
         state.RequireForUpdate<WeaponInfo>();
+        _entityTypeHandle = state.GetEntityTypeHandle();
+        _collisionFilter = new CollisionFilter()
+        {
+            BelongsTo = 1u << 6,
+            CollidesWith = 1u << 7,
+        };
     }
 
     [BurstCompile]
@@ -48,69 +57,26 @@ public partial struct BulletMovementSystem : ISystem
             return;
         }
         
-        
         PhysicsWorldSingleton physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
-        EntityManager entityManager = state.EntityManager;
-        var filter = new CollisionFilter()
-        {
-            BelongsTo = 1u << 6,
-            CollidesWith = 1u << 7
-        };
-        
-        
-        var job = new BulletColliderJOB()
+        EntityQuery euQuery = SystemAPI.QueryBuilder().WithAll<BulletInfo>().WithNone<Disabled, SetActiveSP>().Build();
+        _entityTypeHandle.Update(ref state);
+        var jobChunk = new BulletColliderJOBChunk()
         {
             ecb = ecb.AsParallelWriter(),
             physicsWorld = physicsWorld,
-            filter = filter,
+            filter = _collisionFilter,
             speed = _weaponProperties.bulletSpeed,
             length = _weaponProperties.length,
             time = (float)SystemAPI.Time.ElapsedTime,
             deltaTime = (float)SystemAPI.Time.DeltaTime,
+            localTransformType = state.GetComponentTypeHandle<LocalTransform>(),
+            entityTypeHandle = _entityTypeHandle,
         };
 
-        state.Dependency = job.ScheduleParallel(state.Dependency);
+        state.Dependency = jobChunk.ScheduleParallel(euQuery,state.Dependency);
         state.Dependency.Complete();
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
-        
-        
-        
-        // foreach (var bulletAspect in SystemAPI.Query<BulletAspect>())
-        // {
-        //     float3 newPosition = bulletAspect.Position + bulletAspect.LocalTransform.Forward() * _weaponProperties.bulletSpeed * SystemAPI.Time.DeltaTime;
-        //     
-        //     RaycastInput raycastInput = new RaycastInput()
-        //     {
-        //         Start = bulletAspect.Position,
-        //         End = newPosition + bulletAspect.LocalTransform.Forward() * _weaponProperties.length,
-        //         Filter = new CollisionFilter()
-        //         {
-        //             BelongsTo = 1u << 6,
-        //             CollidesWith = 1u << 7
-        //         }
-        //     };
-        //
-        //     var setActiveSP = new SetActiveSP()
-        //     {
-        //         startTime =  (float)SystemAPI.Time.ElapsedTime,
-        //     };
-        //     
-        //     if (physicsWorld.CastRay(raycastInput, out RaycastHit hit))
-        //     {
-        //         setActiveSP.state = StateID.Wait;
-        //         ecb.AddComponent(hit.Entity, setActiveSP);
-        //         ecb.RemoveComponent<LocalTransform>(hit.Entity);
-        //         ecb.RemoveComponent<LocalTransform>(bulletAspect.entity);
-        //         setActiveSP.state = StateID.CanDisable;
-        //         ecb.AddComponent(bulletAspect.entity,setActiveSP);
-        //     }
-        //     else
-        //     {
-        //         bulletAspect.Position = newPosition;
-        //     }
-        // }
-        // ecb.Playback(entityManager);
     }
 
 
@@ -138,46 +104,55 @@ public partial struct BulletMovementSystem : ISystem
     }
 }
 
-
 [BurstCompile]
-public partial struct BulletColliderJOB : IJobEntity
+public partial struct BulletColliderJOBChunk : IJobChunk
 {
     [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
+    [ReadOnly] public EntityTypeHandle entityTypeHandle;
+    [ReadOnly] public ComponentTypeHandle<LocalTransform> localTransformType;
     [ReadOnly] public PhysicsWorldSingleton physicsWorld;
     [ReadOnly] public CollisionFilter filter;
     [ReadOnly] public float speed;
     [ReadOnly] public float length;
     [ReadOnly] public float time;
     [ReadOnly] public float deltaTime;
-    
-    private void Execute(BulletAspect bulletAspect, [EntityIndexInQuery] int entityIndexQuery)
+    public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
     {
-        float3 newPosition = bulletAspect.Position + bulletAspect.LocalTransform.Forward() * speed * deltaTime;
-            
-        RaycastInput raycastInput = new RaycastInput()
+        var ltArr = chunk.GetNativeArray(localTransformType);
+        var entities = chunk.GetNativeArray(entityTypeHandle);
+        for (int i = 0; i < chunk.Count; i++)
         {
-            Start = bulletAspect.Position,
-            End = newPosition + bulletAspect.LocalTransform.Forward() * length,
-            Filter = filter,
-        };
+            var lt = ltArr[i];
+            float3 newPosition = lt.Position + lt.Forward() * speed * deltaTime;
+            
+            RaycastInput raycastInput = new RaycastInput()
+            {
+                Start = lt.Position,
+                End = newPosition + lt.Forward() * length,
+                Filter = filter,
+            };
 
-        var setActiveSP = new SetActiveSP()
-        {
-            startTime =  time,
-        };
+            var setActiveSP = new SetActiveSP()
+            {
+                startTime =  time,
+            };
             
-        if (physicsWorld.CastRay(raycastInput, out RaycastHit hit))
-        {
-            setActiveSP.state = StateID.Wait;
-            ecb.AddComponent(entityIndexQuery,hit.Entity, setActiveSP);
-            ecb.RemoveComponent<LocalTransform>(entityIndexQuery,hit.Entity);
-            ecb.RemoveComponent<LocalTransform>(entityIndexQuery,bulletAspect.entity);
-            setActiveSP.state = StateID.CanDisable;
-            ecb.AddComponent(entityIndexQuery,bulletAspect.entity,setActiveSP);
+            if (physicsWorld.CastRay(raycastInput, out RaycastHit hit))
+            {
+                setActiveSP.state = StateID.Wait;
+                ecb.AddComponent(unfilteredChunkIndex,hit.Entity, setActiveSP);
+                ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,hit.Entity);
+                ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entities[i]);
+                setActiveSP.state = StateID.CanDisable;
+                ecb.AddComponent(unfilteredChunkIndex,entities[i],setActiveSP);
+            }
+            else
+            {
+                lt.Position = newPosition;
+                ecb.SetComponent(unfilteredChunkIndex,entities[i],lt);
+            }
         }
-        else
-        {
-            bulletAspect.Position = newPosition;
-        }
+        
+        
     }
 }

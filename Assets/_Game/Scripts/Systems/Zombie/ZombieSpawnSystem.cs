@@ -3,10 +3,9 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
 using Random = Unity.Mathematics.Random;
 
-[UpdateInGroup(typeof(InitializationSystemGroup))]
+[UpdateBefore(typeof(ZombieAnimationSystem))]
 [BurstCompile]
 public partial struct ZombieSpawnSystem : ISystem
 {
@@ -56,13 +55,13 @@ public partial struct ZombieSpawnSystem : ISystem
         ecb.Playback(state.EntityManager);
     }
 
-    private void SpawnZombie(ref SystemState state, ref EntityCommandBuffer ecb)
+    private void SpawnZombie(ref SystemState state,ref EntityCommandBuffer ecb)
     {
+        
         int spawnNumber = SystemAPI.QueryBuilder().WithNone<Disabled>().WithNone<SetActiveSP>().WithAll<ZombieInfo>().Build()
             .ToEntityArray(Allocator.Temp).Length;
         if((_zombieProperties.spawner.spawnInfinity < 1) && spawnNumber >= _zombieProperties.spawner.numberSpawn) return;
         if((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < _zombieProperties.spawner.timeDelay) return;
-        EntityManager entityManager = state.EntityManager;
         var zombiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<ZombieInfo>().Build()
             .ToEntityArray(Allocator.Temp);
         Entity entityNew;

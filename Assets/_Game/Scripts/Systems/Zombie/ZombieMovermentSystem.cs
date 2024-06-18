@@ -3,9 +3,10 @@ using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Physics;
 using Unity.Transforms;
 
-[UpdateInGroup(typeof(PresentationSystemGroup))]
+[UpdateBefore(typeof(ZombieAnimationSystem))]
 [BurstCompile]
 public partial struct ZombieMovermentSystem : ISystem
 {
@@ -15,7 +16,6 @@ public partial struct ZombieMovermentSystem : ISystem
     private bool _init;
     private ZombieProperty _zombieProperty;
     private EntityTypeHandle _entityTypeHandle;
-    
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {

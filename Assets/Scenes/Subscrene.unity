@@ -871,8 +871,8 @@ MonoBehaviour:
   speed: 5
   timeDelaySpawn: 0.05
   spawnInfinity: 0
-  numberSpawn: 500
-  numberSpawnPerFrame: 500
+  numberSpawn: 5
+  numberSpawnPerFrame: 10
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}
   pointDir1: {fileID: 1398424327}
