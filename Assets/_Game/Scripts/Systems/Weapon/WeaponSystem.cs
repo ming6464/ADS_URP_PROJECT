@@ -75,7 +75,7 @@ public partial struct WeaponSystem : ISystem
             Rotation = _weaponAspect.RotationWorld,
             Scale = 1,
         };
-
+        float time = (float)(SystemAPI.Time.ElapsedTime);
         BulletInfo bulletInfo = new BulletInfo()
         {
             startTime = (float)SystemAPI.Time.ElapsedTime,
@@ -93,6 +93,7 @@ public partial struct WeaponSystem : ISystem
 
         for (int i = 1; i <= halfNumberPreShot; i++)
         {
+            
             float3 angleRotaNew = angleRota;
 
             float angle = (i - subtractIndex) * spaceAngleAnyBullet;
@@ -116,10 +117,10 @@ public partial struct WeaponSystem : ISystem
                 entity = entitiesDisable[countUsing];
                 ecb.RemoveComponent<Disabled>(entity);
                 ecb.SetComponent(entity,bulletInfo);
-                ecb.AddComponent(entity,new SetActiveSP()
+                ecb.AddComponent(entity, new SetActiveSP()
                 {
-                    status = 4,
-                    startTime = 0,
+                    state = StateID.CanEnable,
+                    startTime = time,
                 });
             }
             else
@@ -133,6 +134,5 @@ public partial struct WeaponSystem : ISystem
         
         ecb.Playback(entityManager);
         _weaponRunTime.timeLatest = (float)SystemAPI.Time.ElapsedTime;
-        // SystemAPI.SetSingleton(_weaponRunTime);
     }
 }

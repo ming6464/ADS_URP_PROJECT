@@ -70,21 +70,12 @@ public partial struct ZombieSpawnSystem : ISystem
         {
             if (i < zombiesDisable.Length)
             {
-                Debug.Log("======== 2");
                 entityNew = zombiesDisable[i];
-
-                ecb.AddComponent(entityNew,new SetActiveSP()
+                ecb.RemoveComponent<Disabled>(entityNew);
+                ecb.AddComponent(entityNew, new SetActiveSP()
                 {
-                    status = 4,
-                    startTime = 0,
+                    state = StateID.CanEnable,
                 });
-                
-                
-                // foreach (LinkedEntityGroup linked in entityManager.GetBuffer<LinkedEntityGroup>(entityNew))
-                // {
-                //     Entity entity2 = linked.Value;
-                //     ecb.RemoveComponent<Disabled>(entity2);
-                // }
             }
             else
             {

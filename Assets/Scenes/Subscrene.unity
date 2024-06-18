@@ -458,7 +458,7 @@ Transform:
   m_GameObject: {fileID: 496664264}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 10.01, y: 0, z: 63.7}
+  m_LocalPosition: {x: 10.01, y: 0, z: 88.8}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -538,7 +538,7 @@ MonoBehaviour:
   speed: 30
   cooldown: 0.01
   length: 0.15
-  bulletPerShot: 30
+  bulletPerShot: 100
   spaceAnglePerBullet: 0.5
   expired: 1.5
 --- !u!1 &616646757
@@ -837,7 +837,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &832985594
 Transform:
   m_ObjectHideFlags: 0
@@ -870,9 +870,9 @@ MonoBehaviour:
     type: 3}
   speed: 5
   timeDelaySpawn: 0.05
-  spawnInfinity: 1
-  numberSpawn: 1500
-  numberSpawnPerFrame: 25
+  spawnInfinity: 0
+  numberSpawn: 500
+  numberSpawnPerFrame: 500
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}
   pointDir1: {fileID: 1398424327}
@@ -981,7 +981,7 @@ Transform:
   m_GameObject: {fileID: 1398424326}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -10.11, y: 0, z: 49.7}
+  m_LocalPosition: {x: -10.11, y: 0, z: 46.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

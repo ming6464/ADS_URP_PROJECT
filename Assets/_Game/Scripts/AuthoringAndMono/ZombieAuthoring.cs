@@ -46,11 +46,3 @@ class ZombieBaker : Baker<ZombieAuthoring>
     }
 }
 
-public enum StateKEY
-{
-    None = 0,
-    Wait = 1,
-    WaitAnimation = 2,
-    CanDisable = 3,
-    CanEnable = 4,
-}

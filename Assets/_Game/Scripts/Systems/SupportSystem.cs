@@ -2,9 +2,6 @@ using Rukhanka;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Rendering;
-using Unity.Transforms;
-using UnityEngine;
 
 [UpdateInGroup(typeof(InitializationSystemGroup))]
 public partial class HandleAnimationSystem : SystemBase
@@ -25,23 +22,23 @@ public partial class HandleAnimationSystem : SystemBase
 [BurstCompile]
 public partial struct ProcessAnimZombie : IJobEntity
 {
-    public FastAnimatorParameter dyingAnimatorParameter;
-    public float time;
+    [ReadOnly] public FastAnimatorParameter dyingAnimatorParameter;
+    [ReadOnly] public float time;
     void Execute(AnimatorParametersAspect parametersAspect, ref SetActiveSP disableSp, in ZombieInfo zombieInfo)
     {
-        switch (disableSp.status)
+        switch (disableSp.state)
         {
-            case 4:
+            case StateID.CanEnable:
                 parametersAspect.SetBoolParameter(dyingAnimatorParameter,false);
                 break;
-            case 1:
+            case StateID.Wait:
                 parametersAspect.SetBoolParameter(dyingAnimatorParameter,true);
-                disableSp.status = 2;
+                disableSp.state = StateID.WaitAnimation;
                 break;
-            case 2:
+            case StateID.WaitAnimation:
                 if ((time - disableSp.startTime) > 1)
                 {
-                    disableSp.status = 3;
+                    disableSp.state = StateID.CanDisable;
                 }
                 break;
         }
@@ -50,57 +47,73 @@ public partial struct ProcessAnimZombie : IJobEntity
 }
 
 
-[UpdateInGroup(typeof(SimulationSystemGroup))]
 [BurstCompile]
-public partial struct HandleDeadSystem : ISystem
+public partial struct HandleSetActiveSystem : ISystem
 {
-    private EntityManager _entityManager;
-    private EntityCommandBuffer _ecb;
-
-
-    public void OnCreate(ref SystemState state)
-    {
-        state.RequireForUpdate<SetActiveSP>();
-    }
-
-    [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        _entityManager = state.EntityManager;
-        EntityQuery queryDisable = SystemAPI.QueryBuilder().WithAll<SetActiveSP>().Build();
-        using (var disabledEntities = queryDisable.ToEntityArray(Allocator.Temp))
-        {
-            _ecb = new EntityCommandBuffer(Allocator.Temp);
-            foreach (Entity entity in disabledEntities)
-            {
-                var key = _entityManager.GetComponentData<SetActiveSP>(entity).status;
-                switch (key)
-                {
-                    case 3:
-                        Debug.Log("--------------- 1");
-                        _ecb.RemoveComponent<SetActiveSP>(entity);
-                        _ecb.AddComponent<Disabled>(entity);
-                        foreach (LinkedEntityGroup linked in _entityManager.GetBuffer<LinkedEntityGroup>(entity))
-                        {
-                            Entity entity2 = linked.Value;
-                            _ecb.AddComponent<Disabled>(entity2);
-                        }
-                        break;
-                    case 4:
-                        Debug.Log("--------------- 2");
-                        _ecb.RemoveComponent<SetActiveSP>(entity);
-                        // _ecb.RemoveComponent<Disabled>(entity);
-                        foreach (LinkedEntityGroup linked in _entityManager.GetBuffer<LinkedEntityGroup>(entity))
-                        {
-                            Entity entity2 = linked.Value;
-                            _ecb.RemoveComponent<Disabled>(entity2);
-                        }
-                        break;
-                }
-            }
-            _ecb.Playback(_entityManager);
-            _ecb.Dispose();
-        }
+        state.Dependency.Complete();
         
+        var ecb = new EntityCommandBuffer(Allocator.TempJob);
+
+        var active = new HandleSetActiveJob
+        {
+            ecb = ecb.AsParallelWriter(),
+            linkedGroupBufferFromEntity = state.GetBufferLookup<LinkedEntityGroup>(true)
+        };
+
+        state.Dependency = active.ScheduleParallel(state.Dependency);
+
+        state.Dependency.Complete(); // Chờ job hoàn thành trước khi phát lại ECB
+        ecb.Playback(state.EntityManager);
+        ecb.Dispose();
+    }
+}
+
+[BurstCompile]
+public partial struct HandleSetActiveJob : IJobEntity
+{
+    [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
+    [ReadOnly] public BufferLookup<LinkedEntityGroup> linkedGroupBufferFromEntity;
+
+    private void Execute(in SetActiveSP setActiveSp, [EntityIndexInQuery] int entityInQueryIndex, in Entity entity)
+    {
+        bool check = false;
+
+        switch (setActiveSp.state)
+        {
+            case StateID.CanDisable:
+                check = true;
+                ecb.RemoveComponent<SetActiveSP>(entityInQueryIndex, entity);
+                ecb.AddComponent<Disabled>(entityInQueryIndex, entity);
+
+                if (linkedGroupBufferFromEntity.HasBuffer(entity))
+                {
+                    var buffer = linkedGroupBufferFromEntity[entity];
+                    for (int i = 0; i < buffer.Length; i++)
+                    {
+                        ecb.AddComponent<Disabled>(entityInQueryIndex, buffer[i].Value);
+                    }
+                }
+                break;
+            case StateID.CanEnable:
+                check = true;
+                ecb.RemoveComponent<SetActiveSP>(entityInQueryIndex, entity);
+
+                if (linkedGroupBufferFromEntity.HasBuffer(entity))
+                {
+                    var buffer = linkedGroupBufferFromEntity[entity];
+                    for (int i = 0; i < buffer.Length; i++)
+                    {
+                        ecb.RemoveComponent<Disabled>(entityInQueryIndex, buffer[i].Value);
+                    }
+                }
+                break;
+        }
+
+        if (check)
+        {
+            ecb.RemoveComponent<SetActiveSP>(entityInQueryIndex, entity);
+        }
     }
 }
