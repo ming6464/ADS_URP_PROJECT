@@ -36,7 +36,6 @@ class WeaponBaker : Baker<WeaponAuthoring>
         
         AddComponent(entity,new WeaponRunTime()
         {
-            timeLatest = -authoring.cooldown,
             cooldown = authoring.cooldown,
         });
     }

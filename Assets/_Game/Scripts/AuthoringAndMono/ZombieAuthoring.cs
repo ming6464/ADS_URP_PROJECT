@@ -8,7 +8,7 @@ public class ZombieAuthoring : MonoBehaviour
     public GameObject zombiePrefab;
     public float speed;
     public float timeDelaySpawn;
-    public byte spawnInfinity;
+    public bool spawnInfinity;
     public int numberSpawn;
     public int numberSpawnPerFrame;
     public Transform pointRange1;

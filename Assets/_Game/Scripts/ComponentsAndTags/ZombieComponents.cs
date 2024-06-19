@@ -13,7 +13,7 @@ public struct ZombieProperty : IComponentData
 public struct ZombieSpawner
 {
     public float timeDelay;
-    public byte spawnInfinity;
+    public bool spawnInfinity;
     public int numberSpawn;
     public int numberSpawnPerFrame;
     public float3 posMin;
@@ -25,6 +25,10 @@ public struct ZombieInfo : IComponentData
     public float3 directNormal;
 }
 
+public struct NotUnique : IComponentData
+{
+    
+}
 
 
 public readonly partial struct ZombieAspect : IAspect

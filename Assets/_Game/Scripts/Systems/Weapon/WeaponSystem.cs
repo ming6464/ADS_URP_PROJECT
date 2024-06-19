@@ -3,7 +3,6 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
 
 [UpdateInGroup(typeof(InitializationSystemGroup))]
 [BurstCompile]
@@ -13,8 +12,9 @@ public partial struct WeaponSystem : ISystem
     private Entity _playerEntity;
     private Entity _weaponEntitySingleton;
     private WeaponProperties _weaponProperties;
-    private WeaponRunTime _weaponRunTime;
-
+    private float _timeLatest;
+    private float _cooldown;
+    
     private WeaponAspect _weaponAspect;
     private bool _isSpawn;
     private bool _isGetComponent;
@@ -32,11 +32,15 @@ public partial struct WeaponSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        
         if (!_isSpawn)
         {
             EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
             var entity = SystemAPI.GetSingletonEntity<WeaponProperties>();
+            var weaponRuntime = SystemAPI.GetComponentRO<WeaponRunTime>(entity).ValueRO;
+
+            _cooldown = weaponRuntime.cooldown;
+            _timeLatest = -_cooldown;
+            
             _playerEntity = SystemAPI.GetSingletonEntity<PlayerInfo>();
             _weaponProperties = SystemAPI.GetComponentRO<WeaponProperties>(entity).ValueRO;
             Entity entityInstantiate = _weaponProperties.entityWeapon;
@@ -46,6 +50,7 @@ public partial struct WeaponSystem : ISystem
             ecb.AddComponent<WeaponInfo>(weaponEntity);
             _isSpawn = true;
             ecb.Playback(state.EntityManager);
+            ecb.Dispose();
             return;
         }
         if (!_isGetComponent)
@@ -59,10 +64,8 @@ public partial struct WeaponSystem : ISystem
 
     private void Shot(ref SystemState state)
     {
-        // Debug.Log("--------1");
+        if ((SystemAPI.Time.ElapsedTime - _timeLatest) < _cooldown) return;
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
-        // _weaponRunTime = SystemAPI.GetSingleton<WeaponRunTime>();
-        if ((SystemAPI.Time.ElapsedTime - _weaponRunTime.timeLatest) < _weaponRunTime.cooldown) return;
         var entityManager = state.EntityManager;
         var entitiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<BulletInfo>().Build().ToEntityArray(Allocator.Temp);
         byte countUsing = 0;
@@ -93,24 +96,19 @@ public partial struct WeaponSystem : ISystem
 
         for (int i = 1; i <= halfNumberPreShot; i++)
         {
-            
             float3 angleRotaNew = angleRota;
-
             float angle = (i - subtractIndex) * spaceAngleAnyBullet;
-
             float angle1 = angleRotaNew.y + angle;
             float angle2 = angleRotaNew.y - angle;
             angleRotaNew.y = angle1;
             lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
             spawnBullet(lt);
-
             angleRotaNew.y = angle2;
             lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
             spawnBullet(lt);
         }
         void spawnBullet(LocalTransform lt)
         {
-            // Debug.Log("--------2");
             Entity entity;
             if (countUsing < entitiesDisable.Length)
             {
@@ -131,8 +129,7 @@ public partial struct WeaponSystem : ISystem
             countUsing++;
             ecb.AddComponent(entity,lt);
         }
-        
         ecb.Playback(entityManager);
-        _weaponRunTime.timeLatest = (float)SystemAPI.Time.ElapsedTime;
+        _timeLatest = (float)SystemAPI.Time.ElapsedTime;
     }
 }

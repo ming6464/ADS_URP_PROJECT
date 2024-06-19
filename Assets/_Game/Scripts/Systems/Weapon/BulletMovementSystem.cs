@@ -109,13 +109,13 @@ public partial struct BulletColliderJOBChunk : IJobChunk
 {
     [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
     [ReadOnly] public EntityTypeHandle entityTypeHandle;
-    [ReadOnly] public ComponentTypeHandle<LocalTransform> localTransformType;
     [ReadOnly] public PhysicsWorldSingleton physicsWorld;
     [ReadOnly] public CollisionFilter filter;
     [ReadOnly] public float speed;
     [ReadOnly] public float length;
     [ReadOnly] public float time;
     [ReadOnly] public float deltaTime;
+    public ComponentTypeHandle<LocalTransform> localTransformType;
     public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
     {
         var ltArr = chunk.GetNativeArray(localTransformType);
@@ -149,10 +149,8 @@ public partial struct BulletColliderJOBChunk : IJobChunk
             else
             {
                 lt.Position = newPosition;
-                ecb.SetComponent(unfilteredChunkIndex,entities[i],lt);
+                ltArr[i] = lt;
             }
         }
-        
-        
     }
 }

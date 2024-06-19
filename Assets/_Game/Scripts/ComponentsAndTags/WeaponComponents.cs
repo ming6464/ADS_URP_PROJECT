@@ -19,7 +19,6 @@ public struct WeaponProperties : IComponentData
 
 public struct WeaponRunTime : IComponentData
 {
-    public float timeLatest;
     public float cooldown;
 }
 
