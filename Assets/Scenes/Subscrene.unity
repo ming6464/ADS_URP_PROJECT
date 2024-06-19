@@ -475,6 +475,7 @@ GameObject:
   - component: {fileID: 592925932}
   - component: {fileID: 592925931}
   - component: {fileID: 592925933}
+  - component: {fileID: 592925934}
   m_Layer: 0
   m_Name: PlayerSpawn
   m_TagString: Untagged
@@ -526,21 +527,35 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cb071d2c94019a45bfb30ef6bf46e95, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  weaponPrefab: {fileID: 3006786673759217005, guid: 28d5ab0b47c74ae449acac7a553549c1,
+  weaponPrefab: {fileID: 4502064372477858661, guid: e2e559d8fe8d0fc4fbdb32b4b492273c,
     type: 3}
-  bulletPrefab: {fileID: 5748703402170672456, guid: fa9934db79070dd418725447b28104a9,
+  bulletPrefab: {fileID: 2192329522781796173, guid: e290f7dbaf29d6e42aa3845c5fe5963e,
     type: 3}
   offset:
-    x: 0.326
-    y: 0.845
-    z: 0.213
+    x: 0.478
+    y: 0.849
+    z: 0.582
   damage: 10
-  speed: 30
-  cooldown: 0.01
-  length: 0.15
-  bulletPerShot: 100
-  spaceAnglePerBullet: 0.5
+  speed: 100
+  cooldown: 0.12
+  lengthRay: 0
+  bulletPerShot: 10
+  spaceAnglePerBullet: 0.7
   expired: 1.5
+--- !u!114 &592925934
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 592925930}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67a8370d6720e7c47bc6f2813c2d5021, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  effHitFlashPrefab: {fileID: 7939257566625396322, guid: 2094e059af186e647b01302e6c7a8b34,
+    type: 3}
 --- !u!1 &616646757
 GameObject:
   m_ObjectHideFlags: 0
@@ -870,9 +885,9 @@ MonoBehaviour:
     type: 3}
   speed: 5
   timeDelaySpawn: 0.05
-  spawnInfinity: 0
+  spawnInfinity: 1
   numberSpawn: 500
-  numberSpawnPerFrame: 25
+  numberSpawnPerFrame: 15
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}
   pointDir1: {fileID: 1398424327}

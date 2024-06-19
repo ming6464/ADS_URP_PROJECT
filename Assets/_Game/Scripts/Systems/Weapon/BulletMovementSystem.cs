@@ -14,6 +14,7 @@ public partial struct BulletMovementSystem : ISystem
     private float _damage;
     private float _expired;
     private bool _isGetComponent;
+    private Entity effHitFlashEntity;
     private EntityManager _entityManager;
     private WeaponProperties _weaponProperties;
     private EntityTypeHandle _entityTypeHandle;
@@ -22,6 +23,7 @@ public partial struct BulletMovementSystem : ISystem
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
+        state.RequireForUpdate<EffectProperty>();
         state.RequireForUpdate<WeaponProperties>();
         state.RequireForUpdate<PhysicsWorldSingleton>();
         state.RequireForUpdate<WeaponInfo>();
@@ -44,6 +46,8 @@ public partial struct BulletMovementSystem : ISystem
             _speed = _weaponProperties.bulletSpeed;
             _damage = _weaponProperties.bulletDamage;
             _expired = _weaponProperties.expired;
+            var effProperty = SystemAPI.GetSingleton<EffectProperty>();
+            effHitFlashEntity = effProperty.effHitFlash;
             return;
         }
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
@@ -71,6 +75,7 @@ public partial struct BulletMovementSystem : ISystem
             deltaTime = (float)SystemAPI.Time.DeltaTime,
             localTransformType = state.GetComponentTypeHandle<LocalTransform>(),
             entityTypeHandle = _entityTypeHandle,
+            effHitFlash = effHitFlashEntity,
         };
 
         state.Dependency = jobChunk.ScheduleParallel(euQuery,state.Dependency);
@@ -78,8 +83,7 @@ public partial struct BulletMovementSystem : ISystem
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
     }
-
-
+    
     private void DisableExpiredBullets(ref SystemState state,ref EntityCommandBuffer ecb)
     {
         float curTime = (float)SystemAPI.Time.ElapsedTime;
@@ -108,6 +112,7 @@ public partial struct BulletMovementSystem : ISystem
 public partial struct BulletMovementJOB : IJobChunk
 {
     [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
+    [ReadOnly] public Entity effHitFlash;
     [ReadOnly] public EntityTypeHandle entityTypeHandle;
     [ReadOnly] public PhysicsWorldSingleton physicsWorld;
     [ReadOnly] public CollisionFilter filter;
@@ -120,7 +125,9 @@ public partial struct BulletMovementJOB : IJobChunk
     {
         var ltArr = chunk.GetNativeArray(localTransformType);
         var entities = chunk.GetNativeArray(entityTypeHandle);
-        for (int i = 0; i < chunk.Count; i++)
+        int hitCount = 0;
+        int count = chunk.Count;
+        for (int i = 0; i < count; i++)
         {
             var lt = ltArr[i];
 
@@ -148,6 +155,14 @@ public partial struct BulletMovementJOB : IJobChunk
                 ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entities[i]);
                 setActiveSP.state = StateID.CanDisable;
                 ecb.AddComponent(unfilteredChunkIndex,entities[i],setActiveSP);
+                var effNew = ecb.Instantiate(count + hitCount, effHitFlash);
+                ecb.AddComponent(count + hitCount,effNew,new LocalTransform()
+                {
+                    Position = hit.Position,
+                    Rotation = quaternion.identity,
+                    Scale = 1,
+                });
+                hitCount++;
             }
             else
             {

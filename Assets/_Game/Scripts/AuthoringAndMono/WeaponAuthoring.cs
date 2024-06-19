@@ -10,7 +10,7 @@ public class WeaponAuthoring : MonoBehaviour
     public float damage;
     public float speed;
     public float cooldown;
-    public float length;
+    public float lengthRay;
     public int bulletPerShot;
     public float spaceAnglePerBullet;
     public float expired;
@@ -28,7 +28,7 @@ class WeaponBaker : Baker<WeaponAuthoring>
             entityBullet = GetEntity(authoring.bulletPrefab,TransformUsageFlags.Dynamic),
             bulletSpeed = authoring.speed,
             offset = authoring.offset,
-            length = authoring.length,
+            length = authoring.lengthRay,
             bulletPerShot = authoring.bulletPerShot,
             spaceAngleAnyBullet = authoring.spaceAnglePerBullet,
             expired = authoring.expired,
