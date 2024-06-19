@@ -60,7 +60,7 @@ public partial struct BulletMovementSystem : ISystem
         PhysicsWorldSingleton physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
         EntityQuery euQuery = SystemAPI.QueryBuilder().WithAll<BulletInfo>().WithNone<Disabled, SetActiveSP>().Build();
         _entityTypeHandle.Update(ref state);
-        var jobChunk = new BulletColliderJOBChunk()
+        var jobChunk = new BulletMovementJOB()
         {
             ecb = ecb.AsParallelWriter(),
             physicsWorld = physicsWorld,
@@ -105,7 +105,7 @@ public partial struct BulletMovementSystem : ISystem
 }
 
 [BurstCompile]
-public partial struct BulletColliderJOBChunk : IJobChunk
+public partial struct BulletMovementJOB : IJobChunk
 {
     [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
     [ReadOnly] public EntityTypeHandle entityTypeHandle;
@@ -123,7 +123,10 @@ public partial struct BulletColliderJOBChunk : IJobChunk
         for (int i = 0; i < chunk.Count; i++)
         {
             var lt = ltArr[i];
-            float3 newPosition = lt.Position + lt.Forward() * speed * deltaTime;
+
+            float speed_ = Random.CreateFromIndex((uint)(i + 1 + (time % deltaTime))).NextFloat(speed - 10f, speed + 10f);
+            
+            float3 newPosition = lt.Position + lt.Forward() * speed_ * deltaTime;
             
             RaycastInput raycastInput = new RaycastInput()
             {
