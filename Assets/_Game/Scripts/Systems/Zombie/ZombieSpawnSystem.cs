@@ -2,6 +2,7 @@
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
@@ -36,6 +37,7 @@ public partial struct ZombieSpawnSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        state.Dependency.Complete();
         if (!_isInit)
         {
             Entity entity = SystemAPI.GetSingletonEntity<ZombieProperty>();
@@ -55,12 +57,16 @@ public partial struct ZombieSpawnSystem : ISystem
             };
             _isInit = true;
         }
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         bool hasEntityNew = false;
-        SpawnZombie(ref state,ref ecb,ref hasEntityNew);
+        var zombiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<ZombieInfo>().Build()
+            .ToEntityArray(Allocator.TempJob);
+        SpawnZombie(ref state,ref ecb,ref hasEntityNew,ref zombiesDisable);
+        state.Dependency.Complete();
         var entityManager = state.EntityManager;
         ecb.Playback(entityManager);
         ecb.Dispose();
+        zombiesDisable.Dispose();
         if (hasEntityNew)
         {
             EntityQuery entityQuery = SystemAPI.QueryBuilder().WithAll<ZombieInfo, NotUnique>().WithNone<Disabled>()
@@ -80,46 +86,36 @@ public partial struct ZombieSpawnSystem : ISystem
         }
     }
 
-    private void SpawnZombie(ref SystemState state,ref EntityCommandBuffer ecb,ref bool hasNewEntity)
+    private void SpawnZombie(ref SystemState state,ref EntityCommandBuffer ecb,ref bool hasNewEntity, ref NativeArray<Entity> zombiesDisable)
     {
         var zombieAliveArr = SystemAPI.QueryBuilder().WithNone<Disabled>().WithNone<SetActiveSP>().WithAll<ZombieInfo>()
             .Build()
-            .ToEntityArray(Allocator.Temp);
+            .ToEntityArray(Allocator.TempJob);
         int zombieAlive = zombieAliveArr.Length;
         zombieAliveArr.Dispose();
         if(!_isSpawnInfinity && zombieAlive >= _numberSpawn) return;
         if((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < _timeDelay) return;
-        var zombiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<ZombieInfo>().Build()
-            .ToEntityArray(Allocator.Temp);
+        
         int numberRunningJob = _isSpawnInfinity ? _numberSpawnPerFrame : (math.min(_numberSpawn - zombieAlive,_numberSpawnPerFrame));
-        int i = 0;
-        while (i < numberRunningJob)
+        
+        var spawnJob = new SpawnZombieJOB()
         {
-            Entity entityNew;
-            if (i < zombiesDisable.Length)
-            {
-                entityNew = zombiesDisable[i];
-                ecb.RemoveComponent<Disabled>(entityNew);
-                ecb.AddComponent(entityNew, new SetActiveSP()
-                {
-                    state = StateID.CanEnable,
-                });
-            }
-            else
-            {
-                entityNew = ecb.Instantiate(_entityZombieSpawn);
-                ecb.AddComponent(entityNew,_zombieComponent);
-                ecb.AddComponent<NotUnique>(entityNew);
-                hasNewEntity = true;
-            }
-            
-            Random random = Random.CreateFromIndex((uint)(++_seedCount));
-            _localTransform.Position = random.GetRandomRange(_pointRandomMin, _pointRandomMax);
-            ecb.AddComponent(entityNew,_localTransform);
-            i++;
-        }
+            ecb = ecb.AsParallelWriter(),
+            entityZombieSpawn = _entityZombieSpawn,
+            zombieInfoComponent = _zombieComponent,
+            localTransformComponent = _localTransform,
+            zombiesDisable = zombiesDisable,
+            seedCount = _seedCount,
+            pointRandomMax = _pointRandomMax,
+            pointRandomMin = _pointRandomMin,
+        };
+        state.Dependency = spawnJob.Schedule(numberRunningJob, 2,state.Dependency);
+        _seedCount += numberRunningJob;
         _latestSpawnTime = (float)SystemAPI.Time.ElapsedTime;
-        zombiesDisable.Dispose();
+        if (numberRunningJob > zombiesDisable.Length)
+        {
+            hasNewEntity = true;
+        }
     }
 }
 
@@ -146,3 +142,40 @@ public partial struct UniquePhysicColliderJOB : IJobChunk
     }
 }
 
+
+[BurstCompile]
+public struct SpawnZombieJOB : IJobParallelFor
+{
+    [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
+    [ReadOnly] public Entity entityZombieSpawn;
+    [ReadOnly] public ZombieInfo zombieInfoComponent;
+    [ReadOnly] public LocalTransform localTransformComponent;
+    [ReadOnly] public NativeArray<Entity> zombiesDisable;
+    [ReadOnly] public int seedCount;
+    [ReadOnly] public float3 pointRandomMin;
+    [ReadOnly] public float3 pointRandomMax;
+    
+    public void Execute(int index)
+    {
+        Entity entityNew;
+        if (index < zombiesDisable.Length)
+        {
+            entityNew = zombiesDisable[index];
+            ecb.RemoveComponent<Disabled>(index,entityNew);
+            ecb.AddComponent(index,entityNew, new SetActiveSP()
+            {
+                state = StateID.CanEnable,
+            });
+        }
+        else
+        {
+            entityNew = ecb.Instantiate(index,entityZombieSpawn);
+            ecb.AddComponent(index,entityNew,zombieInfoComponent);
+            ecb.AddComponent<NotUnique>(index,entityNew);
+        }
+        Random random = Random.CreateFromIndex((uint)(seedCount + index + 1));
+        var lt = localTransformComponent;
+        lt.Position = random.GetRandomRange(pointRandomMin, pointRandomMax);
+        ecb.AddComponent(index,entityNew,lt);
+    }
+}
