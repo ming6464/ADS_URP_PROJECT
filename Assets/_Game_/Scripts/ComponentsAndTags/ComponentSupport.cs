@@ -1,4 +1,19 @@
 ﻿using Unity.Entities;
+using Unity.Mathematics;
+
+
+public struct CameraProperty : IComponentData
+{
+    public float3 offsetCamFirst;
+    public float3 offsetCamThirst;
+    public quaternion offsetRotationCamFirst;
+    public quaternion offsetRotationCamThirst;
+}
+
+public struct CameraComponent : IComponentData
+{
+    public bool isFirstPerson;
+}
 
 public struct SetActiveSP : IComponentData
 {
@@ -13,3 +28,5 @@ public enum StateID
     CanDisable = 3,
     CanEnable = 4,
 }
+
+

@@ -4,8 +4,10 @@ using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Physics;
+using Unity.Transforms;
 using UnityEngine;
 
+// 
 [UpdateBefore(typeof(ZombieAnimationSystem))]
 public partial class ZombieAnimationSystem : SystemBase
 {
@@ -54,6 +56,54 @@ public partial struct ProcessAnimZombie : IJobEntity
         
     }
 }
+
+//
+
+[BurstCompile]
+public partial struct CameraSystem : ISystem
+{
+    public void OnCreate(ref SystemState state)
+    {
+        state.RequireForUpdate<PlayerInfo>();
+        state.RequireForUpdate<CameraProperty>();
+    }
+
+    public void OnUpdate(ref SystemState state)
+    {
+        EntityQuery entityQuery = SystemAPI.QueryBuilder().WithAll<PlayerInfo>().Build();
+        if (!entityQuery.IsEmpty)
+        {
+            Entity entityParent = entityQuery.GetSingletonEntity();
+            var camProperty = SystemAPI.GetSingleton<CameraProperty>();
+            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+            var entityCamFirst = ecb.CreateEntity();
+            ecb.AddComponent(entityCamFirst, new Parent { Value = entityParent });
+            ecb.AddComponent<LocalToWorld>(entityCamFirst);
+            ecb.AddComponent(entityCamFirst, new LocalTransform
+            {
+                Position = camProperty.offsetCamFirst,
+                Rotation = camProperty.offsetRotationCamFirst,
+                Scale = 1,
+            });
+            ecb.AddComponent(entityCamFirst, new CameraComponent { isFirstPerson = true });
+            var entityCamThirst = ecb.CreateEntity();
+            ecb.AddComponent(entityCamThirst, new Parent { Value = entityParent });
+            ecb.AddComponent<LocalToWorld>(entityCamThirst);
+            ecb.AddComponent(entityCamThirst, new LocalTransform
+            {
+                Position = camProperty.offsetCamThirst,
+                Rotation = camProperty.offsetRotationCamThirst,
+                Scale = 1,
+            });
+            ecb.AddComponent(entityCamThirst, new CameraComponent { isFirstPerson = false });
+            ecb.Playback(state.EntityManager);
+            ecb.Dispose();
+            state.Enabled = false;
+        }
+    }
+}
+
+//
 
 [UpdateAfter(typeof(ZombieAnimationSystem))]
 [BurstCompile]
@@ -135,3 +185,30 @@ public partial struct HandleSetActiveJob : IJobChunk
         }
     }
 }
+
+//
+
+public partial class UpdateHybrid : SystemBase
+{
+    public delegate void EventCamera(LocalToWorld ltw, bool isFirstPerson);
+    public EventCamera UpdateCamera;
+
+    protected override void OnStartRunning()
+    {
+        base.OnStartRunning();
+        RequireForUpdate<CameraComponent>();
+    }
+
+    protected override void OnUpdate()
+    {
+        Debug.Log("Hello -1 ");
+        Entities.WithoutBurst().WithAll<CameraComponent>().ForEach((in LocalToWorld ltw, in CameraComponent camComponent) =>
+        {
+            Debug.Log("Hello -2 ");
+            UpdateCamera?.Invoke(ltw, camComponent.isFirstPerson);
+        }).Run();
+    }
+}
+
+
+//
