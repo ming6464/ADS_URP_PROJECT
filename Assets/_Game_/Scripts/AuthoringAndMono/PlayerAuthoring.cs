@@ -7,6 +7,10 @@ public class PlayerAuthoring : MonoBehaviour
     public Transform spawnPosition;
     public GameObject playerPrefab;
     public float speed;
+    //
+    public int numberSpawn;
+    public float2 spaceGrid;
+    public int countOfCol;
 }
 
 class AuthoringBaker : Baker<PlayerAuthoring>
@@ -20,6 +24,9 @@ class AuthoringBaker : Baker<PlayerAuthoring>
             entity = GetEntity(authoring.playerPrefab, TransformUsageFlags.Dynamic),
             speed = authoring.speed,
             spawnPosition = authoring.spawnPosition.position,
+            spaceGrid = authoring.spaceGrid,
+            countOfCol = authoring.countOfCol,
+            numberSpawn = authoring.numberSpawn,
         });
         
         AddComponent(entity, new PlayerMoveInput

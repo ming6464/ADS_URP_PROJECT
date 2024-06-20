@@ -5,7 +5,7 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 
-[UpdateInGroup(typeof(InitializationSystemGroup))]
+[UpdateAfter(typeof(PlayerSystem))]
 [BurstCompile]
 public partial struct WeaponSystem : ISystem
 {
@@ -14,7 +14,6 @@ public partial struct WeaponSystem : ISystem
     private float _timeLatest;
     private float _cooldown;
     
-    // private NativeList<WeaponAspect> _weaponAspects;
     private bool _isSpawn;
     private bool _isGetComponent;
 
@@ -27,16 +26,8 @@ public partial struct WeaponSystem : ISystem
         state.RequireForUpdate<CharacterInfo>();
         _isSpawn = false;
         _isGetComponent = false;
-        // _weaponAspects = new NativeList<WeaponAspect>(Allocator.Persistent);
     }
 
-    public void OnDestroy(ref SystemState state)
-    {
-        // if (_weaponAspects.IsCreated)
-        // {
-        //     _weaponAspects.Dispose();
-        // }
-    }
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
@@ -65,10 +56,6 @@ public partial struct WeaponSystem : ISystem
         if (!_isGetComponent)
         {
             _bulletEntityPrefab = _weaponProperties.entityBullet;
-            // foreach (var aspect in SystemAPI.Query<WeaponAspect>())
-            // {
-            //     _weaponAspects.Add(aspect);
-            // }
             _isGetComponent = true;
         }
         Shot(ref state);
@@ -80,18 +67,18 @@ public partial struct WeaponSystem : ISystem
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         var entityManager = state.EntityManager;
         var entitiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<BulletInfo>().Build().ToEntityArray(Allocator.Temp);
-        int halfNumberPreShot = (int)math.ceil(_weaponProperties.bulletPerShot / 2f);
         var bulletEntityPrefab = _bulletEntityPrefab;
         float spaceAngleAnyBullet = _weaponProperties.spaceAngleAnyBullet;
         float time = (float)(SystemAPI.Time.ElapsedTime);
         BulletInfo bulletInfo = new BulletInfo { startTime = time };
         byte countUsing = 0;
-        float subtractIndex = 0.5f;
         LocalTransform lt;
         float3 angleRota;
         
         foreach (var weaponAspect in SystemAPI.Query<WeaponAspect>())
         {
+            float subtractIndex = 0.5f;
+            int halfNumberPreShot = (int)math.ceil(_weaponProperties.bulletPerShot / 2f);
             lt = new LocalTransform()
             {
                 Position = weaponAspect.PositionWorld,
@@ -119,8 +106,12 @@ public partial struct WeaponSystem : ISystem
                 lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
                 SpawnBullet(lt);
             }
-            
         }
+        
+        ecb.Playback(entityManager);
+        _timeLatest = time;
+        entitiesDisable.Dispose();
+        
         void SpawnBullet(LocalTransform lt)
         {
             Entity entity;
@@ -128,7 +119,6 @@ public partial struct WeaponSystem : ISystem
             {
                 entity = entitiesDisable[countUsing];
                 ecb.RemoveComponent<Disabled>(entity);
-                ecb.SetComponent(entity,bulletInfo);
                 ecb.AddComponent(entity, new SetActiveSP()
                 {
                     state = StateID.CanEnable,
@@ -138,12 +128,11 @@ public partial struct WeaponSystem : ISystem
             else
             {
                 entity = ecb.Instantiate(bulletEntityPrefab);
-                ecb.AddComponent(entity,bulletInfo);
             }
-            countUsing++;
+            ecb.AddComponent(entity,bulletInfo);
             ecb.AddComponent(entity,lt);
+            countUsing++;
         }
-        ecb.Playback(entityManager);
-        _timeLatest = time;
+        
     }
 }

@@ -6,8 +6,10 @@ public struct PlayerProperty : IComponentData
 {
     public Entity entity;
     public float speed;
-
     public float3 spawnPosition;
+    public int numberSpawn;
+    public float2 spaceGrid;
+    public int countOfCol;
 }
 
 public struct PlayerInfo : IComponentData

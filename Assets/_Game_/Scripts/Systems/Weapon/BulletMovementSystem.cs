@@ -5,6 +5,9 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
+using Random = Unity.Mathematics.Random;
+using RaycastHit = Unity.Physics.RaycastHit;
 
 [UpdateBefore(typeof(ZombieAnimationSystem))]
 [BurstCompile]
@@ -14,11 +17,12 @@ public partial struct BulletMovementSystem : ISystem
     private float _damage;
     private float _expired;
     private bool _isGetComponent;
-    private Entity effHitFlashEntity;
+    private Entity _effHitFlashEntity;
     private EntityManager _entityManager;
     private WeaponProperties _weaponProperties;
     private EntityTypeHandle _entityTypeHandle;
     private CollisionFilter _collisionFilter;
+    private PhysicsWorldSingleton _physicsWorld;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -35,7 +39,6 @@ public partial struct BulletMovementSystem : ISystem
         };
     }
 
-    [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
         _entityManager = state.EntityManager;
@@ -47,9 +50,10 @@ public partial struct BulletMovementSystem : ISystem
             _damage = _weaponProperties.bulletDamage;
             _expired = _weaponProperties.expired;
             var effProperty = SystemAPI.GetSingleton<EffectProperty>();
-            effHitFlashEntity = effProperty.effHitFlash;
+            _effHitFlashEntity = effProperty.effHitFlash;
             return;
         }
+        _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         DisableExpiredBullets(ref state, ref ecb);
 
@@ -61,23 +65,21 @@ public partial struct BulletMovementSystem : ISystem
             return;
         }
         
-        PhysicsWorldSingleton physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
         EntityQuery euQuery = SystemAPI.QueryBuilder().WithAll<BulletInfo>().WithNone<Disabled, SetActiveSP>().Build();
         _entityTypeHandle.Update(ref state);
         var jobChunk = new BulletMovementJOB()
         {
             ecb = ecb.AsParallelWriter(),
-            physicsWorld = physicsWorld,
+            _physicsWorld = _physicsWorld,
             filter = _collisionFilter,
             speed = _weaponProperties.bulletSpeed,
             length = _weaponProperties.length,
             time = (float)SystemAPI.Time.ElapsedTime,
-            deltaTime = (float)SystemAPI.Time.DeltaTime,
+            deltaTime = SystemAPI.Time.DeltaTime,
             localTransformType = state.GetComponentTypeHandle<LocalTransform>(),
             entityTypeHandle = _entityTypeHandle,
-            effHitFlash = effHitFlashEntity,
+            effHitFlash = _effHitFlashEntity,
         };
-
         state.Dependency = jobChunk.ScheduleParallel(euQuery,state.Dependency);
         state.Dependency.Complete();
         ecb.Playback(state.EntityManager);
@@ -114,7 +116,7 @@ public partial struct BulletMovementJOB : IJobChunk
     [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
     [ReadOnly] public Entity effHitFlash;
     [ReadOnly] public EntityTypeHandle entityTypeHandle;
-    [ReadOnly] public PhysicsWorldSingleton physicsWorld;
+    [ReadOnly] public PhysicsWorldSingleton _physicsWorld;
     [ReadOnly] public CollisionFilter filter;
     [ReadOnly] public float speed;
     [ReadOnly] public float length;
@@ -147,7 +149,7 @@ public partial struct BulletMovementJOB : IJobChunk
                 startTime =  time,
             };
             
-            if (physicsWorld.CastRay(raycastInput, out RaycastHit hit))
+            if (_physicsWorld.CastRay(raycastInput, out RaycastHit hit))
             {
                 setActiveSP.state = StateID.Wait;
                 ecb.AddComponent(unfilteredChunkIndex,hit.Entity, setActiveSP);

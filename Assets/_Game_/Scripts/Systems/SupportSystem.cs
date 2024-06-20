@@ -201,10 +201,8 @@ public partial class UpdateHybrid : SystemBase
 
     protected override void OnUpdate()
     {
-        Debug.Log("Hello -1 ");
         Entities.WithoutBurst().WithAll<CameraComponent>().ForEach((in LocalToWorld ltw, in CameraComponent camComponent) =>
         {
-            Debug.Log("Hello -2 ");
             UpdateCamera?.Invoke(ltw, camComponent.isFirstPerson);
         }).Run();
     }

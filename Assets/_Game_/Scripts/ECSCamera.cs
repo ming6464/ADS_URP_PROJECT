@@ -63,7 +63,6 @@ public class ECSCamera : MonoBehaviour
         {
             UpdateHybrid playerSystem = World.DefaultGameObjectInjectionWorld.GetExistingSystemManaged<UpdateHybrid>();
             if(playerSystem == null) return;
-            Debug.Log("Hello0 ");
             playerSystem.UpdateCamera += UpdateCamera;
             isAddEvent = true;
         }
@@ -71,18 +70,14 @@ public class ECSCamera : MonoBehaviour
 
     private void UpdateCamera(LocalToWorld ltw,bool isFirstPerson)
     {
-        Debug.Log("Hello1 ");
         if(isFirstPerson != _isCamFirstPersonActive) return;
-        Debug.Log("Hello2 ");
         if (isFirstPerson)
         {
-            Debug.Log("Hello3 ");
             cameraFirstPerson.position = ltw.Position;
             cameraFirstPerson.rotation = ltw.Rotation;
         }
         else
         {
-            Debug.Log("Hello4 ");
             cameraThirstPerson.position = ltw.Position;
         }
     }
