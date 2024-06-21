@@ -7,55 +7,6 @@ using Unity.Physics;
 using Unity.Transforms;
 using UnityEngine;
 
-// 
-[UpdateBefore(typeof(ZombieAnimationSystem))]
-public partial class ZombieAnimationSystem : SystemBase
-{
-    private FastAnimatorParameter _dyingAnimatorParameter = new FastAnimatorParameter("Die");
-    
-    protected override void OnUpdate()
-    {
-        Dependency.Complete();
-        var zombieAnimatorJob = new ProcessAnimZombie()
-        {
-            dyingAnimatorParameter = _dyingAnimatorParameter,
-            time = (float)SystemAPI.Time.ElapsedTime,
-        };
-        Dependency = zombieAnimatorJob.ScheduleParallel(Dependency);
-    }
-}
-
-[BurstCompile]
-public partial struct ProcessAnimZombie : IJobEntity
-{
-    [ReadOnly] public FastAnimatorParameter dyingAnimatorParameter;
-    [ReadOnly] public float time;
-    void Execute( in ZombieInfo zombieInfo, ref SetActiveSP disableSp, AnimatorParametersAspect parametersAspect,ref PhysicsCollider physicsCollider)
-    {
-        var colliderFilter = physicsCollider.Value.Value.GetCollisionFilter();
-        switch (disableSp.state)
-        {
-            case StateID.CanEnable:
-                parametersAspect.SetBoolParameter(dyingAnimatorParameter,false);
-                colliderFilter.BelongsTo = 1u << 7;
-                physicsCollider.Value.Value.SetCollisionFilter(colliderFilter);
-                break;
-            case StateID.Wait:
-                parametersAspect.SetBoolParameter(dyingAnimatorParameter,true);
-                disableSp.state = StateID.WaitAnimation;
-                colliderFilter.BelongsTo = 1u << 9;
-                physicsCollider.Value.Value.SetCollisionFilter(colliderFilter);
-                break;
-            case StateID.WaitAnimation:
-                if ((time - disableSp.startTime) > 4)
-                {
-                    disableSp.state = StateID.CanDisable;
-                }
-                break;
-        }
-        
-    }
-}
 
 //
 
@@ -104,7 +55,6 @@ public partial struct CameraSystem : ISystem
 }
 
 //
-
 [UpdateAfter(typeof(ZombieAnimationSystem))]
 [BurstCompile]
 public partial struct HandleSetActiveSystem : ISystem
@@ -137,76 +87,138 @@ public partial struct HandleSetActiveSystem : ISystem
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
     }
-}
-
-[BurstCompile]
-public partial struct HandleSetActiveJob : IJobChunk
-{
-    [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
-    [ReadOnly] public EntityTypeHandle entityTypeHandle;
-    [ReadOnly] public ComponentTypeHandle<SetActiveSP> setActiveSpTypeHandle;
-    [ReadOnly] public BufferLookup<LinkedEntityGroup> linkedGroupBufferFromEntity;
+    
+    
+    [BurstCompile]
+    partial struct HandleSetActiveJob : IJobChunk
+    {
+        [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
+        [ReadOnly] public EntityTypeHandle entityTypeHandle;
+        [ReadOnly] public ComponentTypeHandle<SetActiveSP> setActiveSpTypeHandle;
+        [ReadOnly] public BufferLookup<LinkedEntityGroup> linkedGroupBufferFromEntity;
     
 
-    public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
-    {
-
-        var setActiveSps = chunk.GetNativeArray(setActiveSpTypeHandle);
-        var entities = chunk.GetNativeArray(entityTypeHandle);
-
-        for (int i = 0; i < chunk.Count; i++)
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
-            var setActiveSp = setActiveSps[i];
-            var entity = entities[i];
-            bool check = false;
-            switch (setActiveSp.state)
+
+            var setActiveSps = chunk.GetNativeArray(setActiveSpTypeHandle);
+            var entities = chunk.GetNativeArray(entityTypeHandle);
+
+            for (int i = 0; i < chunk.Count; i++)
             {
-                case StateID.CanDisable:
-                    check = true;
-                    ecb.SetEnabled(unfilteredChunkIndex,entity,false);
-                    break;
-                case StateID.CanEnable:
-                    check = true;
-                    if (linkedGroupBufferFromEntity.HasBuffer(entity))
-                    {
-                        var buffer = linkedGroupBufferFromEntity[entity];
-                        for (int j = 0; j < buffer.Length; j++)
+                var setActiveSp = setActiveSps[i];
+                var entity = entities[i];
+                bool check = false;
+                switch (setActiveSp.state)
+                {
+                    case StateID.CanDisable:
+                        check = true;
+                        ecb.SetEnabled(unfilteredChunkIndex,entity,false);
+                        break;
+                    case StateID.CanEnable:
+                        check = true;
+                        if (linkedGroupBufferFromEntity.HasBuffer(entity))
                         {
-                            ecb.RemoveComponent<Disabled>(unfilteredChunkIndex, buffer[j].Value);
+                            var buffer = linkedGroupBufferFromEntity[entity];
+                            for (int j = 0; j < buffer.Length; j++)
+                            {
+                                ecb.RemoveComponent<Disabled>(unfilteredChunkIndex, buffer[j].Value);
+                            }
                         }
-                    }
-                    break;
-            }
-            if (check)
-            {
-                ecb.RemoveComponent<SetActiveSP>(unfilteredChunkIndex, entity);
-            }
+                        break;
+                }
+                if (check)
+                {
+                    ecb.RemoveComponent<SetActiveSP>(unfilteredChunkIndex, entity);
+                }
             
+            }
         }
     }
+    
 }
-
 //
-
+[UpdateAfter(typeof(BulletMovementSystem))]
 public partial class UpdateHybrid : SystemBase
 {
     public delegate void EventCamera(LocalToWorld ltw, bool isFirstPerson);
+    public delegate void EventHitFlashEffect(LocalToWorld ltw);
     public EventCamera UpdateCamera;
+    public EventHitFlashEffect UpdateHitFlashEff;
+    private NativeQueue<LocalToWorld> _hitFlashQueue;
 
     protected override void OnStartRunning()
     {
         base.OnStartRunning();
         RequireForUpdate<CameraComponent>();
+        _hitFlashQueue = new NativeQueue<LocalToWorld>(Allocator.Persistent);
+    }
+
+    protected override void OnStopRunning()
+    {
+        base.OnStopRunning();
+        _hitFlashQueue.Dispose();
     }
 
     protected override void OnUpdate()
+    {
+        UpdateCameraEvent();
+        UpdateEffectEvent();
+    }
+
+    private void UpdateEffectEvent()
+    {
+        Dependency.Complete();
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+        var hitFlashEff = new HandleHitFlashEffectEventJOB()
+        {
+            ltwTypeHandle = GetComponentTypeHandle<LocalToWorld>(),
+            hitFlashQueue = _hitFlashQueue.AsParallelWriter(),
+            entityTypeHandle = GetEntityTypeHandle(),
+            ecb = ecb.AsParallelWriter(),
+        };
+        var enQuery = GetEntityQuery(ComponentType.ReadOnly<EffectComponent>());
+        var a = enQuery.ToEntityArray(Allocator.Temp);
+        Debug.Log("Effect Entity : " + a.Length);
+        a.Dispose();
+        
+        Dependency = hitFlashEff.ScheduleParallel(enQuery, Dependency); 
+        Dependency.Complete();
+        ecb.Playback(EntityManager);
+        ecb.Dispose();
+        while (_hitFlashQueue.TryDequeue(out var ltw))
+        {
+            UpdateHitFlashEff?.Invoke(ltw);
+        }
+    }
+    private void UpdateCameraEvent()
     {
         Entities.WithoutBurst().WithAll<CameraComponent>().ForEach((in LocalToWorld ltw, in CameraComponent camComponent) =>
         {
             UpdateCamera?.Invoke(ltw, camComponent.isFirstPerson);
         }).Run();
     }
+    partial struct HandleHitFlashEffectEventJOB : IJobChunk
+    {
+        public EntityCommandBuffer.ParallelWriter ecb;
+        public EntityTypeHandle entityTypeHandle;
+        public NativeQueue<LocalToWorld>.ParallelWriter hitFlashQueue;
+        [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwTypeHandle;
+        
+        public void Execute(in ArchetypeChunk chunk, int indexQuery, bool useEnabledMask, in v128 chunkEnabledMask)
+        {
+            var ltws = chunk.GetNativeArray(ltwTypeHandle);
+            var entities = chunk.GetNativeArray(entityTypeHandle);
+            for (int i = 0; i < chunk.Count; i++)
+            {
+                ecb.RemoveComponent<EffectComponent>(indexQuery,entities[i]);
+                ecb.AddComponent(indexQuery,entities[i],new SetActiveSP()
+                {
+                    state = StateID.CanDisable,
+                });
+                hitFlashQueue.Enqueue(ltws[i]);
+            }
+        }
+    }
 }
-
-
 //

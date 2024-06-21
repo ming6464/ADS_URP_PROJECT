@@ -15,6 +15,11 @@ public struct CameraComponent : IComponentData
     public bool isFirstPerson;
 }
 
+public struct EffectComponent : IComponentData
+{
+    
+}
+
 public struct SetActiveSP : IComponentData
 {
     public StateID state;

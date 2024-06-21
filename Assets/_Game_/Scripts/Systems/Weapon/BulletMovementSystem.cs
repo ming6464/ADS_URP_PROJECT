@@ -24,6 +24,7 @@ public partial struct BulletMovementSystem : ISystem
     private CollisionFilter _collisionFilter;
     private PhysicsWorldSingleton _physicsWorld;
     
+    
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
@@ -127,7 +128,6 @@ public partial struct BulletMovementJOB : IJobChunk
     {
         var ltArr = chunk.GetNativeArray(localTransformType);
         var entities = chunk.GetNativeArray(entityTypeHandle);
-        int hitCount = 0;
         int count = chunk.Count;
         for (int i = 0; i < count; i++)
         {
@@ -148,7 +148,7 @@ public partial struct BulletMovementJOB : IJobChunk
             {
                 startTime =  time,
             };
-            
+             
             if (_physicsWorld.CastRay(raycastInput, out RaycastHit hit))
             {
                 setActiveSP.state = StateID.Wait;
@@ -157,14 +157,17 @@ public partial struct BulletMovementJOB : IJobChunk
                 ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entities[i]);
                 setActiveSP.state = StateID.CanDisable;
                 ecb.AddComponent(unfilteredChunkIndex,entities[i],setActiveSP);
-                var effNew = ecb.Instantiate(count + hitCount, effHitFlash);
-                ecb.AddComponent(count + hitCount,effNew,new LocalTransform()
+                var effNew = ecb.CreateEntity(unfilteredChunkIndex);
+                ecb.AddComponent<EffectComponent>(unfilteredChunkIndex,effNew);
+                
+                var lt_eff = new LocalTransform()
                 {
                     Position = hit.Position,
-                    Rotation = quaternion.identity,
+                    Rotation = quaternion.LookRotationSafe(hit.SurfaceNormal, math.up()),
                     Scale = 1,
-                });
-                hitCount++;
+                };
+                ecb.AddComponent(unfilteredChunkIndex,effNew,lt_eff);
+                ecb.AddComponent(unfilteredChunkIndex,effNew,DotsEX.ConvertDataLocalToWorldTf(lt_eff));
             }
             else
             {
