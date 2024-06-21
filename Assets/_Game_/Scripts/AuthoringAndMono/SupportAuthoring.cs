@@ -14,7 +14,6 @@ namespace _Game_.Scripts.AuthoringAndMono
         public LayerMask itemLayer;
 
         [Header("Camera")] 
-        public float speedChangeCamera;
         public float3 offsetFirstPerson; 
         public float3 offsetRotationFirstPerson; 
         public float3 offsetThirstPerson; 
@@ -28,7 +27,6 @@ namespace _Game_.Scripts.AuthoringAndMono
                 Entity entity = GetEntity(TransformUsageFlags.None);
                 AddComponent(entity,new CameraProperty()
                 {
-                    speedChangeCamera = authoring.speedChangeCamera,
                     offsetCamFirst = authoring.offsetFirstPerson,
                     offsetRotationCamFirst = MathExt.Float3ToQuaternion(authoring.offsetRotationFirstPerson),
                     offsetCamThirst = authoring.offsetThirstPerson,

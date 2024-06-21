@@ -7,7 +7,7 @@ public struct PlayerProperty : IComponentData
     public Entity entity;
     public float speed;
     public float3 spawnPosition;
-    public int numberSpawn;
+    public int numberSpawnDefault;
     public float2 spaceGrid;
     public int countOfCol;
     public bool aimNearestEnemy;
@@ -16,7 +16,7 @@ public struct PlayerProperty : IComponentData
 
 public struct PlayerInfo : IComponentData
 {
-    
+    public int currentCharacter;
 }
 
 public readonly partial struct PlayerAspect : IAspect
@@ -67,7 +67,7 @@ public struct PlayerInput : IComponentData
 //
 public struct CharacterInfo : IComponentData
 {
-    
+    public int index;
 }
 
 public readonly partial struct CharacterAspect : IAspect

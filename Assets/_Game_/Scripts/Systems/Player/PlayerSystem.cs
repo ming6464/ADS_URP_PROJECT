@@ -52,7 +52,6 @@ public partial struct PlayerSystem : ISystem
     private float3 GetDirectRota(ref SystemState state)
     {
         float3 dirRota;
-
         if (_aimNearestEnemy)
         {
             float3 playerPosWorld = _playerAspect.PositionWorld;

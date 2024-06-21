@@ -11,7 +11,7 @@ public class PlayerAuthoring : MonoBehaviour
     //
     public bool aimNearestEnemy;
     public float moveToWard;
-    public int numberSpawn;
+    public int numberSpawnDefault;
     public float2 spaceGrid;
     public int countOfCol;
 }
@@ -29,7 +29,7 @@ class AuthoringBaker : Baker<PlayerAuthoring>
             spawnPosition = authoring.spawnPosition.position,
             spaceGrid = authoring.spaceGrid,
             countOfCol = authoring.countOfCol,
-            numberSpawn = authoring.numberSpawn,
+            numberSpawnDefault = authoring.numberSpawnDefault,
             aimNearestEnemy = authoring.aimNearestEnemy,
             moveToWard = authoring.moveToWard
         });

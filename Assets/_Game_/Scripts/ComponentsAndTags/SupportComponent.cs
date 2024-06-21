@@ -4,7 +4,6 @@ using Unity.Mathematics;
 
 public struct CameraProperty : IComponentData
 {
-    public float speedChangeCamera;
     public float3 offsetCamFirst;
     public float3 offsetCamThirst;
     public quaternion offsetRotationCamFirst;

@@ -10,11 +10,13 @@ public partial struct PlayerSpawnSystem : ISystem
     private byte _spawnPlayerState;
     private Entity _playerEntity;
     private PlayerProperty _playerProperty;
+    private int _numberCharacter;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<PlayerProperty>();
+        _numberCharacter = -1;
     }
 
     [BurstCompile]
@@ -43,14 +45,35 @@ public partial struct PlayerSpawnSystem : ISystem
             _spawnPlayerState = 2;
         }
 
-        SpawnCharacter(ref state,ref ecb);
+        UpdateNumberCharacter(ref state,ref ecb);
         
         ecb.Playback(state.EntityManager);
         
         state.Enabled = false;
     }
 
-    private void SpawnCharacter(ref SystemState state,ref EntityCommandBuffer ecb)
+    private void UpdateNumberCharacter(ref SystemState state, ref EntityCommandBuffer ecb)
+    {
+        int spawnChange = 0;
+        if (_numberCharacter < 0)
+        {
+            spawnChange = _playerProperty.numberSpawnDefault;
+        }
+
+
+        if (spawnChange > 0)
+        {
+            
+        }else if (spawnChange < 0)
+        {
+            
+        }
+        
+        Spawn(ref state, ref ecb);
+
+    }
+
+    private void Spawn(ref SystemState state,ref EntityCommandBuffer ecb)
     {
         Entity entityIns = _playerProperty.entity;
         Entity entityPlayer = _playerEntity;
@@ -61,7 +84,7 @@ public partial struct PlayerSpawnSystem : ISystem
             Scale = 1,
         };
 
-        int totalNumber = _playerProperty.numberSpawn;
+        int totalNumber = _playerProperty.numberSpawnDefault;
         int countOfCol = _playerProperty.countOfCol;
         float2 space = _playerProperty.spaceGrid;
         int maxX = totalNumber;
@@ -73,7 +96,7 @@ public partial struct PlayerSpawnSystem : ISystem
         }
         for (int i = 0; i < maxY; i++)
         {
-            float z = -getPos(maxY, i,space.y);
+            float z = -GetPos_L(maxY, i,space.y);
 
             int countJ = maxX;
             if (maxY - i == 1)
@@ -83,13 +106,13 @@ public partial struct PlayerSpawnSystem : ISystem
             
             for (int j = 0; j < countJ; j++)
             {
-                float x = getPos(maxX, j,space.x);
+                float x = GetPos_L(maxX, j,space.x);
                 lt.Position = new float3(x, 0, z);
-                Spawn_c(lt, ref ecb);
+                SpawnCharacter_L(lt, ref ecb,i, entityIns, entityPlayer);
             }
         }
         
-        float getPos(int number, int index,float space)
+        float GetPos_L(int number, int index,float space)
         {
             index++;
             int halfNumber = (int)math.ceil(number / 2f);
@@ -105,17 +128,20 @@ public partial struct PlayerSpawnSystem : ISystem
             
             return (i - subtractIndex) * space;
         }
-        void Spawn_c(LocalTransform lt,ref EntityCommandBuffer ecb)
+        
+        void SpawnCharacter_L(LocalTransform lt, ref EntityCommandBuffer ecb, int index, Entity entityIns, Entity entityPlayer)
         {
             Entity entityNew = ecb.Instantiate(entityIns);
             ecb.AddComponent<LocalToWorld>(entityNew);
             ecb.AddComponent(entityNew,lt);
-            ecb.AddComponent(entityNew,new CharacterInfo());
+            ecb.AddComponent(entityNew,new CharacterInfo()
+            {
+                index = index
+            });
             ecb.AddComponent(entityNew,new Parent()
             {
                 Value = entityPlayer,
             });
         }
-        
     }
 }

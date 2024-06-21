@@ -6,6 +6,11 @@ public struct ItemInfo : IComponentData
     public int count;
 }
 
+public struct ItemCollection : IComponentData
+{
+    public ItemType type;
+    public int count;
+}
 
 public enum ItemType
 {
