@@ -213,4 +213,86 @@ public static class MathExt
     }
 
     #endregion
+
+    #region MyRegion
+    
+    /// <summary>
+    /// Di chuyển float3 từ vị trí hiện tại đến mục tiêu với một bước nhất định.
+    /// </summary>
+    /// <param name="current">Vị trí hiện tại.</param>
+    /// <param name="target">Vị trí mục tiêu.</param>
+    /// <param name="step">Bước di chuyển tối đa cho mỗi lần cập nhật.</param>
+    /// <returns>float3 mới sau khi di chuyển.</returns>
+    public static float3 MoveTowards(float3 current, float3 target, float step)
+    {
+        float3 direction = target - current;
+        float distance = math.length(direction);
+        if (distance <= step || distance == 0f)
+            return target;
+        return current + math.normalize(direction) * step;
+    }
+    
+    /// <summary>
+    /// Di chuyển float2 từ vị trí hiện tại đến mục tiêu với một bước nhất định.
+    /// </summary>
+    /// <param name="current">Vị trí hiện tại.</param>
+    /// <param name="target">Vị trí mục tiêu.</param>
+    /// <param name="step">Bước di chuyển tối đa cho mỗi lần cập nhật.</param>
+    /// <returns>float2 mới sau khi di chuyển.</returns>
+    public static float2 MoveTowards(float2 current, float2 target, float step)
+    {
+        float2 direction = target - current;
+        float distance = math.length(direction);
+        if (distance <= step || distance == 0f)
+            return target;
+        return current + math.normalize(direction) * step;
+    }
+    
+    /// <summary>
+    /// Di chuyển quaternion từ giá trị hiện tại đến mục tiêu với một góc quay nhất định.
+    /// </summary>
+    /// <param name="current">Quaternion hiện tại.</param>
+    /// <param name="target">Quaternion mục tiêu.</param>
+    /// <param name="maxDegreesDelta">Góc quay tối đa cho mỗi lần cập nhật.</param>
+    /// <returns>quaternion mới sau khi quay.</returns>
+    public static quaternion MoveTowards(quaternion current, quaternion target, float maxDegreesDelta)
+    {
+        float angle = math.degrees(math.angle(current, target));
+        if (angle <= maxDegreesDelta)
+            return target;
+        return math.slerp(current, target, maxDegreesDelta / angle);
+    }
+    
+    /// <summary>
+    /// Di chuyển int từ giá trị hiện tại đến mục tiêu với một bước nhất định.
+    /// </summary>
+    /// <param name="current">Giá trị hiện tại.</param>
+    /// <param name="target">Giá trị mục tiêu.</param>
+    /// <param name="step">Bước di chuyển tối đa cho mỗi lần cập nhật.</param>
+    /// <returns>int mới sau khi di chuyển.</returns>
+    public static int MoveTowards(int current, int target, int step)
+    {
+        int difference = target - current;
+        if (math.abs(difference) <= step)
+            return target;
+        return current + (int)math.sign(difference) * step;
+    }
+
+    /// <summary>
+    /// Di chuyển float từ giá trị hiện tại đến mục tiêu với một bước nhất định.
+    /// </summary>
+    /// <param name="current">Giá trị hiện tại.</param>
+    /// <param name="target">Giá trị mục tiêu.</param>
+    /// <param name="step">Bước di chuyển tối đa cho mỗi lần cập nhật.</param>
+    /// <returns>float mới sau khi di chuyển.</returns>
+    public static float MoveTowards(float current, float target, float step)
+    {
+        float difference = target - current;
+        if (math.abs(difference) <= step)
+            return target;
+        return current + math.sign(difference) * step;
+    }
+    
+    #endregion Interpolate
+    
 }

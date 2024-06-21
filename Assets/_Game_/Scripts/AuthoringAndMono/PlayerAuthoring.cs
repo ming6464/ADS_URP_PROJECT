@@ -4,10 +4,13 @@ using UnityEngine;
 
 public class PlayerAuthoring : MonoBehaviour
 {
+    
     public Transform spawnPosition;
     public GameObject playerPrefab;
     public float speed;
     //
+    public bool aimNearestEnemy;
+    public float moveToWard;
     public int numberSpawn;
     public float2 spaceGrid;
     public int countOfCol;
@@ -27,12 +30,14 @@ class AuthoringBaker : Baker<PlayerAuthoring>
             spaceGrid = authoring.spaceGrid,
             countOfCol = authoring.countOfCol,
             numberSpawn = authoring.numberSpawn,
+            aimNearestEnemy = authoring.aimNearestEnemy,
+            moveToWard = authoring.moveToWard
         });
         
-        AddComponent(entity, new PlayerMoveInput
+        AddComponent(entity, new PlayerInput
         {
             directMove = new float2(0, 0),
-            shot = false,
+            pullTrigger = false,
             mousePos = new float2(0, 0),
         });
     }

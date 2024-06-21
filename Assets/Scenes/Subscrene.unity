@@ -248,6 +248,8 @@ MonoBehaviour:
   playerPrefab: {fileID: 9132848337858035269, guid: 96c4147626e3ea64c8710fe7305e3ba4,
     type: 3}
   speed: 2.5
+  aimNearestEnemy: 1
+  moveToWard: 180
   numberSpawn: 7
   spaceGrid:
     x: 1.5
@@ -298,6 +300,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cb071d2c94019a45bfb30ef6bf46e95, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  shootAuto: 1
   weaponPrefab: {fileID: 4502064372477858661, guid: e2e559d8fe8d0fc4fbdb32b4b492273c,
     type: 3}
   bulletPrefab: {fileID: 2192329522781796173, guid: e290f7dbaf29d6e42aa3845c5fe5963e,
@@ -308,7 +311,7 @@ MonoBehaviour:
     z: 0.582
   damage: 10
   speed: 90
-  cooldown: 0.15
+  cooldown: 0.08
   lengthRay: 0.8
   bulletPerShot: 7
   spaceAnglePerBullet: 0.7

@@ -3,7 +3,6 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
 
 [UpdateAfter(typeof(PlayerSystem))]
 [BurstCompile]
@@ -16,10 +15,13 @@ public partial struct WeaponSystem : ISystem
     
     private bool _isSpawn;
     private bool _isGetComponent;
+    private bool _shootAuto;
+    private bool _pullTrigger;
 
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
+        state.RequireForUpdate<PlayerInput>();
         state.RequireForUpdate<WeaponRunTime>();
         state.RequireForUpdate<WeaponProperties>();
         state.RequireForUpdate<PlayerInfo>();
@@ -49,6 +51,11 @@ public partial struct WeaponSystem : ISystem
                 ecb.AddComponent<WeaponInfo>(weaponEntity);
             }
             _isSpawn = true;
+
+
+            _shootAuto = _weaponProperties.shootAuto;
+            _pullTrigger = _shootAuto;
+            
             ecb.Playback(state.EntityManager);
             ecb.Dispose();
             return;
@@ -58,11 +65,18 @@ public partial struct WeaponSystem : ISystem
             _bulletEntityPrefab = _weaponProperties.entityBullet;
             _isGetComponent = true;
         }
+
+        if (!_shootAuto)
+        {
+            _pullTrigger = SystemAPI.GetSingleton<PlayerInput>().pullTrigger;
+        }
+        
         Shot(ref state);
     }
 
     private void Shot(ref SystemState state)
     {
+        if(!_pullTrigger) return;
         if ((SystemAPI.Time.ElapsedTime - _timeLatest) < _cooldown) return;
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         var entityManager = state.EntityManager;

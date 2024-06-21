@@ -10,6 +10,8 @@ public struct PlayerProperty : IComponentData
     public int numberSpawn;
     public float2 spaceGrid;
     public int countOfCol;
+    public bool aimNearestEnemy;
+    public float moveToWard;
 }
 
 public struct PlayerInfo : IComponentData
@@ -55,10 +57,10 @@ public readonly partial struct PlayerAspect : IAspect
 
 
 
-public struct PlayerMoveInput : IComponentData
+public struct PlayerInput : IComponentData
 {
+    public bool pullTrigger;
     public float2 directMove;
-    public bool shot;
     public float2 mousePos;
 }
 

@@ -10,7 +10,7 @@ public partial class GetPlayerInputSystem : SystemBase
     protected override void OnCreate()
     {
         base.OnCreate();
-        RequireForUpdate<PlayerMoveInput>();
+        RequireForUpdate<PlayerInput>();
         _inputs = new Inputs();
     }
 
@@ -32,11 +32,11 @@ public partial class GetPlayerInputSystem : SystemBase
         float2 curMoveInput = _inputs.Player.PlayerMovement.ReadValue<Vector2>();
         float2 mousePos = _inputs.Player.Mouse.ReadValue<Vector2>();
         bool isShot = _inputs.Player.Shot.ReadValue<float>() > 0;
-        SystemAPI.SetSingleton(new PlayerMoveInput()
+        SystemAPI.SetSingleton(new PlayerInput()
         {
             directMove = curMoveInput,
             mousePos = mousePos,
-            shot = isShot,
+            pullTrigger = isShot,
         });
     }
 }

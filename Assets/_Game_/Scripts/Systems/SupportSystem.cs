@@ -142,16 +142,16 @@ public partial struct HandleSetActiveSystem : ISystem
 public partial class UpdateHybrid : SystemBase
 {
     public delegate void EventCamera(LocalToWorld ltw, bool isFirstPerson);
-    public delegate void EventHitFlashEffect(LocalToWorld ltw);
+    public delegate void EventHitFlashEffect(Vector3 position,Quaternion rotation);
     public EventCamera UpdateCamera;
     public EventHitFlashEffect UpdateHitFlashEff;
-    private NativeQueue<LocalToWorld> _hitFlashQueue;
+    private NativeQueue<LocalTransform> _hitFlashQueue;
 
     protected override void OnStartRunning()
     {
         base.OnStartRunning();
         RequireForUpdate<CameraComponent>();
-        _hitFlashQueue = new NativeQueue<LocalToWorld>(Allocator.Persistent);
+        _hitFlashQueue = new NativeQueue<LocalTransform>(Allocator.Persistent);
     }
 
     protected override void OnStopRunning()
@@ -172,23 +172,19 @@ public partial class UpdateHybrid : SystemBase
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         var hitFlashEff = new HandleHitFlashEffectEventJOB()
         {
-            ltwTypeHandle = GetComponentTypeHandle<LocalToWorld>(),
+            ltwTypeHandle = GetComponentTypeHandle<LocalTransform>(),
             hitFlashQueue = _hitFlashQueue.AsParallelWriter(),
             entityTypeHandle = GetEntityTypeHandle(),
             ecb = ecb.AsParallelWriter(),
         };
         var enQuery = GetEntityQuery(ComponentType.ReadOnly<EffectComponent>());
-        var a = enQuery.ToEntityArray(Allocator.Temp);
-        Debug.Log("Effect Entity : " + a.Length);
-        a.Dispose();
-        
         Dependency = hitFlashEff.ScheduleParallel(enQuery, Dependency); 
         Dependency.Complete();
         ecb.Playback(EntityManager);
         ecb.Dispose();
-        while (_hitFlashQueue.TryDequeue(out var ltw))
+        while (_hitFlashQueue.TryDequeue(out var lt))
         {
-            UpdateHitFlashEff?.Invoke(ltw);
+            UpdateHitFlashEff?.Invoke(lt.Position,lt.Rotation);
         }
     }
     private void UpdateCameraEvent()
@@ -198,16 +194,19 @@ public partial class UpdateHybrid : SystemBase
             UpdateCamera?.Invoke(ltw, camComponent.isFirstPerson);
         }).Run();
     }
+    
+    
+    //JOB
     partial struct HandleHitFlashEffectEventJOB : IJobChunk
     {
         public EntityCommandBuffer.ParallelWriter ecb;
         public EntityTypeHandle entityTypeHandle;
-        public NativeQueue<LocalToWorld>.ParallelWriter hitFlashQueue;
-        [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwTypeHandle;
+        public NativeQueue<LocalTransform>.ParallelWriter hitFlashQueue;
+        [ReadOnly] public ComponentTypeHandle<LocalTransform> ltwTypeHandle;
         
         public void Execute(in ArchetypeChunk chunk, int indexQuery, bool useEnabledMask, in v128 chunkEnabledMask)
         {
-            var ltws = chunk.GetNativeArray(ltwTypeHandle);
+            var lts = chunk.GetNativeArray(ltwTypeHandle);
             var entities = chunk.GetNativeArray(entityTypeHandle);
             for (int i = 0; i < chunk.Count; i++)
             {
@@ -216,9 +215,9 @@ public partial class UpdateHybrid : SystemBase
                 {
                     state = StateID.CanDisable,
                 });
-                hitFlashQueue.Enqueue(ltws[i]);
+                hitFlashQueue.Enqueue(lts[i]);
             }
         }
     }
+    //JOB
 }
-//

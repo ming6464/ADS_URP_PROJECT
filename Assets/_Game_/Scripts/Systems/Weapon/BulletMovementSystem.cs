@@ -5,9 +5,6 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
-using UnityEngine;
-using Random = Unity.Mathematics.Random;
-using RaycastHit = Unity.Physics.RaycastHit;
 
 [UpdateBefore(typeof(ZombieAnimationSystem))]
 [BurstCompile]
@@ -17,13 +14,11 @@ public partial struct BulletMovementSystem : ISystem
     private float _damage;
     private float _expired;
     private bool _isGetComponent;
-    private Entity _effHitFlashEntity;
-    private EntityManager _entityManager;
     private WeaponProperties _weaponProperties;
     private EntityTypeHandle _entityTypeHandle;
     private CollisionFilter _collisionFilter;
     private PhysicsWorldSingleton _physicsWorld;
-    
+    private NativeArray<Entity> _pointsEffectDisable;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -40,9 +35,15 @@ public partial struct BulletMovementSystem : ISystem
         };
     }
 
+    public void OnDestroy(ref SystemState state)
+    {
+        if (_pointsEffectDisable.IsCreated)
+            _pointsEffectDisable.Dispose();
+    }
+
     public void OnUpdate(ref SystemState state)
     {
-        _entityManager = state.EntityManager;
+        state.Dependency.Complete();
         if (!_isGetComponent)
         {
             _isGetComponent = true;
@@ -50,23 +51,19 @@ public partial struct BulletMovementSystem : ISystem
             _speed = _weaponProperties.bulletSpeed;
             _damage = _weaponProperties.bulletDamage;
             _expired = _weaponProperties.expired;
-            var effProperty = SystemAPI.GetSingleton<EffectProperty>();
-            _effHitFlashEntity = effProperty.effHitFlash;
-            return;
-        }
-        _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
-        DisableExpiredBullets(ref state, ref ecb);
-
-        if (!state.Dependency.IsCompleted)
-        {
-            ecb.Playback(state.EntityManager);
-            ecb.Dispose();
-            ecb = new EntityCommandBuffer(Allocator.TempJob);
-            return;
         }
         
+        MovementBulletAndCheckExpiredBullet(ref state);
+    }
+
+    private void MovementBulletAndCheckExpiredBullet(ref SystemState state)
+    {
+        float curTime = (float)SystemAPI.Time.ElapsedTime;
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+        _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
         EntityQuery euQuery = SystemAPI.QueryBuilder().WithAll<BulletInfo>().WithNone<Disabled, SetActiveSP>().Build();
+        _pointsEffectDisable = SystemAPI.QueryBuilder().WithAll<EffectComponent, Disabled>().Build()
+            .ToEntityArray(Allocator.TempJob);
         _entityTypeHandle.Update(ref state);
         var jobChunk = new BulletMovementJOB()
         {
@@ -79,101 +76,112 @@ public partial struct BulletMovementSystem : ISystem
             deltaTime = SystemAPI.Time.DeltaTime,
             localTransformType = state.GetComponentTypeHandle<LocalTransform>(),
             entityTypeHandle = _entityTypeHandle,
-            effHitFlash = _effHitFlashEntity,
+            hitFlashPointDisable = _pointsEffectDisable,
+            currentTime = curTime,
+            bulletInfoTypeHandle = state.GetComponentTypeHandle<BulletInfo>(),
+            expired = _expired,
         };
-        state.Dependency = jobChunk.ScheduleParallel(euQuery,state.Dependency);
+        state.Dependency = jobChunk.ScheduleParallel(euQuery, state.Dependency);
         state.Dependency.Complete();
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
+        _pointsEffectDisable.Dispose();
     }
-    
-    private void DisableExpiredBullets(ref SystemState state,ref EntityCommandBuffer ecb)
-    {
-        float curTime = (float)SystemAPI.Time.ElapsedTime;
-        EntityQuery entityQuery = SystemAPI.QueryBuilder().WithNone<Disabled>().WithNone<SetActiveSP>()
-            .WithAll<BulletInfo>().Build();
-        
-        using (var bulletsSetExpire = entityQuery.ToEntityArray(Allocator.Temp))
-        {
-            foreach (Entity entity in bulletsSetExpire)
-            {
-                BulletInfo bulletInfo = _entityManager.GetComponentData<BulletInfo>(entity);
-                
-                if((curTime - bulletInfo.startTime) < _expired) continue;
-                ecb.RemoveComponent<LocalTransform>(entity);
-                ecb.AddComponent(entity, new SetActiveSP()
-                {
-                    state = StateID.CanDisable,
-                });
-            }
-        }
-        
-    }
-}
 
-[BurstCompile]
-public partial struct BulletMovementJOB : IJobChunk
-{
-    [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
-    [ReadOnly] public Entity effHitFlash;
-    [ReadOnly] public EntityTypeHandle entityTypeHandle;
-    [ReadOnly] public PhysicsWorldSingleton _physicsWorld;
-    [ReadOnly] public CollisionFilter filter;
-    [ReadOnly] public float speed;
-    [ReadOnly] public float length;
-    [ReadOnly] public float time;
-    [ReadOnly] public float deltaTime;
-    public ComponentTypeHandle<LocalTransform> localTransformType;
-    public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
-    {
-        var ltArr = chunk.GetNativeArray(localTransformType);
-        var entities = chunk.GetNativeArray(entityTypeHandle);
-        int count = chunk.Count;
-        for (int i = 0; i < count; i++)
-        {
-            var lt = ltArr[i];
+    //Jobs {
 
-            float speed_ = Random.CreateFromIndex((uint)(i + 1 + (time % deltaTime))).NextFloat(speed - 10f, speed + 10f);
-            
-            float3 newPosition = lt.Position + lt.Forward() * speed_ * deltaTime;
-            
-            RaycastInput raycastInput = new RaycastInput()
+    [BurstCompile]
+    partial struct BulletMovementJOB : IJobChunk
+    {
+        [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
+        [ReadOnly] public EntityTypeHandle entityTypeHandle;
+        [ReadOnly] public ComponentTypeHandle<BulletInfo> bulletInfoTypeHandle;
+        [ReadOnly] public PhysicsWorldSingleton _physicsWorld;
+        [ReadOnly] public CollisionFilter filter;
+        [ReadOnly] public float speed;
+        [ReadOnly] public float length;
+        [ReadOnly] public float time;
+        [ReadOnly] public float deltaTime;
+        [ReadOnly] public NativeArray<Entity> hitFlashPointDisable;
+        [ReadOnly] public float currentTime;
+        [ReadOnly] public float expired;
+        public ComponentTypeHandle<LocalTransform> localTransformType;
+
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
+            in v128 chunkEnabledMask)
+        {
+            var ltArr = chunk.GetNativeArray(localTransformType);
+            var entities = chunk.GetNativeArray(entityTypeHandle);
+            var bulletInfos = chunk.GetNativeArray(bulletInfoTypeHandle);
+            int countPointUsed = 0;
+            int totalCountPoint = hitFlashPointDisable.Length;
+            var lt_eff = new LocalTransform()
             {
-                Start = lt.Position,
-                End = newPosition + lt.Forward() * length,
-                Filter = filter,
+                Scale = 1,
             };
-
+            
             var setActiveSP = new SetActiveSP()
             {
-                startTime =  time,
+                startTime = time,
             };
-             
-            if (_physicsWorld.CastRay(raycastInput, out RaycastHit hit))
+            
+            for (int i = 0; i < chunk.Count; i++)
             {
-                setActiveSP.state = StateID.Wait;
-                ecb.AddComponent(unfilteredChunkIndex,hit.Entity, setActiveSP);
-                ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,hit.Entity);
-                ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entities[i]);
-                setActiveSP.state = StateID.CanDisable;
-                ecb.AddComponent(unfilteredChunkIndex,entities[i],setActiveSP);
-                var effNew = ecb.CreateEntity(unfilteredChunkIndex);
-                ecb.AddComponent<EffectComponent>(unfilteredChunkIndex,effNew);
-                
-                var lt_eff = new LocalTransform()
+
+                var entity = entities[i];
+                if ((currentTime - bulletInfos[i].startTime) >= expired)
                 {
-                    Position = hit.Position,
-                    Rotation = quaternion.LookRotationSafe(hit.SurfaceNormal, math.up()),
-                    Scale = 1,
+                    ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entity);
+                    ecb.AddComponent(unfilteredChunkIndex,entities,new SetActiveSP()
+                    {
+                        state = StateID.CanDisable
+                    });
+                    continue;
+                }
+                var lt = ltArr[i];
+                float speed_New = Random.CreateFromIndex((uint)(i + 1 + (time % deltaTime)))
+                    .NextFloat(speed - 10f, speed + 10f);
+                float3 newPosition = lt.Position + lt.Forward() * speed_New * deltaTime;
+
+                RaycastInput raycastInput = new RaycastInput()
+                {
+                    Start = lt.Position,
+                    End = newPosition + lt.Forward() * length,
+                    Filter = filter,
                 };
-                ecb.AddComponent(unfilteredChunkIndex,effNew,lt_eff);
-                ecb.AddComponent(unfilteredChunkIndex,effNew,DotsEX.ConvertDataLocalToWorldTf(lt_eff));
-            }
-            else
-            {
-                lt.Position = newPosition;
-                ltArr[i] = lt;
+                
+                if (_physicsWorld.CastRay(raycastInput, out RaycastHit hit))
+                {
+                    setActiveSP.state = StateID.Wait;
+                    ecb.AddComponent(unfilteredChunkIndex, hit.Entity, setActiveSP);
+                    ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex, hit.Entity);
+                    ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex, entity);
+                    setActiveSP.state = StateID.CanDisable;
+                    ecb.AddComponent(unfilteredChunkIndex, entity, setActiveSP);
+                    Entity effNew;
+
+                    if (countPointUsed < totalCountPoint)
+                    {
+                        effNew = hitFlashPointDisable[countPointUsed];
+                        ++countPointUsed;
+                    }
+                    else
+                    {
+                        effNew = ecb.CreateEntity(unfilteredChunkIndex);
+                        ecb.AddComponent<EffectComponent>(unfilteredChunkIndex, effNew);
+                    }
+
+                    lt_eff.Position = hit.Position;
+                    lt_eff.Rotation = quaternion.LookRotationSafe(hit.SurfaceNormal, math.up());
+                    ecb.AddComponent(unfilteredChunkIndex, effNew, lt_eff);
+                }
+                else
+                {
+                    lt.Position = newPosition;
+                    ltArr[i] = lt;
+                }
             }
         }
     }
+    //Jobs }
 }

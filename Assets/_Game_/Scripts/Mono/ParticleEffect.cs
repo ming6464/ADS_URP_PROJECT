@@ -1,39 +1,33 @@
-﻿using System;
-using Unity.Entities;
-using Unity.Transforms;
+﻿using Unity.Entities;
 using UnityEngine;
 
 public class ParticleEffect : MonoBehaviour
 {
     public ParticleSystem hitFlashEff;
-    private bool isAddEvent;
-    private Transform hitFlashTf;
+    private bool _isAddEvent;
+    private Transform _hitFlashTf;
 
     private void Awake()
     {
-        hitFlashTf = hitFlashEff.GetComponent<Transform>();
+        _hitFlashTf = hitFlashEff.GetComponent<Transform>();
     }
 
     private void Update()
     {
-        // hitFlashEff.Emit(1);
-        if (!isAddEvent)
+        if (!_isAddEvent)
         {
-            return;
             UpdateHybrid playerSystem = World.DefaultGameObjectInjectionWorld.GetExistingSystemManaged<UpdateHybrid>();
             if(playerSystem == null) return;
-            isAddEvent = true;
+            _isAddEvent = true;
             playerSystem.UpdateHitFlashEff += UpdateHitFlashEff;
         }
     }
 
-    private void UpdateHitFlashEff(LocalToWorld ltw)
+    private void UpdateHitFlashEff(Vector3 position,Quaternion rotation)
     {
-        Debug.Log("Play Eff1");
-        if(!hitFlashTf) return;
-        Debug.Log("Play Eff2");
-        hitFlashTf.position = ltw.Position;
-        hitFlashTf.rotation = ltw.Rotation;
+        if(!_hitFlashTf) return;
+        _hitFlashTf.position = position;
+        _hitFlashTf.rotation = rotation;
         hitFlashEff.Emit(1);
     }
 }

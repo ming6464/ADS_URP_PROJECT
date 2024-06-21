@@ -4,6 +4,8 @@ using Unity.Transforms;
 
 public struct WeaponProperties : IComponentData
 {
+    public bool shootAuto;
+    //
     public Entity entityWeapon;
     public Entity entityBullet;
     public float3 offset;
