@@ -3,6 +3,7 @@ using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
 using UnityEngine;
@@ -36,7 +37,7 @@ public partial struct CameraSystem : ISystem
                 Rotation = camProperty.offsetRotationCamFirst,
                 Scale = 1,
             });
-            ecb.AddComponent(entityCamFirst, new CameraComponent { isFirstPerson = true });
+            ecb.AddComponent(entityCamFirst, new CameraComponent { type = CameraType.FirstPersonCamera});
             var entityCamThirst = ecb.CreateEntity();
             ecb.AddComponent(entityCamThirst, new Parent { Value = entityParent });
             ecb.AddComponent<LocalToWorld>(entityCamThirst);
@@ -46,7 +47,7 @@ public partial struct CameraSystem : ISystem
                 Rotation = camProperty.offsetRotationCamThirst,
                 Scale = 1,
             });
-            ecb.AddComponent(entityCamThirst, new CameraComponent { isFirstPerson = false });
+            ecb.AddComponent(entityCamThirst, new CameraComponent { type = CameraType.ThirstPersonCamera });
             ecb.Playback(state.EntityManager);
             ecb.Dispose();
             state.Enabled = false;
@@ -141,12 +142,19 @@ public partial struct HandleSetActiveSystem : ISystem
 [UpdateAfter(typeof(BulletMovementSystem))]
 public partial class UpdateHybrid : SystemBase
 {
-    public delegate void EventCamera(LocalToWorld ltw, bool isFirstPerson);
+    // Camera {
+    public delegate void EventCamera(Vector3 positionWorld,Quaternion rotationWorld, CameraType type);
     public delegate void EventHitFlashEffect(Vector3 position,Quaternion rotation);
     public EventCamera UpdateCamera;
+    // Camera }
+    
+    //Effect {
+    
     public EventHitFlashEffect UpdateHitFlashEff;
     private NativeQueue<LocalTransform> _hitFlashQueue;
-
+    
+    //Effect }
+    
     protected override void OnStartRunning()
     {
         base.OnStartRunning();
@@ -191,7 +199,7 @@ public partial class UpdateHybrid : SystemBase
     {
         Entities.WithoutBurst().WithAll<CameraComponent>().ForEach((in LocalToWorld ltw, in CameraComponent camComponent) =>
         {
-            UpdateCamera?.Invoke(ltw, camComponent.isFirstPerson);
+            UpdateCamera(ltw.Position,ltw.Rotation, camComponent.type);
         }).Run();
     }
     
@@ -221,3 +229,5 @@ public partial class UpdateHybrid : SystemBase
     }
     //JOB
 }
+
+

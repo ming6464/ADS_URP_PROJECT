@@ -5,6 +5,9 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
+using Random = Unity.Mathematics.Random;
+using RaycastHit = Unity.Physics.RaycastHit;
 
 [UpdateBefore(typeof(ZombieAnimationSystem))]
 [BurstCompile]
@@ -23,16 +26,12 @@ public partial struct BulletMovementSystem : ISystem
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
+        state.RequireForUpdate<LayerStoreComponent>();
         state.RequireForUpdate<EffectProperty>();
         state.RequireForUpdate<WeaponProperties>();
         state.RequireForUpdate<PhysicsWorldSingleton>();
         state.RequireForUpdate<WeaponInfo>();
         _entityTypeHandle = state.GetEntityTypeHandle();
-        _collisionFilter = new CollisionFilter()
-        {
-            BelongsTo = 1u << 6,
-            CollidesWith = 1u << 7,
-        };
     }
 
     public void OnDestroy(ref SystemState state)
@@ -51,6 +50,12 @@ public partial struct BulletMovementSystem : ISystem
             _speed = _weaponProperties.bulletSpeed;
             _damage = _weaponProperties.bulletDamage;
             _expired = _weaponProperties.expired;
+            var layerStore = SystemAPI.GetSingleton<LayerStoreComponent>();
+            _collisionFilter = new CollisionFilter()
+            {
+                BelongsTo = layerStore.bulletLayer,
+                CollidesWith = layerStore.zombieLayer,
+            };
         }
         
         MovementBulletAndCheckExpiredBullet(ref state);
@@ -68,7 +73,7 @@ public partial struct BulletMovementSystem : ISystem
         var jobChunk = new BulletMovementJOB()
         {
             ecb = ecb.AsParallelWriter(),
-            _physicsWorld = _physicsWorld,
+            physicsWorld = _physicsWorld,
             filter = _collisionFilter,
             speed = _weaponProperties.bulletSpeed,
             length = _weaponProperties.length,
@@ -96,7 +101,7 @@ public partial struct BulletMovementSystem : ISystem
         [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
         [ReadOnly] public EntityTypeHandle entityTypeHandle;
         [ReadOnly] public ComponentTypeHandle<BulletInfo> bulletInfoTypeHandle;
-        [ReadOnly] public PhysicsWorldSingleton _physicsWorld;
+        [ReadOnly] public PhysicsWorldSingleton physicsWorld;
         [ReadOnly] public CollisionFilter filter;
         [ReadOnly] public float speed;
         [ReadOnly] public float length;
@@ -150,7 +155,7 @@ public partial struct BulletMovementSystem : ISystem
                     Filter = filter,
                 };
                 
-                if (_physicsWorld.CastRay(raycastInput, out RaycastHit hit))
+                if (physicsWorld.CastRay(raycastInput, out RaycastHit hit))
                 {
                     setActiveSP.state = StateID.Wait;
                     ecb.AddComponent(unfilteredChunkIndex, hit.Entity, setActiveSP);

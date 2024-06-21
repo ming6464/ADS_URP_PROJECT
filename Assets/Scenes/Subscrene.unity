@@ -606,6 +606,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 620e15396ae24a01a7ea5ad5c4c29b13, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  characterLayer:
+    serializedVersion: 2
+    m_Bits: 2048
+  zombieLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  bulletLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  itemLayer:
+    serializedVersion: 2
+    m_Bits: 4096
   offsetFirstPerson:
     x: 0
     y: 1.441

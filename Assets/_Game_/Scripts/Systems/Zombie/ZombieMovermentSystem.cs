@@ -44,6 +44,7 @@ public partial struct ZombieMovermentSystem : ISystem
         CheckZombieToDeadZone(ref state, ref ecb);
         state.Dependency.Complete();
         ecb.Playback(state.EntityManager);
+        ecb.Dispose();
     }
 
     private void Move(ref SystemState state)

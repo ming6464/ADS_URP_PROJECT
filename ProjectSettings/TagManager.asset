@@ -16,8 +16,8 @@ TagManager:
   - Player
   - EnemyDie
   - PlayerBody
-  - 
-  - 
+  - Character
+  - Item
   - 
   - 
   - 
