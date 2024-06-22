@@ -8,6 +8,7 @@ public class PlayerAuthoring : MonoBehaviour
     public Transform spawnPosition;
     public GameObject playerPrefab;
     public float speed;
+    public float radius;
     //
     public bool aimNearestEnemy;
     public float moveToWard;
@@ -24,14 +25,15 @@ class AuthoringBaker : Baker<PlayerAuthoring>
 
         AddComponent(entity, new PlayerProperty
         {
-            entity = GetEntity(authoring.playerPrefab, TransformUsageFlags.Dynamic),
+            characterEntity = GetEntity(authoring.playerPrefab, TransformUsageFlags.Dynamic),
             speed = authoring.speed,
             spawnPosition = authoring.spawnPosition.position,
             spaceGrid = authoring.spaceGrid,
             countOfCol = authoring.countOfCol,
             numberSpawnDefault = authoring.numberSpawnDefault,
             aimNearestEnemy = authoring.aimNearestEnemy,
-            moveToWard = authoring.moveToWard
+            moveToWard = authoring.moveToWard,
+            characterRadius = authoring.radius,
         });
         
         AddComponent(entity, new PlayerInput

@@ -1,11 +1,16 @@
+using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 
 public static class DotsEX
 {
     /// <summary>
-    /// Tạo thành phần LocalToWorld từ vị trí, xoay, và tỷ lệ
+    /// Tạo thành phần LocalToWorld từ vị trí, xoay, và tỷ lệ.
     /// </summary>
+    /// <param name="position">Vị trí của thành phần.</param>
+    /// <param name="rotation">Xoay của thành phần.</param>
+    /// <param name="scale">Tỷ lệ của thành phần.</param>
+    /// <returns>LocalToWorld được tạo.</returns>
     public static LocalToWorld GetComponentWorldTf(float3 position, quaternion rotation, float scale)
     {
         return new LocalToWorld()
@@ -15,8 +20,12 @@ public static class DotsEX
     }
 
     /// <summary>
-    /// Tạo thành phần LocalTransform từ vị trí, xoay, và tỷ lệ
+    /// Tạo thành phần LocalTransform từ vị trí, xoay, và tỷ lệ.
     /// </summary>
+    /// <param name="position">Vị trí của thành phần.</param>
+    /// <param name="rotation">Xoay của thành phần.</param>
+    /// <param name="scale">Tỷ lệ của thành phần.</param>
+    /// <returns>LocalTransform được tạo.</returns>
     public static LocalTransform GetComponentLocalTf(float3 position, quaternion rotation, float scale)
     {
         return new LocalTransform()
@@ -28,43 +37,86 @@ public static class DotsEX
     }
 
     /// <summary>
-    /// Chuyển đổi dữ liệu từ LocalTransform sang LocalToWorld
+    /// Chuyển đổi dữ liệu từ LocalTransform sang LocalToWorld.
     /// </summary>
+    /// <param name="lt">LocalTransform cần chuyển đổi.</param>
+    /// <returns>LocalToWorld sau khi chuyển đổi.</returns>
     public static LocalToWorld ConvertDataLocalToWorldTf(LocalTransform lt)
     {
         return GetComponentWorldTf(lt.Position, lt.Rotation, lt.Scale);
     }
 
     /// <summary>
-    /// Chuyển đổi dữ liệu từ LocalToWorld sang LocalTransform
+    /// Chuyển đổi dữ liệu từ LocalToWorld sang LocalTransform.
     /// </summary>
+    /// <param name="ltw">LocalToWorld cần chuyển đổi.</param>
+    /// <returns>LocalTransform sau khi chuyển đổi.</returns>
     public static LocalTransform ConvertDataWorldToLocalTf(LocalToWorld ltw)
     {
         return GetComponentLocalTf(ltw.Position, ltw.Rotation, ltw.Value.c0.x);
     }
-}
 
+    /// <summary>
+    /// Tạo một LocalTransform mặc định với Position là float3.zero, Scale là 1, và Rotation là quaternion.identity.
+    /// </summary>
+    /// <returns>LocalTransform mặc định.</returns>
+    public static LocalTransform LocalTransformDefault()
+    {
+        return new LocalTransform()
+        {
+            Position = float3.zero,
+            Scale = 1,
+            Rotation = quaternion.identity,
+        };
+    }
+
+    /// <summary>
+    /// Tạo một LocalToWorld mặc định với Position là float3.zero, Rotation là quaternion.identity, và Scale là 1.
+    /// </summary>
+    /// <returns>LocalToWorld mặc định.</returns>
+    public static LocalToWorld LocalToWorldDefault()
+    {
+        return DotsEX.GetComponentWorldTf(float3.zero, quaternion.identity, 1);
+    }
+
+    /// <summary>
+    /// Thêm các component LocalToWorld và LocalTransform mặc định vào một entity thông qua EntityCommandBuffer.
+    /// </summary>
+    /// <param name="ecb">EntityCommandBuffer được sử dụng để thêm component.</param>
+    /// <param name="entity">Entity cần thêm các component.</param>
+    public static void AddTransformDefault(ref EntityCommandBuffer ecb, Entity entity)
+    {
+        ecb.AddComponent<LocalToWorld>(entity);
+        ecb.AddComponent(entity, LocalTransformDefault());
+    }
+}
 public static class MathExt
 {
     /// <summary>
-    /// Chuyển đổi float3 thành quaternion
+    /// Chuyển đổi float3 thành quaternion.
     /// </summary>
+    /// <param name="euler">Góc Euler cần chuyển đổi.</param>
+    /// <returns>Quaternion được tạo từ góc Euler.</returns>
     public static quaternion Float3ToQuaternion(float3 euler)
     {
         return quaternion.EulerXYZ(math.radians(euler));
     }
 
     /// <summary>
-    /// Chuyển đổi quaternion thành float3
+    /// Chuyển đổi quaternion thành float3.
     /// </summary>
+    /// <param name="q">Quaternion cần chuyển đổi.</param>
+    /// <returns>Góc Euler được tạo từ quaternion.</returns>
     public static float3 QuaternionToFloat3(quaternion q)
     {
         return math.degrees(ToEulerAngles(q));
     }
 
     /// <summary>
-    /// Chuyển đổi quaternion thành góc Euler
+    /// Chuyển đổi quaternion thành góc Euler.
     /// </summary>
+    /// <param name="q">Quaternion cần chuyển đổi.</param>
+    /// <returns>Góc Euler được tạo từ quaternion.</returns>
     private static float3 ToEulerAngles(quaternion q)
     {
         float3 angles;
@@ -90,16 +142,24 @@ public static class MathExt
     }
 
     /// <summary>
-    /// Tạo một ma trận từ vị trí, xoay và tỷ lệ
+    /// Tạo một ma trận từ vị trí, xoay và tỷ lệ.
     /// </summary>
+    /// <param name="position">Vị trí của thành phần.</param>
+    /// <param name="rotation">Xoay của thành phần.</param>
+    /// <param name="scale">Tỷ lệ của thành phần.</param>
+    /// <returns>Ma trận 4x4 được tạo từ vị trí, xoay và tỷ lệ.</returns>
     public static float4x4 TRSToMatrix(float3 position, quaternion rotation, float3 scale)
     {
         return float4x4.TRS(position, rotation, scale);
     }
 
     /// <summary>
-    /// Chuyển đổi ma trận thành vị trí, xoay và tỷ lệ
+    /// Chuyển đổi ma trận thành vị trí, xoay và tỷ lệ.
     /// </summary>
+    /// <param name="matrix">Ma trận cần chuyển đổi.</param>
+    /// <param name="position">Vị trí được trích xuất từ ma trận.</param>
+    /// <param name="rotation">Xoay được trích xuất từ ma trận.</param>
+    /// <param name="scale">Tỷ lệ được trích xuất từ ma trận.</param>
     public static void MatrixToTRS(float4x4 matrix, out float3 position, out quaternion rotation, out float3 scale)
     {
         position = matrix.c3.xyz;
@@ -110,88 +170,123 @@ public static class MathExt
     #region Random
 
     /// <summary>
-    /// Lấy giá trị ngẫu nhiên trong phạm vi cho trước
+    /// Lấy giá trị ngẫu nhiên trong phạm vi cho trước.
     /// </summary>
+    /// <param name="random">Đối tượng Random để lấy giá trị ngẫu nhiên.</param>
+    /// <param name="min">Giá trị nhỏ nhất trong phạm vi.</param>
+    /// <param name="max">Giá trị lớn nhất trong phạm vi.</param>
+    /// <returns>Giá trị ngẫu nhiên trong phạm vi cho trước.</returns>
     public static int GetRandomRange(this Random random, int min, int max)
     {
         return random.NextInt(min, max);
     }
 
     /// <summary>
-    /// Lấy giá trị float3 ngẫu nhiên trong phạm vi cho trước
+    /// Lấy giá trị float3 ngẫu nhiên trong phạm vi cho trước.
     /// </summary>
+    /// <param name="random">Đối tượng Random để lấy giá trị ngẫu nhiên.</param>
+    /// <param name="min">Giá trị float3 nhỏ nhất trong phạm vi.</param>
+    /// <param name="max">Giá trị float3 lớn nhất trong phạm vi.</param>
+    /// <returns>Giá trị float3 ngẫu nhiên trong phạm vi cho trước.</returns>
     public static float3 GetRandomRange(this Random random, float3 min, float3 max)
     {
         return random.NextFloat3(min, max);
     }
 
     /// <summary>
-    /// Lấy giá trị float2 ngẫu nhiên trong phạm vi cho trước
+    /// Lấy giá trị float2 ngẫu nhiên trong phạm vi cho trước.
     /// </summary>
+    /// <param name="random">Đối tượng Random để lấy giá trị ngẫu nhiên.</param>
+    /// <param name="min">Giá trị float2 nhỏ nhất trong phạm vi.</param>
+    /// <param name="max">Giá trị float2 lớn nhất trong phạm vi.</param>
+    /// <returns>Giá trị float2 ngẫu nhiên trong phạm vi cho trước.</returns>
     public static float2 GetRandomRange(this Random random, float2 min, float2 max)
     {
         return random.NextFloat2(min, max);
     }
 
     /// <summary>
-    /// Lấy giá trị float ngẫu nhiên trong phạm vi cho trước
+    /// Lấy giá trị float ngẫu nhiên trong phạm vi cho trước.
     /// </summary>
+    /// <param name="random">Đối tượng Random để lấy giá trị ngẫu nhiên.</param>
+    /// <param name="min">Giá trị float nhỏ nhất trong phạm vi.</param>
+    /// <param name="max">Giá trị float lớn nhất trong phạm vi.</param>
+    /// <returns>Giá trị float ngẫu nhiên trong phạm vi cho trước.</returns>
     public static float GetRandomRange(this Random random, float min, float max)
     {
         return random.NextFloat(min, max);
     }
 
     /// <summary>
-    /// Lấy giá trị ngẫu nhiên trong phạm vi cho trước
+    /// Lấy giá trị ngẫu nhiên trong phạm vi cho trước.
     /// </summary>
+    /// <param name="min">Giá trị nhỏ nhất trong phạm vi.</param>
+    /// <param name="max">Giá trị lớn nhất trong phạm vi.</param>
+    /// <returns>Giá trị ngẫu nhiên trong phạm vi cho trước.</returns>
     public static int GetRandomRange(int min, int max)
     {
         return GetRandomProperty(GetSeedWithTime()).NextInt(min, max);
     }
 
     /// <summary>
-    /// Lấy giá trị float3 ngẫu nhiên từ seed và phạm vi cho trước
+    /// Lấy giá trị float3 ngẫu nhiên từ seed và phạm vi cho trước.
     /// </summary>
+    /// <param name="seed">Seed để tạo giá trị ngẫu nhiên.</param>
+    /// <param name="min">Giá trị float3 nhỏ nhất trong phạm vi.</param>
+    /// <param name="max">Giá trị float3 lớn nhất trong phạm vi.</param>
+    /// <returns>Giá trị float3 ngẫu nhiên từ seed và phạm vi cho trước.</returns>
     public static float3 GetRandomRange(uint seed, float3 min, float3 max)
     {
         return GetRandomProperty(seed).NextFloat3(min, max);
     }
 
     /// <summary>
-    /// Lấy giá trị float3 ngẫu nhiên trong phạm vi cho trước
+    /// Lấy giá trị float3 ngẫu nhiên trong phạm vi cho trước.
     /// </summary>
+    /// <param name="min">Giá trị float3 nhỏ nhất trong phạm vi.</param>
+    /// <param name="max">Giá trị float3 lớn nhất trong phạm vi.</param>
+    /// <returns>Giá trị float3 ngẫu nhiên trong phạm vi cho trước.</returns>
     public static float3 GetRandomRange(float3 min, float3 max)
     {
         return GetRandomProperty(GetSeedWithTime()).NextFloat3(min, max);
     }
 
     /// <summary>
-    /// Lấy giá trị float2 ngẫu nhiên trong phạm vi cho trước
+    /// Lấy giá trị float2 ngẫu nhiên trong phạm vi cho trước.
     /// </summary>
+    /// <param name="min">Giá trị float2 nhỏ nhất trong phạm vi.</param>
+    /// <param name="max">Giá trị float2 lớn nhất trong phạm vi.</param>
+    /// <returns>Giá trị float2 ngẫu nhiên trong phạm vi cho trước.</returns>
     public static float2 GetRandomRange(float2 min, float2 max)
     {
         return GetRandomProperty(GetSeedWithTime()).NextFloat2(min, max);
     }
 
     /// <summary>
-    /// Lấy giá trị float ngẫu nhiên trong phạm vi cho trước
+    /// Lấy giá trị float ngẫu nhiên trong phạm vi cho trước.
     /// </summary>
+    /// <param name="min">Giá trị float nhỏ nhất trong phạm vi.</param>
+    /// <param name="max">Giá trị float lớn nhất trong phạm vi.</param>
+    /// <returns>Giá trị float ngẫu nhiên trong phạm vi cho trước.</returns>
     public static float GetRandomRange(float min, float max)
     {
         return GetRandomProperty(GetSeedWithTime()).NextFloat(min, max);
     }
 
     /// <summary>
-    /// Tạo một Random từ seed
+    /// Tạo một Random từ seed.
     /// </summary>
+    /// <param name="seed">Seed để tạo đối tượng Random.</param>
+    /// <returns>Đối tượng Random được tạo từ seed.</returns>
     private static Random GetRandomProperty(uint seed)
     {
         return Random.CreateFromIndex(seed);
     }
 
     /// <summary>
-    /// Lấy seed từ thời gian hiện tại
+    /// Lấy seed từ thời gian hiện tại.
     /// </summary>
+    /// <returns>Seed được lấy từ thời gian hiện tại.</returns>
     public static uint GetSeedWithTime()
     {
         long tick = GetTimeTick();
@@ -205,8 +300,9 @@ public static class MathExt
     }
 
     /// <summary>
-    /// Lấy số tick của thời gian hiện tại
+    /// Lấy số tick của thời gian hiện tại.
     /// </summary>
+    /// <returns>Số tick của thời gian hiện tại.</returns>
     public static long GetTimeTick()
     {
         return System.DateTime.Now.Ticks;
@@ -214,7 +310,7 @@ public static class MathExt
 
     #endregion
 
-    #region MyRegion
+    #region Interpolate
     
     /// <summary>
     /// Di chuyển float3 từ vị trí hiện tại đến mục tiêu với một bước nhất định.
@@ -296,3 +392,4 @@ public static class MathExt
     #endregion Interpolate
     
 }
+

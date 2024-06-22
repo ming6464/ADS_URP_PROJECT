@@ -8,6 +8,7 @@ namespace _Game_.Scripts.AuthoringAndMono
     public class SupportAuthoring : MonoBehaviour
     {
         [Header("Layer")] 
+        public LayerMask playerLayer;
         public LayerMask characterLayer;
         public LayerMask zombieLayer;
         public LayerMask bulletLayer;
@@ -35,6 +36,7 @@ namespace _Game_.Scripts.AuthoringAndMono
                 
                 AddComponent(entity,new LayerStoreComponent()
                 {
+                    playerLayer = (uint)authoring.playerLayer.value,
                     characterLayer = (uint)authoring.characterLayer.value,
                     zombieLayer = (uint)authoring.zombieLayer.value,
                     bulletLayer = (uint)authoring.bulletLayer.value,

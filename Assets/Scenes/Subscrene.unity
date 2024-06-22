@@ -247,13 +247,14 @@ MonoBehaviour:
   spawnPosition: {fileID: 809366256}
   playerPrefab: {fileID: 9132848337858035269, guid: 96c4147626e3ea64c8710fe7305e3ba4,
     type: 3}
-  speed: 2.5
+  speed: 3.5
+  radius: 0.35
   aimNearestEnemy: 1
   moveToWard: 180
-  numberSpawnDefault: 4
+  numberSpawnDefault: 7
   spaceGrid:
-    x: 1.5
-    y: 1.5
+    x: 1
+    y: 1
   countOfCol: 3
 --- !u!4 &592925932
 Transform:
@@ -598,7 +599,7 @@ Transform:
   m_GameObject: {fileID: 809366255}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.5, y: 0, z: 35.3}
+  m_LocalPosition: {x: -2.5, y: 0, z: 14.75}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -655,7 +656,7 @@ MonoBehaviour:
   timeDelaySpawn: 0.05
   spawnInfinity: 1
   numberSpawn: 2000
-  numberSpawnPerFrame: 10
+  numberSpawnPerFrame: 3
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}
   pointDir1: {fileID: 1398424327}
@@ -967,6 +968,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 620e15396ae24a01a7ea5ad5c4c29b13, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 256
   characterLayer:
     serializedVersion: 2
     m_Bits: 2048
@@ -988,11 +992,11 @@ MonoBehaviour:
     y: 0
     z: 0
   offsetThirstPerson:
-    x: 0.06
+    x: 0
     y: 13.65
     z: -4.62
   offsetRotationThirstPerson:
-    x: 45.1
+    x: 52.29
     y: -1
     z: 0
 --- !u!4 &1737533687

@@ -17,6 +17,7 @@ public struct CameraComponent : IComponentData
 
 public struct LayerStoreComponent : IComponentData
 {
+    public uint playerLayer;
     public uint characterLayer;
     public uint zombieLayer;
     public uint bulletLayer;

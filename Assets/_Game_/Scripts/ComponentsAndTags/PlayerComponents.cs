@@ -4,7 +4,8 @@ using Unity.Transforms;
 
 public struct PlayerProperty : IComponentData
 {
-    public Entity entity;
+    public Entity characterEntity;
+    public float characterRadius;
     public float speed;
     public float3 spawnPosition;
     public int numberSpawnDefault;
@@ -16,7 +17,9 @@ public struct PlayerProperty : IComponentData
 
 public struct PlayerInfo : IComponentData
 {
-    public int currentCharacter;
+    public int numberCharacter;
+    public int maxXGridCharacter;
+    public int maxYGridCharacter;
 }
 
 public readonly partial struct PlayerAspect : IAspect
@@ -64,7 +67,13 @@ public struct PlayerInput : IComponentData
     public float2 mousePos;
 }
 
-//
+// Character
+
+public struct ParentCharacter : IComponentData
+{
+    
+}
+
 public struct CharacterInfo : IComponentData
 {
     public int index;

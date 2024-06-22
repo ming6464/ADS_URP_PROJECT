@@ -168,6 +168,11 @@ public partial struct BulletMovementSystem : ISystem
                     if (countPointUsed < totalCountPoint)
                     {
                         effNew = hitFlashPointDisable[countPointUsed];
+                        ecb.RemoveComponent<Disabled>(unfilteredChunkIndex,effNew);
+                        ecb.AddComponent(unfilteredChunkIndex,effNew,new SetActiveSP()
+                        {
+                            state = StateID.CanEnable
+                        });
                         ++countPointUsed;
                     }
                     else
