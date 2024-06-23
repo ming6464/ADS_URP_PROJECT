@@ -5,6 +5,7 @@ using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
 
+[UpdateInGroup(typeof(SimulationSystemGroup))]
 public partial struct PlayerSystem : ISystem
 {
     private EntityManager _entityManager;
@@ -104,7 +105,7 @@ public partial struct PlayerSystem : ISystem
         {
 
             NativeArray<Entity> itemDisable =
-                SystemAPI.QueryBuilder().WithAll<ItemInfo, Disabled>().Build().ToEntityArray(Allocator.Temp);
+                SystemAPI.QueryBuilder().WithAll<ItemCollection, Disabled>().Build().ToEntityArray(Allocator.Temp);
             int maxIndexItemDisable = itemDisable.Length - 1;
             for (int i = 0; i < _arrHitItem.Length; i++)
             {
@@ -117,21 +118,25 @@ public partial struct PlayerSystem : ISystem
                     ecb.RemoveComponent<Disabled>(entityItemCollection);
                     ecb.AddComponent(entityItemCollection,new SetActiveSP()
                     {
-                        state = StateID.CanEnable,
+                        state = StateID.Enable,
                     });
                 }
                 else
                 {
                     entityItemCollection = ecb.CreateEntity();
                 }
-                
                 ecb.AddComponent(entityItemCollection,new ItemCollection()
                 {
                     type = itemInfo.type,
                     count = itemInfo.count,
                 });
                 
-                ecb.DestroyEntity(entityItem);
+                ecb.AddComponent(entityItem,new SetActiveSP()
+                {
+                    state = StateID.DestroyAll,
+                });
+                
+                ecb.RemoveComponent<PhysicsCollider>(entityItem);
             }
 
             itemDisable.Dispose();

@@ -2,7 +2,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 
-[UpdateInGroup(typeof(InitializationSystemGroup),OrderLast = true)]
+[UpdateInGroup(typeof(InitializationSystemGroup),OrderFirst = true)]
 public partial class GetPlayerInputSystem : SystemBase
 {
     private Inputs _inputs;

@@ -251,7 +251,7 @@ MonoBehaviour:
   radius: 0.35
   aimNearestEnemy: 1
   moveToWard: 180
-  numberSpawnDefault: 7
+  numberSpawnDefault: 6
   spaceGrid:
     x: 1
     y: 1
@@ -501,7 +501,7 @@ PrefabInstance:
     - target: {fileID: 1330491277030721445, guid: 77e8c43f80e7fda478d7cbcc62dc8e39,
         type: 3}
       propertyPath: count
-      value: -2
+      value: -5
       objectReference: {fileID: 0}
     - target: {fileID: 2035862929969342748, guid: 77e8c43f80e7fda478d7cbcc62dc8e39,
         type: 3}

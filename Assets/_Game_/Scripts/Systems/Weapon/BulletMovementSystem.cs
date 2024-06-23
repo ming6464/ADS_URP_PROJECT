@@ -9,7 +9,7 @@ using UnityEngine;
 using Random = Unity.Mathematics.Random;
 using RaycastHit = Unity.Physics.RaycastHit;
 
-[UpdateBefore(typeof(ZombieAnimationSystem))]
+[UpdateInGroup(typeof(SimulationSystemGroup)),UpdateBefore(typeof(ZombieAnimationSystem))]
 [BurstCompile]
 public partial struct BulletMovementSystem : ISystem
 {
@@ -139,7 +139,7 @@ public partial struct BulletMovementSystem : ISystem
                     ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entity);
                     ecb.AddComponent(unfilteredChunkIndex,entities,new SetActiveSP()
                     {
-                        state = StateID.CanDisable
+                        state = StateID.Disable
                     });
                     continue;
                 }
@@ -161,7 +161,7 @@ public partial struct BulletMovementSystem : ISystem
                     ecb.AddComponent(unfilteredChunkIndex, hit.Entity, setActiveSP);
                     ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex, hit.Entity);
                     ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex, entity);
-                    setActiveSP.state = StateID.CanDisable;
+                    setActiveSP.state = StateID.Disable;
                     ecb.AddComponent(unfilteredChunkIndex, entity, setActiveSP);
                     Entity effNew;
 
@@ -171,7 +171,7 @@ public partial struct BulletMovementSystem : ISystem
                         ecb.RemoveComponent<Disabled>(unfilteredChunkIndex,effNew);
                         ecb.AddComponent(unfilteredChunkIndex,effNew,new SetActiveSP()
                         {
-                            state = StateID.CanEnable
+                            state = StateID.Enable
                         });
                         ++countPointUsed;
                     }

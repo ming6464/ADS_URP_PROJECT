@@ -35,14 +35,19 @@ public struct SetActiveSP : IComponentData
     public float startTime;
 }
 
+
 //Enum
 public enum StateID
 {
-    None = 0,
-    Wait = 1,
-    WaitAnimation = 2,
-    CanDisable = 3,
-    CanEnable = 4,
+    None,
+    Wait,
+    WaitAnimation,
+    Disable,
+    Enable,
+    DisableAll,
+    EnableAll,
+    Destroy,
+    DestroyAll
 }
 
 public enum CameraType
@@ -53,4 +58,10 @@ public enum CameraType
 
 //Enum
 
+
+//other components
+
+    
+
+//
 

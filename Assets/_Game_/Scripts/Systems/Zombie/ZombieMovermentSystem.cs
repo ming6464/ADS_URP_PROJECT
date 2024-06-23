@@ -6,7 +6,7 @@ using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
 
-[UpdateBefore(typeof(ZombieAnimationSystem))]
+[UpdateInGroup(typeof(SimulationSystemGroup)),UpdateBefore(typeof(ZombieAnimationSystem))]
 [BurstCompile]
 public partial struct ZombieMovermentSystem : ISystem
 {
@@ -125,7 +125,7 @@ public partial struct ZombieMovermentSystem : ISystem
                 if (CheckInRange(ltwArr[i].Position, minPointRange, maxPointRange)) continue;
                 ecb.AddComponent(unfilteredChunkIndex, entities[i], new SetActiveSP
                 {
-                    state = StateID.CanDisable,
+                    state = StateID.Disable,
                 });
             }
 

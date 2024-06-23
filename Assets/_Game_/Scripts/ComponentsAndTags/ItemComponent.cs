@@ -1,5 +1,11 @@
 ﻿using Unity.Entities;
 
+
+public struct ItemProperty : IComponentData
+{
+    public Entity entity;
+}
+
 public struct ItemInfo : IComponentData
 {
     public ItemType type;

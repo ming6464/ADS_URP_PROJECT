@@ -17,9 +17,13 @@ public struct PlayerProperty : IComponentData
 
 public struct PlayerInfo : IComponentData
 {
-    public int numberCharacter;
     public int maxXGridCharacter;
     public int maxYGridCharacter;
+}
+
+public struct CharacterNewBuffer : IBufferElementData
+{
+    public Entity entity;
 }
 
 public readonly partial struct PlayerAspect : IAspect

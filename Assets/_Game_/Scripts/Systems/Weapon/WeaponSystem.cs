@@ -4,16 +4,19 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 
-[UpdateAfter(typeof(PlayerSystem))]
+[UpdateInGroup(typeof(InitializationSystemGroup)),UpdateAfter(typeof(PlayerSpawnSystem))]
 [BurstCompile]
 public partial struct WeaponSystem : ISystem
 {
+    private Entity _weaponEntityInstantiate;
+    private EntityManager _entityManager;
+    private Entity _entityPlayer;
     private Entity _bulletEntityPrefab;
     private WeaponProperties _weaponProperties;
     private float _timeLatest;
     private float _cooldown;
     
-    private bool _isSpawn;
+    private bool _isSpawnDefault;
     private bool _isGetComponent;
     private bool _shootAuto;
     private bool _pullTrigger;
@@ -26,7 +29,7 @@ public partial struct WeaponSystem : ISystem
         state.RequireForUpdate<WeaponProperties>();
         state.RequireForUpdate<PlayerInfo>();
         state.RequireForUpdate<CharacterInfo>();
-        _isSpawn = false;
+        _isSpawnDefault = false;
         _isGetComponent = false;
     }
 
@@ -34,32 +37,26 @@ public partial struct WeaponSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        if (!_isSpawn)
+        if (!_isSpawnDefault)
         {
             EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
             var weaponRuntime = SystemAPI.GetSingleton<WeaponRunTime>();
             _weaponProperties = SystemAPI.GetSingleton<WeaponProperties>();
             _cooldown = weaponRuntime.cooldown;
             _timeLatest = -_cooldown;
-            Entity entityInstantiate = _weaponProperties.entityWeapon;
-            foreach (var aspect in SystemAPI.Query<CharacterAspect>())
-            {
-                var playerEntity = aspect.entity;
-                Entity weaponEntity = ecb.Instantiate(entityInstantiate);
-                ecb.AddComponent(weaponEntity, new Parent() { Value = playerEntity });
-                ecb.AddComponent(weaponEntity, new LocalTransform() { Position = _weaponProperties.offset, Rotation = quaternion.identity, Scale = 1 });
-                ecb.AddComponent<WeaponInfo>(weaponEntity);
-            }
-            _isSpawn = true;
-
-
+            _weaponEntityInstantiate = _weaponProperties.entityWeapon;
+            _isSpawnDefault = true;
+            _entityPlayer = SystemAPI.GetSingletonEntity<PlayerInfo>();
             _shootAuto = _weaponProperties.shootAuto;
             _pullTrigger = _shootAuto;
-            
+            _entityManager = state.EntityManager;
             ecb.Playback(state.EntityManager);
             ecb.Dispose();
             return;
         }
+        UpdateWeapon(ref state);
+        
+        
         if (!_isGetComponent)
         {
             _bulletEntityPrefab = _weaponProperties.entityBullet;
@@ -72,6 +69,26 @@ public partial struct WeaponSystem : ISystem
         }
         
         Shot(ref state);
+    }
+
+    private void UpdateWeapon(ref SystemState state)
+    {
+        var buffer = _entityManager.GetBuffer<CharacterNewBuffer>(_entityPlayer);
+        if(buffer.Length == 0) return;
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+        foreach (var b in buffer)
+        {
+            Entity weaponEntity = _entityManager.Instantiate(_weaponEntityInstantiate);
+            ecb.AddComponent(weaponEntity, new Parent() { Value = b.entity });
+            ecb.AddComponent(weaponEntity, new LocalTransform() { Position = _weaponProperties.offset, Rotation = quaternion.identity, Scale = 1 });
+            ecb.AddComponent<WeaponInfo>(weaponEntity);
+            var entityGroup = _entityManager.GetBuffer<LinkedEntityGroup>(weaponEntity).ToNativeArray(Allocator.Temp);
+            _entityManager.GetBuffer<LinkedEntityGroup>(b.entity).AddRange(entityGroup);
+            entityGroup.Dispose();
+        }
+        buffer.Clear();
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
     }
 
     private void Shot(ref SystemState state)
@@ -135,7 +152,7 @@ public partial struct WeaponSystem : ISystem
                 ecb.RemoveComponent<Disabled>(entity);
                 ecb.AddComponent(entity, new SetActiveSP()
                 {
-                    state = StateID.CanEnable,
+                    state = StateID.Enable,
                     startTime = time,
                 });
             }

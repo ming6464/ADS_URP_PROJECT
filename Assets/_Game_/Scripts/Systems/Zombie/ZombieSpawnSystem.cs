@@ -6,7 +6,7 @@ using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
 
-[UpdateBefore(typeof(ZombieAnimationSystem))]
+[UpdateInGroup(typeof(InitializationSystemGroup))]
 [BurstCompile]
 public partial struct ZombieSpawnSystem : ISystem
 {
@@ -102,7 +102,7 @@ public partial struct ZombieSpawnSystem : ISystem
                 ecb.RemoveComponent<Disabled>(entityNew);
                 ecb.AddComponent(entityNew, new SetActiveSP()
                 {
-                    state = StateID.CanEnable,
+                    state = StateID.Enable,
                 });
             }
             else

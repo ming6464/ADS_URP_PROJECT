@@ -4,7 +4,7 @@ using Unity.Burst;
 using Unity.Entities;
 using Unity.Physics;
 
-[UpdateBefore(typeof(ZombieAnimationSystem))]
+[UpdateInGroup(typeof(SimulationSystemGroup))]
 public partial class ZombieAnimationSystem : SystemBase
 {
     private FastAnimatorParameter _dyingAnimatorParameter = new FastAnimatorParameter("Die");
@@ -31,7 +31,7 @@ public partial class ZombieAnimationSystem : SystemBase
             var colliderFilter = physicsCollider.Value.Value.GetCollisionFilter();
             switch (disableSp.state)
             {
-                case StateID.CanEnable:
+                case StateID.Enable:
                     parametersAspect.SetBoolParameter(dyingAnimatorParameter,false);
                     colliderFilter.BelongsTo = 1u << 7;
                     physicsCollider.Value.Value.SetCollisionFilter(colliderFilter);
@@ -45,7 +45,7 @@ public partial class ZombieAnimationSystem : SystemBase
                 case StateID.WaitAnimation:
                     if ((time - disableSp.startTime) > 4)
                     {
-                        disableSp.state = StateID.CanDisable;
+                        disableSp.state = StateID.Disable;
                     }
                     break;
             }

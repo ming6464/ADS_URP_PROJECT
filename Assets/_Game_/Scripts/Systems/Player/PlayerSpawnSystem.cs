@@ -25,6 +25,7 @@ public partial struct PlayerSpawnSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         if (_spawnPlayerState < 2)
         {
@@ -40,7 +41,7 @@ public partial struct PlayerSpawnSystem : ISystem
                     Rotation = quaternion.identity,
                     Scale = 1,
                 });
-                
+                ecb.AddBuffer<CharacterNewBuffer>(entityPlayer);
                 
                 var parentCharacter = ecb.CreateEntity();
                 ecb.AddComponent<ParentCharacter>(parentCharacter);
@@ -56,11 +57,13 @@ public partial struct PlayerSpawnSystem : ISystem
                 return;
             }
             _parentCharacterEntity = SystemAPI.GetSingletonEntity<ParentCharacter>();
+            _playerEntity = SystemAPI.GetSingletonEntity<PlayerInfo>();
             _characterEntityInstantiate = _playerProperty.characterEntity;
             _entityManager = state.EntityManager;
             _spawnPlayerState = 2;
             _spaceGrid = _playerProperty.spaceGrid;
         }
+        
         UpdateCharacter(ref state, ref ecb);
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
@@ -74,8 +77,8 @@ public partial struct PlayerSpawnSystem : ISystem
             _spawnInit = true;
             spawnChange = _playerProperty.numberSpawnDefault;
         }
-        
-        foreach(var (collect,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess().WithNone<Disabled>())
+
+        foreach(var (collect,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess().WithNone<Disabled,SetActiveSP>())
         {
             switch (collect.ValueRO.type)
             {
@@ -85,9 +88,10 @@ public partial struct PlayerSpawnSystem : ISystem
             }
             ecb.AddComponent(entity,new SetActiveSP()
             {
-                state = StateID.CanDisable,
+                state = StateID.Disable,
             });
         }
+        
         Spawn(ref state, ref ecb, spawnChange);
     }
 
@@ -111,6 +115,7 @@ public partial struct PlayerSpawnSystem : ISystem
 
         if (count > 0)
         {
+            var characterBuffer = _entityManager.GetBuffer<CharacterNewBuffer>(_playerEntity);
             NativeArray<Entity> characterDisable = SystemAPI.QueryBuilder().WithAll<CharacterInfo>().WithAll<Disabled>().Build().ToEntityArray(Allocator.Temp);
             int maxIndexUsing = -1;
             int maxIndexCharacterDisable = characterDisable.Length - 1;
@@ -127,16 +132,20 @@ public partial struct PlayerSpawnSystem : ISystem
                     ecb.RemoveComponent<Disabled>(entityNew);
                     ecb.AddComponent(entityNew,new SetActiveSP()
                     {
-                        state = StateID.CanEnable,
+                        state = StateID.Enable,
                     });
                 }
                 else
                 {
-                    entityNew = ecb.Instantiate(_characterEntityInstantiate);
+                    entityNew = _entityManager.Instantiate(_characterEntityInstantiate);
                     ecb.AddComponent<LocalToWorld>(entityNew);
                     ecb.AddComponent(entityNew, new Parent()
                     {
                         Value = _parentCharacterEntity,
+                    });
+                    characterBuffer.Add(new CharacterNewBuffer()
+                    {
+                        entity = entityNew,
                     });
                 }
                 ecb.AddComponent(entityNew, lt);
@@ -159,7 +168,7 @@ public partial struct PlayerSpawnSystem : ISystem
                     numberDisable++;
                     ecb.AddComponent(characterAlive[i], new SetActiveSP()
                     {
-                        state = StateID.CanDisable
+                        state = StateID.Disable
                     });
                 }
             }
@@ -183,10 +192,9 @@ public partial struct PlayerSpawnSystem : ISystem
             Rotation = quaternion.identity,
         });
 
-        var playInfo = SystemAPI.GetSingleton<PlayerInfo>();
-        playInfo.maxXGridCharacter = maxX;
-        playInfo.maxYGridCharacter = maxY;
-        SystemAPI.SetSingleton(playInfo);
+        var playInfo = SystemAPI.GetComponentRW<PlayerInfo>(_playerEntity);
+        playInfo.ValueRW.maxXGridCharacter = maxX;
+        playInfo.ValueRW.maxYGridCharacter = maxY;
         characterAlive.Dispose();
 
         // local function

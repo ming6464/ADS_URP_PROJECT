@@ -11,7 +11,7 @@ using UnityEngine;
 
 //
 
-[BurstCompile]
+[BurstCompile,UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial struct CameraSystem : ISystem
 {
     public void OnCreate(ref SystemState state)
@@ -56,8 +56,7 @@ public partial struct CameraSystem : ISystem
 }
 
 //
-[UpdateAfter(typeof(ZombieAnimationSystem))]
-[BurstCompile]
+[BurstCompile,UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial struct HandleSetActiveSystem : ISystem
 {
 
@@ -72,14 +71,14 @@ public partial struct HandleSetActiveSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        state.Dependency.Complete();
         EntityQuery entityQuery = SystemAPI.QueryBuilder().WithAll<SetActiveSP>().Build();
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
         _entityTypeHandle.Update(ref state);
         var active = new HandleSetActiveJob
         {
             ecb = ecb.AsParallelWriter(),
-            linkedGroupBufferFromEntity = state.GetBufferLookup<LinkedEntityGroup>(true),
+            linkedGroupBufferLockUp = state.GetBufferLookup<LinkedEntityGroup>(true),
+            childBufferLockUp = state.GetBufferLookup<Child>(true),
             entityTypeHandle = _entityTypeHandle,
             setActiveSpTypeHandle = state.GetComponentTypeHandle<SetActiveSP>(true)
         };
@@ -89,19 +88,19 @@ public partial struct HandleSetActiveSystem : ISystem
         ecb.Dispose();
     }
     
-    
+     
     [BurstCompile]
     partial struct HandleSetActiveJob : IJobChunk
     {
         [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
         [ReadOnly] public EntityTypeHandle entityTypeHandle;
         [ReadOnly] public ComponentTypeHandle<SetActiveSP> setActiveSpTypeHandle;
-        [ReadOnly] public BufferLookup<LinkedEntityGroup> linkedGroupBufferFromEntity;
+        [ReadOnly] public BufferLookup<LinkedEntityGroup> linkedGroupBufferLockUp;
+        [ReadOnly] public BufferLookup<Child> childBufferLockUp;
     
 
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
-
             var setActiveSps = chunk.GetNativeArray(setActiveSpTypeHandle);
             var entities = chunk.GetNativeArray(entityTypeHandle);
 
@@ -112,34 +111,57 @@ public partial struct HandleSetActiveSystem : ISystem
                 bool check = false;
                 switch (setActiveSp.state)
                 {
-                    case StateID.CanDisable:
+                    case StateID.Disable:
                         check = true;
                         ecb.SetEnabled(unfilteredChunkIndex,entity,false);
                         break;
-                    case StateID.CanEnable:
+                    case StateID.Enable:
                         check = true;
-                        if (linkedGroupBufferFromEntity.HasBuffer(entity))
+                        if (linkedGroupBufferLockUp.HasBuffer(entity))
                         {
-                            var buffer = linkedGroupBufferFromEntity[entity];
+                            var buffer = linkedGroupBufferLockUp[entity];
                             for (int j = 0; j < buffer.Length; j++)
                             {
                                 ecb.RemoveComponent<Disabled>(unfilteredChunkIndex, buffer[j].Value);
                             }
                         }
                         break;
+                    case StateID.Destroy:
+                        check = true;
+                        ecb.DestroyEntity(unfilteredChunkIndex,entity);
+                        break;
+                    case StateID.DestroyAll:
+                        check = true;
+                        DestroyAllChildren(entity,unfilteredChunkIndex);
+                        break;
                 }
                 if (check)
                 {
                     ecb.RemoveComponent<SetActiveSP>(unfilteredChunkIndex, entity);
                 }
+            }
             
+        }
+        void DestroyAllChildren(Entity entity,int index)
+        {
+            if (childBufferLockUp.HasBuffer(entity))
+            {
+                var buffer = childBufferLockUp[entity];
+                for (int j = buffer.Length - 1; j >= 0; j--)
+                {
+                    DestroyAllChildren(buffer[j].Value, index);
+                }
+            }
+            else
+            {
+                ecb.DestroyEntity(index,entity);
             }
         }
     }
     
 }
 //
-[UpdateAfter(typeof(BulletMovementSystem))]
+[UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial class UpdateHybrid : SystemBase
 {
     // Camera {
@@ -221,7 +243,7 @@ public partial class UpdateHybrid : SystemBase
                 ecb.RemoveComponent<EffectComponent>(indexQuery,entities[i]);
                 ecb.AddComponent(indexQuery,entities[i],new SetActiveSP()
                 {
-                    state = StateID.CanDisable,
+                    state = StateID.Disable,
                 });
                 hitFlashQueue.Enqueue(lts[i]);
             }
