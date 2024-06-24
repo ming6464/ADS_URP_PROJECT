@@ -3,8 +3,9 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
-[BurstCompile, UpdateInGroup(typeof(InitializationSystemGroup))]
+[BurstCompile, UpdateInGroup(typeof(InitializationSystemGroup)),UpdateAfter(typeof(PlayerSystem))]
 public partial struct PlayerSpawnSystem : ISystem
 {
     private byte _spawnPlayerState;
@@ -15,6 +16,7 @@ public partial struct PlayerSpawnSystem : ISystem
     private bool _spawnInit;
     private EntityManager _entityManager;
     private float2 _spaceGrid;
+    private bool check;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -67,6 +69,11 @@ public partial struct PlayerSpawnSystem : ISystem
         UpdateCharacter(ref state, ref ecb);
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
+        if (check)
+        {
+            Debug.Log("m _ playback spawn");
+            check = false;
+        }
     }
 
     private void UpdateCharacter(ref SystemState state, ref EntityCommandBuffer ecb)
@@ -80,6 +87,8 @@ public partial struct PlayerSpawnSystem : ISystem
 
         foreach(var (collect,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess().WithNone<Disabled,SetActiveSP>())
         {
+            check = true;
+            Debug.Log($"m _ spawn _ {collect.ValueRO.count}");
             switch (collect.ValueRO.type)
             {
                 case ItemType.Character:

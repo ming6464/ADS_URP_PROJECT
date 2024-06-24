@@ -1,5 +1,4 @@
-﻿using System;
-using Unity.Entities;
+﻿using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -9,6 +8,7 @@ public class ZombieAuthoring : MonoBehaviour
     public float speed;
     public float timeDelaySpawn;
     public bool spawnInfinity;
+    public bool allowRespawn;
     public int numberSpawn;
     public int numberSpawnPerFrame;
     public Transform pointRange1;
@@ -38,6 +38,7 @@ class ZombieBaker : Baker<ZombieAuthoring>
                 numberSpawn = authoring.numberSpawn,
                 numberSpawnPerFrame = authoring.numberSpawnPerFrame,
                 spawnInfinity = authoring.spawnInfinity,
+                allowRespawn = authoring.allowRespawn,
                 timeDelay = authoring.timeDelaySpawn,
                 posMax = posMax,
                 posMin = posMin,
@@ -45,4 +46,3 @@ class ZombieBaker : Baker<ZombieAuthoring>
         });
     }
 }
-

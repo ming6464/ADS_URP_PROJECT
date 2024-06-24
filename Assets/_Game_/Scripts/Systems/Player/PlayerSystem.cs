@@ -4,6 +4,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 public partial struct PlayerSystem : ISystem
@@ -27,6 +28,7 @@ public partial struct PlayerSystem : ISystem
     private NativeList<ColliderCastHit> _arrHitItem;
     private CollisionFilter _filterItem;
     private LayerStoreComponent _layerStore;
+    private bool check;
     
     public void OnCreate(ref SystemState state)
     {
@@ -84,6 +86,11 @@ public partial struct PlayerSystem : ISystem
         CheckCollider(ref state,ref ecb);
         ecb.Playback(_entityManager);
         ecb.Dispose();
+        if (check)
+        {
+            Debug.Log("m _ playback player system");
+            check = false;
+        }
     }
 
     private void CheckCollider(ref SystemState state, ref EntityCommandBuffer ecb)
@@ -131,12 +138,15 @@ public partial struct PlayerSystem : ISystem
                     count = itemInfo.count,
                 });
                 
+                ecb.RemoveComponent<PhysicsCollider>(entityItem);
+                
                 ecb.AddComponent(entityItem,new SetActiveSP()
                 {
                     state = StateID.DestroyAll,
                 });
                 
-                ecb.RemoveComponent<PhysicsCollider>(entityItem);
+                Debug.Log($"m _ collider _ {itemInfo.count}");
+                check = true;
             }
 
             itemDisable.Dispose();
@@ -153,9 +163,11 @@ public partial struct PlayerSystem : ISystem
             float3 playerPosWorld = _playerAspect.PositionWorld;
             float3 positionNearest = float3.zero;
             float spaceNearest = 99999f;
+            bool check = false;
             foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAll<ZombieInfo>()
                          .WithNone<Disabled, SetActiveSP>())
             {
+                check = true;
                 float space = math.distance(playerPosWorld, ltw.ValueRO.Position);
                 if (space < spaceNearest)
                 {
@@ -164,11 +176,19 @@ public partial struct PlayerSystem : ISystem
                 }
             }
 
-            dirRota = positionNearest - playerPosWorld;
-            if (!dirRota.Equals(float3.zero))
+            if (!check)
             {
-                dirRota = math.normalize(dirRota);
+                dirRota = _playerAspect.LocalToWorld.Forward;
             }
+            else
+            {
+                dirRota = positionNearest - playerPosWorld;
+                if (!dirRota.Equals(float3.zero))
+                {
+                    dirRota = math.normalize(dirRota);
+                }
+            }
+            
         }
         else
         {

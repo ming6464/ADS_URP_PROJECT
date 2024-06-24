@@ -654,9 +654,10 @@ MonoBehaviour:
     type: 3}
   speed: 4.5
   timeDelaySpawn: 0.05
-  spawnInfinity: 1
-  numberSpawn: 2000
-  numberSpawnPerFrame: 3
+  spawnInfinity: 0
+  allowRespawn: 0
+  numberSpawn: 500
+  numberSpawnPerFrame: 300
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}
   pointDir1: {fileID: 1398424327}

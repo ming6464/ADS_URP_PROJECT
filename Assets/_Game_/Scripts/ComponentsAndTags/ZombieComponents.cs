@@ -14,6 +14,7 @@ public struct ZombieSpawner
 {
     public float timeDelay;
     public bool spawnInfinity;
+    public bool allowRespawn;
     public int numberSpawn;
     public int numberSpawnPerFrame;
     public float3 posMin;
@@ -22,6 +23,7 @@ public struct ZombieSpawner
 
 public struct ZombieInfo : IComponentData
 {
+    public float hp;
     public float3 directNormal;
 }
 

@@ -15,6 +15,7 @@ public partial struct ZombieSpawnSystem : ISystem
     private float _latestSpawnTime;
     private bool _isInit;
     private bool _isSpawnInfinity;
+    private bool _isAllowRespawn;
     private int _numberSpawn;
     private int _numberSpawnPerFrame;
     private float _timeDelay;
@@ -24,12 +25,14 @@ public partial struct ZombieSpawnSystem : ISystem
     private ZombieInfo _zombieComponent;
     private ZombieProperty _zombieProperties;
     private EntityTypeHandle _entityTypeHandle;
+    private int _totalSpawnCount;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         _isInit = false;
         state.RequireForUpdate<ZombieProperty>();
+        _totalSpawnCount = 0;
         _entityTypeHandle = state.GetEntityTypeHandle();
     }
 
@@ -45,6 +48,7 @@ public partial struct ZombieSpawnSystem : ISystem
             _pointRandomMax = _localTransform.InverseTransformPoint(_zombieProperties.spawner.posMax);
             _latestSpawnTime = -_zombieProperties.spawner.timeDelay;
             _isSpawnInfinity = _zombieProperties.spawner.spawnInfinity;
+            _isAllowRespawn = _zombieProperties.spawner.allowRespawn;
             _numberSpawn = _zombieProperties.spawner.numberSpawn;
             _numberSpawnPerFrame = _zombieProperties.spawner.numberSpawnPerFrame;
             _timeDelay = _zombieProperties.spawner.timeDelay;
@@ -82,18 +86,29 @@ public partial struct ZombieSpawnSystem : ISystem
 
     private void SpawnZombie(ref SystemState state,ref EntityCommandBuffer ecb,ref bool hasNewEntity)
     {
-        var zombieAliveArr = SystemAPI.QueryBuilder().WithNone<Disabled>().WithNone<SetActiveSP>().WithAll<ZombieInfo>()
-            .Build()
-            .ToEntityArray(Allocator.Temp);
-        int zombieAlive = zombieAliveArr.Length;
-        zombieAliveArr.Dispose();
+        int zombieAlive = 0;
+
+        if (_isAllowRespawn)
+        {
+            NativeArray<Entity> zombieAliveArr = SystemAPI.QueryBuilder().WithNone<Disabled,SetActiveSP>().WithAll<ZombieInfo>()
+                .Build()
+                .ToEntityArray(Allocator.Temp);
+            zombieAlive = zombieAliveArr.Length;
+            zombieAliveArr.Dispose();
+        }
+        else
+        {
+            zombieAlive = _totalSpawnCount;
+        }
+        
+        
         if(!_isSpawnInfinity && zombieAlive >= _numberSpawn) return;
         if((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < _timeDelay) return;
         var zombiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<ZombieInfo>().Build()
             .ToEntityArray(Allocator.Temp);
-        int numberRunningJob = _isSpawnInfinity ? _numberSpawnPerFrame : (math.min(_numberSpawn - zombieAlive,_numberSpawnPerFrame));
+        int numberZombieCanSpawn = _isSpawnInfinity ? _numberSpawnPerFrame : (math.min(_numberSpawn - zombieAlive,_numberSpawnPerFrame));
         int i = 0;
-        while (i < numberRunningJob)
+        while (i < numberZombieCanSpawn)
         {
             Entity entityNew;
             if (i < zombiesDisable.Length)
@@ -119,6 +134,7 @@ public partial struct ZombieSpawnSystem : ISystem
             i++;
         }
         _latestSpawnTime = (float)SystemAPI.Time.ElapsedTime;
+        _totalSpawnCount += numberZombieCanSpawn;
         zombiesDisable.Dispose();
     }
 }
