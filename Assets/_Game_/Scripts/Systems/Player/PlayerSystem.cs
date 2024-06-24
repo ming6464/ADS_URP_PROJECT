@@ -4,6 +4,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 public partial struct PlayerSystem : ISystem
@@ -54,7 +55,6 @@ public partial struct PlayerSystem : ISystem
             _playerEntity = SystemAPI.GetSingletonEntity<PlayerInfo>();
             _aimNearestEnemy = _playerProperty.aimNearestEnemy;
             _moveToWard = _playerProperty.moveToWard;
-            
             _characterRadius = _playerProperty.characterRadius;
             _layerStore = SystemAPI.GetSingleton<LayerStoreComponent>();
             _filterItem = new CollisionFilter()
@@ -130,6 +130,7 @@ public partial struct PlayerSystem : ISystem
                 {
                     type = itemInfo.type,
                     count = itemInfo.count,
+                    id = itemInfo.id,
                 });
                 
                 ecb.RemoveComponent<PhysicsCollider>(entityItem);

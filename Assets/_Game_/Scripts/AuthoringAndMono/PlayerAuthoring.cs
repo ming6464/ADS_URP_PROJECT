@@ -15,6 +15,8 @@ public class PlayerAuthoring : MonoBehaviour
     public int numberSpawnDefault;
     public float2 spaceGrid;
     public int countOfCol;
+    //
+    public int idWeaponDefault;
 }
 
 class AuthoringBaker : Baker<PlayerAuthoring>
@@ -34,6 +36,7 @@ class AuthoringBaker : Baker<PlayerAuthoring>
             aimNearestEnemy = authoring.aimNearestEnemy,
             moveToWard = authoring.moveToWard,
             characterRadius = authoring.radius,
+            idWeaponDefault = authoring.idWeaponDefault,
         });
         
         AddComponent(entity, new PlayerInput

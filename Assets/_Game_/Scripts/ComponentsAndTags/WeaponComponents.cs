@@ -6,29 +6,29 @@ public struct WeaponProperties : IComponentData
 {
     public bool shootAuto;
     //
-    public Entity entityWeapon;
     public Entity entityBullet;
-    public float3 offset;
     public float length;
     //
     public float expired;
-    public float bulletSpeed;
-    public float bulletDamage;
-    public int bulletPerShot;
-    public float spaceAngleAnyBullet;
-}
-
-
-public struct WeaponRunTime : IComponentData
-{
-    public float cooldown;
 }
 
 public struct WeaponInfo : IComponentData
 {
-    
+    public int id;
 }
 
+public struct WeaponStore : IBufferElementData
+{
+    public int id;
+    public Entity entity;
+    public float3 offset;
+    public float damage;
+    public float speed;
+    public float cooldown;
+    public int bulletPerShot;
+    public float spaceAnglePerBullet;
+    public bool parallelOrbit;
+}
 
 public readonly partial struct WeaponAspect : IAspect
 {
@@ -67,6 +67,7 @@ public struct BulletInfo : IComponentData
 {
     public float startTime;
     public float damage;
+    public float speed;
 }
 
 public readonly partial struct BulletAspect : IAspect

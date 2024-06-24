@@ -5,6 +5,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
 using Random = Unity.Mathematics.Random;
 using RaycastHit = Unity.Physics.RaycastHit;
 
@@ -12,7 +13,6 @@ using RaycastHit = Unity.Physics.RaycastHit;
 [BurstCompile]
 public partial struct BulletMovementSystem : ISystem
 {
-    private float _speed;
     private float _expired;
     private bool _isGetComponent;
     private EntityManager _entityManager;
@@ -55,7 +55,6 @@ public partial struct BulletMovementSystem : ISystem
             _entityManager = state.EntityManager;
             _isGetComponent = true;
             _weaponProperties = SystemAPI.GetSingleton<WeaponProperties>();
-            _speed = _weaponProperties.bulletSpeed;
             _expired = _weaponProperties.expired;
             var layerStore = SystemAPI.GetSingleton<LayerStoreComponent>();
             _collisionFilter = new CollisionFilter()
@@ -84,7 +83,6 @@ public partial struct BulletMovementSystem : ISystem
             ecb = ecb.AsParallelWriter(),
             physicsWorld = _physicsWorld,
             filter = _collisionFilter,
-            speed = _speed,
             length = _weaponProperties.length,
             time = (float)SystemAPI.Time.ElapsedTime,
             deltaTime = SystemAPI.Time.DeltaTime,
@@ -102,7 +100,12 @@ public partial struct BulletMovementSystem : ISystem
         {
             while(_zombieDamageMapQueue.TryDequeue(out var item))
             {
-                if (item.damage == 0)continue;
+                Debug.Log("_ damage take " + item.damage);
+                if (item.damage == 0)
+                {
+                    
+                    continue;
+                }
                 if (_zombieTakeDamageMap.ContainsKey(item.entity))
                 {
                     _zombieTakeDamageMap[item.entity] += item.damage;
@@ -135,11 +138,10 @@ public partial struct BulletMovementSystem : ISystem
         [ReadOnly] public ComponentTypeHandle<BulletInfo> bulletInfoTypeHandle;
         [ReadOnly] public PhysicsWorldSingleton physicsWorld;
         [ReadOnly] public CollisionFilter filter;
-        [ReadOnly] public float speed;
+        [ReadOnly] public NativeArray<Entity> hitFlashPointDisable;
         [ReadOnly] public float length;
         [ReadOnly] public float time;
         [ReadOnly] public float deltaTime;
-        [ReadOnly] public NativeArray<Entity> hitFlashPointDisable;
         [ReadOnly] public float currentTime;
         [ReadOnly] public float expired;
         public ComponentTypeHandle<LocalTransform> localTransformType;
@@ -175,9 +177,10 @@ public partial struct BulletMovementSystem : ISystem
                     });
                     continue;
                 }
+                
                 var lt = ltArr[i];
                 float speed_New = Random.CreateFromIndex((uint)(i + 1 + (time % deltaTime)))
-                    .NextFloat(speed - 10f, speed + 10f);
+                    .NextFloat(bulletInfo.speed - 10f, bulletInfo.speed + 10f);
                 float3 newPosition = lt.Position + lt.Forward() * speed_New * deltaTime;
 
                 RaycastInput raycastInput = new RaycastInput()

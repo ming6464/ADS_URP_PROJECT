@@ -250,12 +250,13 @@ MonoBehaviour:
   speed: 3.5
   radius: 0.35
   aimNearestEnemy: 1
-  moveToWard: 100
+  moveToWard: 800
   numberSpawnDefault: 3
   spaceGrid:
     x: 1
     y: 1
   countOfCol: 3
+  idWeaponDefault: 0
 --- !u!4 &592925932
 Transform:
   m_ObjectHideFlags: 0
@@ -460,20 +461,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   shootAuto: 1
-  weaponPrefab: {fileID: 4502064372477858661, guid: e2e559d8fe8d0fc4fbdb32b4b492273c,
-    type: 3}
+  data: {fileID: 11400000, guid: e033e9e758026ec429d51e00c44c130a, type: 2}
   bulletPrefab: {fileID: 2192329522781796173, guid: e290f7dbaf29d6e42aa3845c5fe5963e,
     type: 3}
-  offset:
-    x: 0.478
-    y: 0.849
-    z: 0.582
-  damage: 10
-  speed: 90
-  cooldown: 0.08
   lengthRay: 0.8
-  bulletPerShot: 7
-  spaceAnglePerBullet: 0.7
   expired: 1
 --- !u!4 &735154629
 Transform:
@@ -652,10 +643,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   zombiePrefab: {fileID: 7846563739282400770, guid: 916e68ea8558c93499f2a84488006f19,
     type: 3}
-  hp: 200
+  hp: 30
   speed: 4.5
   timeDelaySpawn: 0.05
-  spawnInfinity: 0
+  spawnInfinity: 1
   allowRespawn: 1
   numberSpawn: 50
   numberSpawnPerFrame: 10
@@ -852,8 +843,18 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1330491277030721445, guid: 77e8c43f80e7fda478d7cbcc62dc8e39,
         type: 3}
+      propertyPath: id
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1330491277030721445, guid: 77e8c43f80e7fda478d7cbcc62dc8e39,
+        type: 3}
+      propertyPath: type
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1330491277030721445, guid: 77e8c43f80e7fda478d7cbcc62dc8e39,
+        type: 3}
       propertyPath: count
-      value: 2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2035862929969342748, guid: 77e8c43f80e7fda478d7cbcc62dc8e39,
         type: 3}

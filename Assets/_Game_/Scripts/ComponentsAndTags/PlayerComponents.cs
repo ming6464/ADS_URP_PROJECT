@@ -4,6 +4,7 @@ using Unity.Transforms;
 
 public struct PlayerProperty : IComponentData
 {
+    public int idWeaponDefault;
     public Entity characterEntity;
     public float characterRadius;
     public float speed;
@@ -17,6 +18,7 @@ public struct PlayerProperty : IComponentData
 
 public struct PlayerInfo : IComponentData
 {
+    public int idWeapon;
     public int maxXGridCharacter;
     public int maxYGridCharacter;
 }

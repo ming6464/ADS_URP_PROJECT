@@ -1,20 +1,14 @@
 using Unity.Entities;
-using Unity.Mathematics;
 using UnityEngine;
 
 public class WeaponAuthoring : MonoBehaviour
 {
     public bool shootAuto;
-    [Space(10)]
-    public GameObject weaponPrefab;
+    [Space(10)] 
+    public WeaponSO data;
+
     public GameObject bulletPrefab;
-    public float3 offset;
-    public float damage;
-    public float speed;
-    public float cooldown;
     public float lengthRay;
-    public int bulletPerShot;
-    public float spaceAnglePerBullet;
     public float expired;
 }
 
@@ -26,21 +20,27 @@ class WeaponBaker : Baker<WeaponAuthoring>
         AddComponent(entity,new WeaponProperties()
         {
             shootAuto = authoring.shootAuto,
-            bulletDamage = authoring.damage,
-            entityWeapon = GetEntity(authoring.weaponPrefab,TransformUsageFlags.Dynamic),
             entityBullet = GetEntity(authoring.bulletPrefab,TransformUsageFlags.Dynamic),
-            bulletSpeed = authoring.speed,
-            offset = authoring.offset,
             length = authoring.lengthRay,
-            bulletPerShot = authoring.bulletPerShot,
-            spaceAngleAnyBullet = authoring.spaceAnglePerBullet,
             expired = authoring.expired,
         });
-        
-        AddComponent(entity,new WeaponRunTime()
+
+        DynamicBuffer<WeaponStore> weaponStoresBuffer = AddBuffer<WeaponStore>(entity);;
+        foreach (var weapon in authoring.data.weapons)
         {
-            cooldown = authoring.cooldown,
-        });
+            weaponStoresBuffer.Add(new WeaponStore()
+            {
+                id = weapon.id,
+                entity = GetEntity(weapon.weaponPrefab,TransformUsageFlags.Dynamic),
+                offset = weapon.offset,
+                damage = weapon.damage,
+                speed = weapon.speed,
+                cooldown = weapon.cooldown,
+                bulletPerShot = weapon.bulletPerShot,
+                spaceAnglePerBullet = weapon.spaceAnglePerBullet,
+                parallelOrbit = weapon.parallelOrbit,
+            });
+        }
     }
 }
 

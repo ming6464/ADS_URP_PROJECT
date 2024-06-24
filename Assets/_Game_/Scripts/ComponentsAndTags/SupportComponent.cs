@@ -58,6 +58,14 @@ public enum CameraType
 
 //Enum
 
+//Events {
+
+public struct EventChangeWeapon : IComponentData
+{
+    public WeaponStore value;
+}
+
+//Events }
 
 //other components
 

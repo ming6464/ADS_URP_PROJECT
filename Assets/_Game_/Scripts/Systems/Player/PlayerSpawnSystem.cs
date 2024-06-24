@@ -16,7 +16,6 @@ public partial struct PlayerSpawnSystem : ISystem
     private bool _spawnInit;
     private EntityManager _entityManager;
     private float2 _spaceGrid;
-    private bool check;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -35,7 +34,10 @@ public partial struct PlayerSpawnSystem : ISystem
             {
                 _playerProperty = SystemAPI.GetSingleton<PlayerProperty>();
                 var entityPlayer = ecb.CreateEntity();
-                ecb.AddComponent(entityPlayer, new PlayerInfo());
+                ecb.AddComponent(entityPlayer, new PlayerInfo()
+                {
+                    idWeapon = _playerProperty.idWeaponDefault,
+                });
                 ecb.AddComponent<LocalToWorld>(entityPlayer);
                 ecb.AddComponent(entityPlayer, new LocalTransform()
                 {
@@ -69,11 +71,6 @@ public partial struct PlayerSpawnSystem : ISystem
         UpdateCharacter(ref state, ref ecb);
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
-        if (check)
-        {
-            Debug.Log("m _ playback spawn");
-            check = false;
-        }
     }
 
     private void UpdateCharacter(ref SystemState state, ref EntityCommandBuffer ecb)
@@ -87,18 +84,17 @@ public partial struct PlayerSpawnSystem : ISystem
 
         foreach(var (collect,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess().WithNone<Disabled,SetActiveSP>())
         {
-            check = true;
-            Debug.Log($"m _ spawn _ {collect.ValueRO.count}");
             switch (collect.ValueRO.type)
             {
                 case ItemType.Character:
                     spawnChange += collect.ValueRO.count;
+                    ecb.AddComponent(entity,new SetActiveSP()
+                    {
+                        state = StateID.Disable,
+                    });
                     break;
             }
-            ecb.AddComponent(entity,new SetActiveSP()
-            {
-                state = StateID.Disable,
-            });
+           
         }
         
         Spawn(ref state, ref ecb, spawnChange);

@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8cb0692c2c04033a3ef2aec136e52fa, type: 3}
+  m_Name: WeaponSO
+  m_EditorClassIdentifier: 
+  weapons:
+  - id: 0
+    weaponPrefab: {fileID: 4502064372477858661, guid: e2e559d8fe8d0fc4fbdb32b4b492273c,
+      type: 3}
+    offset:
+      x: 0.478
+      y: 0.849
+      z: 0.582
+    damage: 10
+    speed: 80
+    cooldown: 0.2
+    bulletPerShot: 5
+    spaceAnglePerBullet: 0.6
+    parallelOrbit: 0
+  - id: 1
+    weaponPrefab: {fileID: 4502064372477858661, guid: d827824cc1754874a8696dc4c9316b75,
+      type: 3}
+    offset:
+      x: -0.03
+      y: 1.562
+      z: 0.359
+    damage: 20
+    speed: 70
+    cooldown: 0.2
+    bulletPerShot: 40
+    spaceAnglePerBullet: 0.7
+    parallelOrbit: 1
