@@ -26,7 +26,6 @@ public partial struct PlayerSpawnSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         if (_spawnPlayerState < 2)
         {
@@ -139,6 +138,7 @@ public partial struct PlayerSpawnSystem : ISystem
                     {
                         state = StateID.Enable,
                     });
+                    
                 }
                 else
                 {
@@ -148,11 +148,11 @@ public partial struct PlayerSpawnSystem : ISystem
                     {
                         Value = _parentCharacterEntity,
                     });
-                    characterBuffer.Add(new CharacterNewBuffer()
-                    {
-                        entity = entityNew,
-                    });
                 }
+                characterBuffer.Add(new CharacterNewBuffer()
+                {
+                    entity = entityNew,
+                });
                 ecb.AddComponent(entityNew, lt);
                 ecb.AddComponent(entityNew, new CharacterInfo()
                 {
@@ -168,13 +168,23 @@ public partial struct PlayerSpawnSystem : ISystem
             for (int i = characterAliveCount - 1; i >= 0; i--)
             {
                 if (numberDisable + count == 0) break;
-                if (_entityManager.GetComponentData<CharacterInfo>(characterAlive[i]).index > maxIndex)
+                var characterInfo = _entityManager.GetComponentData<CharacterInfo>(characterAlive[i]);
+                if (characterInfo.index > maxIndex)
                 {
                     numberDisable++;
                     ecb.AddComponent(characterAlive[i], new SetActiveSP()
                     {
                         state = StateID.Disable
                     });
+
+                    if (!characterInfo.weaponEntity.Equals(default))
+                    {
+                        ecb.RemoveComponent<Parent>(characterInfo.weaponEntity);
+                        ecb.AddComponent(characterInfo.weaponEntity,new SetActiveSP()
+                        {
+                            state = StateID.Disable,
+                        });
+                    }
                 }
             }
         }

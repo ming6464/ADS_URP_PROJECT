@@ -73,12 +73,13 @@ public partial struct WeaponSystem : ISystem
         {
             _pullTrigger = SystemAPI.GetSingleton<PlayerInput>().pullTrigger;
         }
+        Shot(ref state);
         UpdateDataWeapon(ref state,ref ecb);
         UpdateWeapon(ref state,ref ecb);
         ecb.Playback(_entityManager);
         ecb.Dispose();
-        Shot(ref state);
     }
+
 
     private void UpdateDataWeapon(ref SystemState state,ref EntityCommandBuffer ecb)
     {
@@ -132,6 +133,7 @@ public partial struct WeaponSystem : ISystem
         {
             if(ws.id != id) continue;
             weaponStore = ws;
+            break;
         }
         
         return weaponStore;
@@ -151,9 +153,9 @@ public partial struct WeaponSystem : ISystem
                 {
                     id = _idCurrentWeapon,
                 });
-                var entityGroup = _entityManager.GetBuffer<LinkedEntityGroup>(weaponEntity).ToNativeArray(Allocator.Temp);
-                _entityManager.GetBuffer<LinkedEntityGroup>(parent.ValueRO.Value).AddRange(entityGroup);
-                entityGroup.Dispose();
+                var characterInfo = _entityManager.GetComponentData<CharacterInfo>(parent.ValueRO.Value);
+                characterInfo.weaponEntity = weaponEntity;
+                ecb.SetComponent(parent.ValueRO.Value,characterInfo);
                 
                 ecb.RemoveComponent<Parent>(entity);
                 ecb.AddComponent(entity,new SetActiveSP()
@@ -175,9 +177,9 @@ public partial struct WeaponSystem : ISystem
             {
                 id = _idCurrentWeapon,
             });
-            var entityGroup = _entityManager.GetBuffer<LinkedEntityGroup>(weaponEntity).ToNativeArray(Allocator.Temp);
-            _entityManager.GetBuffer<LinkedEntityGroup>(b.entity).AddRange(entityGroup);
-            entityGroup.Dispose();
+            var characterInfo = _entityManager.GetComponentData<CharacterInfo>(b.entity);
+            characterInfo.weaponEntity = weaponEntity;
+            _entityManager.SetComponentData(b.entity,characterInfo);
         }
         buffer.Clear();
     }

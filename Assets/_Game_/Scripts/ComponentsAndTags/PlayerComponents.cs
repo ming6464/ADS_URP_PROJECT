@@ -83,6 +83,7 @@ public struct ParentCharacter : IComponentData
 public struct CharacterInfo : IComponentData
 {
     public int index;
+    public Entity weaponEntity;
 }
 
 public readonly partial struct CharacterAspect : IAspect

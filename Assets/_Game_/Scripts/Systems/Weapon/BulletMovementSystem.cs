@@ -100,7 +100,6 @@ public partial struct BulletMovementSystem : ISystem
         {
             while(_zombieDamageMapQueue.TryDequeue(out var item))
             {
-                Debug.Log("_ damage take " + item.damage);
                 if (item.damage == 0)
                 {
                     
