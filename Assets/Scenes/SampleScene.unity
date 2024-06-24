@@ -488,7 +488,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cullingCameras:
-  - {fileID: 0}
+  - {fileID: 330585545}
   shadowCastingLights:
   - {fileID: 410087040}
   addEditorSceneCamera: 1

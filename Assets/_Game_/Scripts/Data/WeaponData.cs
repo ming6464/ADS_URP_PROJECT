@@ -8,7 +8,7 @@ public class WeaponSO : ScriptableObject
     public Weapon[] weapons;
 }
 [Serializable]
-public class Weapon
+public struct Weapon
 {
     public int id;
     public GameObject weaponPrefab;
