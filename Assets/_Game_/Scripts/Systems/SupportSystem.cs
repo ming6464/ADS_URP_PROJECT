@@ -1,10 +1,7 @@
-using Rukhanka;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Mathematics;
-using Unity.Physics;
 using Unity.Transforms;
 using UnityEngine;
 
@@ -14,6 +11,7 @@ using UnityEngine;
 [BurstCompile,UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial struct CameraSystem : ISystem
 {
+    
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<PlayerInfo>();
@@ -240,13 +238,13 @@ public partial class UpdateHybrid : SystemBase
             var entities = chunk.GetNativeArray(entityTypeHandle);
             for (int i = 0; i < chunk.Count; i++)
             {
-                ecb.RemoveComponent<EffectComponent>(indexQuery,entities[i]);
                 ecb.AddComponent(indexQuery,entities[i],new SetActiveSP()
                 {
                     state = StateID.Disable,
                 });
                 hitFlashQueue.Enqueue(lts[i]);
             }
+            ecb.RemoveComponent<EffectComponent>(indexQuery,entities);
         }
     }
     //JOB

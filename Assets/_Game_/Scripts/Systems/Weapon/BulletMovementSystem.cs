@@ -5,7 +5,6 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
-using UnityEngine;
 using Random = Unity.Mathematics.Random;
 using RaycastHit = Unity.Physics.RaycastHit;
 
@@ -14,14 +13,16 @@ using RaycastHit = Unity.Physics.RaycastHit;
 public partial struct BulletMovementSystem : ISystem
 {
     private float _speed;
-    private float _damage;
     private float _expired;
     private bool _isGetComponent;
+    private EntityManager _entityManager;
     private WeaponProperties _weaponProperties;
     private EntityTypeHandle _entityTypeHandle;
     private CollisionFilter _collisionFilter;
     private PhysicsWorldSingleton _physicsWorld;
     private NativeArray<Entity> _pointsEffectDisable;
+    private NativeQueue<ZombieTakeDamage> _zombieDamageMapQueue;
+    private NativeHashMap<Entity, float> _zombieTakeDamageMap;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -32,23 +33,29 @@ public partial struct BulletMovementSystem : ISystem
         state.RequireForUpdate<PhysicsWorldSingleton>();
         state.RequireForUpdate<WeaponInfo>();
         _entityTypeHandle = state.GetEntityTypeHandle();
+        _zombieDamageMapQueue = new NativeQueue<ZombieTakeDamage>( Allocator.Persistent);
+        _zombieTakeDamageMap =
+            new NativeHashMap<Entity, float>(1000, Allocator.Persistent);
     }
 
     public void OnDestroy(ref SystemState state)
     {
         if (_pointsEffectDisable.IsCreated)
             _pointsEffectDisable.Dispose();
+        if (_zombieDamageMapQueue.IsCreated)
+            _zombieDamageMapQueue.Dispose();
+        if (_zombieTakeDamageMap.IsCreated)
+            _zombieTakeDamageMap.Dispose();
     }
 
     public void OnUpdate(ref SystemState state)
     {
-        state.Dependency.Complete();
         if (!_isGetComponent)
         {
+            _entityManager = state.EntityManager;
             _isGetComponent = true;
             _weaponProperties = SystemAPI.GetSingleton<WeaponProperties>();
             _speed = _weaponProperties.bulletSpeed;
-            _damage = _weaponProperties.bulletDamage;
             _expired = _weaponProperties.expired;
             var layerStore = SystemAPI.GetSingleton<LayerStoreComponent>();
             _collisionFilter = new CollisionFilter()
@@ -63,6 +70,8 @@ public partial struct BulletMovementSystem : ISystem
 
     private void MovementBulletAndCheckExpiredBullet(ref SystemState state)
     {
+        _zombieDamageMapQueue.Clear();
+        _zombieTakeDamageMap.Clear();
         float curTime = (float)SystemAPI.Time.ElapsedTime;
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
@@ -75,7 +84,7 @@ public partial struct BulletMovementSystem : ISystem
             ecb = ecb.AsParallelWriter(),
             physicsWorld = _physicsWorld,
             filter = _collisionFilter,
-            speed = _weaponProperties.bulletSpeed,
+            speed = _speed,
             length = _weaponProperties.length,
             time = (float)SystemAPI.Time.ElapsedTime,
             deltaTime = SystemAPI.Time.DeltaTime,
@@ -85,10 +94,33 @@ public partial struct BulletMovementSystem : ISystem
             currentTime = curTime,
             bulletInfoTypeHandle = state.GetComponentTypeHandle<BulletInfo>(),
             expired = _expired,
+            zombieDamageMapQueue = _zombieDamageMapQueue.AsParallelWriter(),
         };
-        state.Dependency = jobChunk.ScheduleParallel(euQuery, state.Dependency);
+        state.Dependency = jobChunk.Schedule(euQuery, state.Dependency);
         state.Dependency.Complete();
-        ecb.Playback(state.EntityManager);
+        if (_zombieDamageMapQueue.Count > 0)
+        {
+            while(_zombieDamageMapQueue.TryDequeue(out var item))
+            {
+                if (item.damage == 0)continue;
+                if (_zombieTakeDamageMap.ContainsKey(item.entity))
+                {
+                    _zombieTakeDamageMap[item.entity] += item.damage;
+                }
+                else
+                {
+                    _zombieTakeDamageMap.Add(item.entity,item.damage);
+                }
+            }
+            foreach (var map in _zombieTakeDamageMap)
+            {
+                ecb.AddComponent(map.Key,new TakeDamage()
+                {
+                    value = map.Value,
+                });
+            }
+        }
+        ecb.Playback(_entityManager);
         ecb.Dispose();
         _pointsEffectDisable.Dispose();
     }
@@ -111,6 +143,7 @@ public partial struct BulletMovementSystem : ISystem
         [ReadOnly] public float currentTime;
         [ReadOnly] public float expired;
         public ComponentTypeHandle<LocalTransform> localTransformType;
+        [WriteOnly]public NativeQueue<ZombieTakeDamage>.ParallelWriter  zombieDamageMapQueue;
 
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
             in v128 chunkEnabledMask)
@@ -124,17 +157,16 @@ public partial struct BulletMovementSystem : ISystem
             {
                 Scale = 1,
             };
-            
             var setActiveSP = new SetActiveSP()
             {
                 startTime = time,
             };
-            
             for (int i = 0; i < chunk.Count; i++)
             {
 
                 var entity = entities[i];
-                if ((currentTime - bulletInfos[i].startTime) >= expired)
+                var bulletInfo = bulletInfos[i];
+                if ((currentTime - bulletInfo.startTime) >= expired)
                 {
                     ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entity);
                     ecb.AddComponent(unfilteredChunkIndex,entities,new SetActiveSP()
@@ -157,9 +189,12 @@ public partial struct BulletMovementSystem : ISystem
                 
                 if (physicsWorld.CastRay(raycastInput, out RaycastHit hit))
                 {
-                    setActiveSP.state = StateID.Wait;
-                    ecb.AddComponent(unfilteredChunkIndex, hit.Entity, setActiveSP);
-                    ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex, hit.Entity);
+                    zombieDamageMapQueue.Enqueue(new ZombieTakeDamage()
+                    {
+                        damage = bulletInfo.damage,
+                        entity = hit.Entity,
+                    });
+                    
                     ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex, entity);
                     setActiveSP.state = StateID.Disable;
                     ecb.AddComponent(unfilteredChunkIndex, entity, setActiveSP);
@@ -169,10 +204,8 @@ public partial struct BulletMovementSystem : ISystem
                     {
                         effNew = hitFlashPointDisable[countPointUsed];
                         ecb.RemoveComponent<Disabled>(unfilteredChunkIndex,effNew);
-                        ecb.AddComponent(unfilteredChunkIndex,effNew,new SetActiveSP()
-                        {
-                            state = StateID.Enable
-                        });
+                        setActiveSP.state = StateID.Enable;
+                        ecb.AddComponent(unfilteredChunkIndex,effNew,setActiveSP);
                         ++countPointUsed;
                     }
                     else
@@ -194,4 +227,15 @@ public partial struct BulletMovementSystem : ISystem
         }
     }
     //Jobs }
+    
+    
+    // structs {
+
+    private struct ZombieTakeDamage
+    {
+        public Entity entity;
+        public float damage;
+    }
+    
+    // structs }
 }

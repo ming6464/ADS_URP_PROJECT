@@ -66,6 +66,7 @@ public readonly partial struct WeaponAspect : IAspect
 public struct BulletInfo : IComponentData
 {
     public float startTime;
+    public float damage;
 }
 
 public readonly partial struct BulletAspect : IAspect

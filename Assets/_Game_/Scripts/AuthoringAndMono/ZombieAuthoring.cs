@@ -5,6 +5,7 @@ using UnityEngine;
 public class ZombieAuthoring : MonoBehaviour
 {
     public GameObject zombiePrefab;
+    public float hp;
     public float speed;
     public float timeDelaySpawn;
     public bool spawnInfinity;
@@ -31,6 +32,7 @@ class ZombieBaker : Baker<ZombieAuthoring>
         AddComponent(entity,new ZombieProperty
         {
             entity = GetEntity(authoring.zombiePrefab,TransformUsageFlags.Dynamic),
+            hp = authoring.hp,
             speed = authoring.speed,
             directNormal = dirNormal,
             spawner = new ZombieSpawner

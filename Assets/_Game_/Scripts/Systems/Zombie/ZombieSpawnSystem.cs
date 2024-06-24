@@ -56,10 +56,11 @@ public partial struct ZombieSpawnSystem : ISystem
             _zombieComponent = new ZombieInfo
             {
                 directNormal = _zombieProperties.directNormal,
+                hp = _zombieProperties.hp,
             };
             _isInit = true;
         }
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         bool hasEntityNew = false;
         SpawnZombie(ref state,ref ecb,ref hasEntityNew);
         var entityManager = state.EntityManager;
@@ -92,7 +93,7 @@ public partial struct ZombieSpawnSystem : ISystem
         {
             NativeArray<Entity> zombieAliveArr = SystemAPI.QueryBuilder().WithNone<Disabled,SetActiveSP>().WithAll<ZombieInfo>()
                 .Build()
-                .ToEntityArray(Allocator.Temp);
+                .ToEntityArray(Allocator.TempJob);
             zombieAlive = zombieAliveArr.Length;
             zombieAliveArr.Dispose();
         }
@@ -105,15 +106,20 @@ public partial struct ZombieSpawnSystem : ISystem
         if(!_isSpawnInfinity && zombieAlive >= _numberSpawn) return;
         if((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < _timeDelay) return;
         var zombiesDisable = SystemAPI.QueryBuilder().WithAll<Disabled>().WithAll<ZombieInfo>().Build()
-            .ToEntityArray(Allocator.Temp);
+            .ToEntityArray(Allocator.TempJob);
         int numberZombieCanSpawn = _isSpawnInfinity ? _numberSpawnPerFrame : (math.min(_numberSpawn - zombieAlive,_numberSpawnPerFrame));
         int i = 0;
         while (i < numberZombieCanSpawn)
         {
+            
+            Random random = Random.CreateFromIndex((uint)(++_seedCount));
+            _localTransform.Position = random.GetRandomRange(_pointRandomMin, _pointRandomMax);
+            
             Entity entityNew;
             if (i < zombiesDisable.Length)
             {
                 entityNew = zombiesDisable[i];
+                ecb.AddComponent(entityNew,_localTransform);
                 ecb.RemoveComponent<Disabled>(entityNew);
                 ecb.AddComponent(entityNew, new SetActiveSP()
                 {
@@ -123,14 +129,11 @@ public partial struct ZombieSpawnSystem : ISystem
             else
             {
                 entityNew = ecb.Instantiate(_entityZombieSpawn);
-                ecb.AddComponent(entityNew,_zombieComponent);
                 ecb.AddComponent<NotUnique>(entityNew);
+                ecb.AddComponent(entityNew,_localTransform);
                 hasNewEntity = true;
             }
-            
-            Random random = Random.CreateFromIndex((uint)(++_seedCount));
-            _localTransform.Position = random.GetRandomRange(_pointRandomMin, _pointRandomMax);
-            ecb.AddComponent(entityNew,_localTransform);
+            ecb.AddComponent(entityNew,_zombieComponent);
             i++;
         }
         _latestSpawnTime = (float)SystemAPI.Time.ElapsedTime;
@@ -147,18 +150,14 @@ public partial struct UniquePhysicColliderJOB : IJobChunk
     public ComponentTypeHandle<PhysicsCollider> physicColliderTypeHandle;
     public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
     {
-        var entites = chunk.GetNativeArray(entityTypeHandle);
         var physicColliders = chunk.GetNativeArray(physicColliderTypeHandle);
         for (int i = 0; i < chunk.Count; i++)
         {
-            var entity = entites[i];
             var collider = physicColliders[i];
-
             collider.Value = collider.Value.Value.Clone();
             physicColliders[i] = collider;
-            ecb.RemoveComponent<NotUnique>(unfilteredChunkIndex,entity);
+            
         }
-        
+        ecb.RemoveComponent<NotUnique>(unfilteredChunkIndex,chunk.GetNativeArray(entityTypeHandle));
     }
 }
-

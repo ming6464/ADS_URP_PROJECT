@@ -101,7 +101,7 @@ public partial struct WeaponSystem : ISystem
         var bulletEntityPrefab = _bulletEntityPrefab;
         float spaceAngleAnyBullet = _weaponProperties.spaceAngleAnyBullet;
         float time = (float)(SystemAPI.Time.ElapsedTime);
-        BulletInfo bulletInfo = new BulletInfo { startTime = time };
+        BulletInfo bulletInfo = new BulletInfo { startTime = time, damage = _weaponProperties.bulletDamage};
         byte countUsing = 0;
         LocalTransform lt;
         float3 angleRota;
@@ -149,19 +149,21 @@ public partial struct WeaponSystem : ISystem
             if (countUsing < entitiesDisable.Length)
             {
                 entity = entitiesDisable[countUsing];
-                ecb.RemoveComponent<Disabled>(entity);
+                ecb.AddComponent(entity,lt);
                 ecb.AddComponent(entity, new SetActiveSP()
                 {
                     state = StateID.Enable,
                     startTime = time,
                 });
+                ecb.RemoveComponent<Disabled>(entity);
             }
             else
             {
                 entity = ecb.Instantiate(bulletEntityPrefab);
+                ecb.AddComponent(entity,lt);
             }
             ecb.AddComponent(entity,bulletInfo);
-            ecb.AddComponent(entity,lt);
+            
             countUsing++;
         }
         

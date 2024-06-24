@@ -4,7 +4,6 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
-using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 public partial struct PlayerSystem : ISystem
@@ -28,7 +27,6 @@ public partial struct PlayerSystem : ISystem
     private NativeList<ColliderCastHit> _arrHitItem;
     private CollisionFilter _filterItem;
     private LayerStoreComponent _layerStore;
-    private bool check;
     
     public void OnCreate(ref SystemState state)
     {
@@ -75,6 +73,7 @@ public partial struct PlayerSystem : ISystem
         _playerAspect = SystemAPI.GetAspect<PlayerAspect>(_playerEntity);
         float2 direct = _playerMoveInput.directMove;
         _playerAspect.Position += new float3(direct.x, 0, direct.y) * _playerProperty.speed * SystemAPI.Time.DeltaTime;
+        
         state.Dependency = new CharacterRotate()
         {
             ltComponentTypeHandle = state.GetComponentTypeHandle<LocalTransform>(),
@@ -86,11 +85,6 @@ public partial struct PlayerSystem : ISystem
         CheckCollider(ref state,ref ecb);
         ecb.Playback(_entityManager);
         ecb.Dispose();
-        if (check)
-        {
-            Debug.Log("m _ playback player system");
-            check = false;
-        }
     }
 
     private void CheckCollider(ref SystemState state, ref EntityCommandBuffer ecb)
@@ -144,9 +138,6 @@ public partial struct PlayerSystem : ISystem
                 {
                     state = StateID.DestroyAll,
                 });
-                
-                Debug.Log($"m _ collider _ {itemInfo.count}");
-                check = true;
             }
 
             itemDisable.Dispose();

@@ -5,6 +5,7 @@ using Unity.Transforms;
 public struct ZombieProperty : IComponentData
 {
     public Entity entity;
+    public float hp;
     public float speed;
     public ZombieSpawner spawner;
     public float3 directNormal;
@@ -25,6 +26,11 @@ public struct ZombieInfo : IComponentData
 {
     public float hp;
     public float3 directNormal;
+}
+
+public struct TakeDamage : IComponentData
+{
+    public float value;
 }
 
 public struct NotUnique : IComponentData

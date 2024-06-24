@@ -250,8 +250,8 @@ MonoBehaviour:
   speed: 3.5
   radius: 0.35
   aimNearestEnemy: 1
-  moveToWard: 180
-  numberSpawnDefault: 6
+  moveToWard: 100
+  numberSpawnDefault: 3
   spaceGrid:
     x: 1
     y: 1
@@ -652,12 +652,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   zombiePrefab: {fileID: 7846563739282400770, guid: 916e68ea8558c93499f2a84488006f19,
     type: 3}
+  hp: 200
   speed: 4.5
   timeDelaySpawn: 0.05
   spawnInfinity: 0
-  allowRespawn: 0
-  numberSpawn: 500
-  numberSpawnPerFrame: 300
+  allowRespawn: 1
+  numberSpawn: 50
+  numberSpawnPerFrame: 10
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}
   pointDir1: {fileID: 1398424327}
