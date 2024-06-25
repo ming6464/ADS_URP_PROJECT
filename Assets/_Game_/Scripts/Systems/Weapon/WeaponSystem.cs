@@ -12,6 +12,7 @@ public partial struct WeaponSystem : ISystem
     private EntityManager _entityManager;
     private Entity _entityPlayer;
     private Entity _bulletEntityPrefab;
+    private Entity _entityWeaponProperty;
     private WeaponProperties _weaponProperties;
     private float _timeLatest;
     
@@ -30,7 +31,6 @@ public partial struct WeaponSystem : ISystem
 
     private bool _isNewWeapon;
     private NativeArray<BufferWeaponStore> _weaponStores;
-    private EntityQuery _entityQuery;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -42,7 +42,6 @@ public partial struct WeaponSystem : ISystem
         _isSpawnDefault = false;
         _isGetComponent = false;
         _idCurrentWeapon = -1;
-        _entityQuery = SystemAPI.QueryBuilder().WithAll<BulletInfo>().WithAll<Disabled>().Build();
     }
 
 
@@ -53,9 +52,9 @@ public partial struct WeaponSystem : ISystem
         
         if (!_isSpawnDefault)
         {
-            var entityWeaponProperties = SystemAPI.GetSingletonEntity<WeaponProperties>();
+            _entityWeaponProperty = SystemAPI.GetSingletonEntity<WeaponProperties>();
             _weaponProperties = SystemAPI.GetSingleton<WeaponProperties>();
-            _weaponStores = SystemAPI.GetBuffer<BufferWeaponStore>(entityWeaponProperties).ToNativeArray(Allocator.Persistent);
+            _weaponStores = SystemAPI.GetBuffer<BufferWeaponStore>(_entityWeaponProperty).ToNativeArray(Allocator.Persistent);
             _entityPlayer = SystemAPI.GetSingletonEntity<PlayerInfo>();
             _shootAuto = _weaponProperties.shootAuto;
             _pullTrigger = _shootAuto;
@@ -191,12 +190,11 @@ public partial struct WeaponSystem : ISystem
         if(!_pullTrigger) return;
         if ((SystemAPI.Time.ElapsedTime - _timeLatest) < _cooldown) return;
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
-        var entitiesDisable = _entityQuery.ToEntityArray(Allocator.Temp);
+        var entitiesDisable = _entityManager.GetBuffer<BufferBulletDisable>(_entityWeaponProperty);
         var bulletEntityPrefab = _bulletEntityPrefab;
         float spaceAngleAnyBullet = _spaceAnglePerBullet;
         float time = (float)(SystemAPI.Time.ElapsedTime);
         BulletInfo bulletInfo = new BulletInfo { startTime = time, damage = _damage, speed = _speed};
-        byte countUsing = 0;
         LocalTransform lt;
         float3 angleRota;
         
@@ -235,21 +233,20 @@ public partial struct WeaponSystem : ISystem
         
         ecb.Playback(_entityManager);
         _timeLatest = time;
-        entitiesDisable.Dispose();
         
         void SpawnBullet_L(LocalTransform lt)
         {
             Entity entity;
-            if (countUsing < entitiesDisable.Length)
+            if (entitiesDisable.Length > 0)
             {
-                entity = entitiesDisable[countUsing];
+                entity = entitiesDisable[0].entity;
+                entitiesDisable.RemoveAt(0);
                 ecb.AddComponent(entity, new SetActiveSP()
                 {
                     state = StateID.Enable,
                     startTime = time,
                 });
                 ecb.RemoveComponent<Disabled>(entity);
-                countUsing++;
             }
             else
             {

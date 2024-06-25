@@ -171,16 +171,16 @@ public partial struct HandlePoolZombie : ISystem
     private EntityManager _entityManager;
     private bool _isInit;
 
-    private int _currentCountZombieAlive;
     private int _currentCountZombieDie;
-    private int _passCountZombieAlive;
     private int _passCountZombieDie;
+    private int _countCheck;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<ZombieProperty>();
         state.RequireForUpdate<AddToBuffer>();
+        _countCheck = 100;
         _entityQuery = SystemAPI.QueryBuilder().WithAll<ZombieInfo, AddToBuffer,Disabled>().Build();
         _entityTypeHandle = state.GetEntityTypeHandle();
     }
@@ -202,10 +202,10 @@ public partial struct HandlePoolZombie : ISystem
             _entityZombieProperty = SystemAPI.GetSingletonEntity<ZombieProperty>();
         }
 
-        if (_currentCountZombieDie - _passCountZombieDie < 100)
+        if (_currentCountZombieDie - _passCountZombieDie < _countCheck)
         {
             _zombieDieToPoolList.Dispose();
-            _zombieDieToPoolList = new NativeList<BufferZombieDie>(_passCountZombieDie + 100, Allocator.Persistent);
+            _zombieDieToPoolList = new NativeList<BufferZombieDie>(_passCountZombieDie + _countCheck, Allocator.Persistent);
         }
         else
         {
@@ -216,7 +216,7 @@ public partial struct HandlePoolZombie : ISystem
         
         _entityTypeHandle.Update(ref state);
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
-        var job = new GetListDataToPool()
+        var job = new GetListZombieDataToPool()
         {
             zombieDieToPoolList = _zombieDieToPoolList.AsParallelWriter(),
             entityTypeHandle = _entityTypeHandle,
@@ -232,7 +232,7 @@ public partial struct HandlePoolZombie : ISystem
     }
     
     
-    partial struct GetListDataToPool : IJobChunk
+    partial struct GetListZombieDataToPool : IJobChunk
     {
         public EntityCommandBuffer.ParallelWriter ecb;
         [WriteOnly] public NativeList<BufferZombieDie>.ParallelWriter zombieDieToPoolList;
@@ -258,9 +258,99 @@ public partial struct HandlePoolZombie : ISystem
         }
     }
 }
+//
+public partial struct HandlePoolBullet : ISystem
+{
+    private NativeList<BufferBulletDisable> _bufferBulletDisables;
+    private Entity _entityWeaponProperty;
+    private EntityQuery _entityQuery;
+    private EntityTypeHandle _entityTypeHandle;
+    private EntityManager _entityManager;
+    private bool _isInit;
 
+    private int _currentCountWeaponDisable;
+    private int _passCountWeaponDisable;
+    private int _countCheck;
+    
+    
+    [BurstCompile]
+    public void OnCreate(ref SystemState state)
+    {
+        state.RequireForUpdate<WeaponProperties>();
+        state.RequireForUpdate<AddToBuffer>();
+        _countCheck = 200;
+        _entityQuery = SystemAPI.QueryBuilder().WithAll<BulletInfo, AddToBuffer,Disabled>().Build();
+        _entityTypeHandle = state.GetEntityTypeHandle();
+    }
 
+    [BurstCompile]
+    public void OnDestroy(ref SystemState state)
+    {
+        if (_bufferBulletDisables.IsCreated)
+            _bufferBulletDisables.Dispose();
+    }
 
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
+        _entityManager = state.EntityManager;
+        if (!_isInit)
+        {
+            _isInit = true;
+            _entityWeaponProperty = SystemAPI.GetSingletonEntity<WeaponProperties>();
+        }
+
+        if (_currentCountWeaponDisable - _passCountWeaponDisable < _countCheck)
+        {
+            _bufferBulletDisables.Dispose();
+            _bufferBulletDisables = new NativeList<BufferBulletDisable>(_passCountWeaponDisable + _countCheck, Allocator.Persistent);
+        }
+        else
+        {
+            _bufferBulletDisables.Clear();
+        }
+        
+        
+        
+        _entityTypeHandle.Update(ref state);
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+        var job = new GetListDataToPool()
+        {
+            bulletToPoolList = _bufferBulletDisables.AsParallelWriter(),
+            entityTypeHandle = _entityTypeHandle,
+            ecb = ecb.AsParallelWriter(),
+        };
+        state.Dependency = job.ScheduleParallel(_entityQuery, state.Dependency);
+        state.Dependency.Complete();
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
+        _passCountWeaponDisable = _bufferBulletDisables.Length;
+        _entityManager.GetBuffer<BufferBulletDisable>(_entityWeaponProperty).AddRange(_bufferBulletDisables);
+    }
+    
+    
+    partial struct GetListDataToPool : IJobChunk
+    {
+        public EntityCommandBuffer.ParallelWriter ecb;
+        [WriteOnly] public NativeList<BufferBulletDisable>.ParallelWriter bulletToPoolList;
+        [ReadOnly] public EntityTypeHandle entityTypeHandle;
+        
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+        {
+            var entities = chunk.GetNativeArray(entityTypeHandle);
+
+            for (int i = 0; i < chunk.Count; i++)
+            {
+                var entity = entities[i];
+                bulletToPoolList.AddNoResize(new BufferBulletDisable()
+                {
+                    entity = entity,
+                });
+            }
+            ecb.RemoveComponent<AddToBuffer>(unfilteredChunkIndex,entities);
+        }
+    }
+}
 //
 [UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial class UpdateHybrid : SystemBase

@@ -25,7 +25,8 @@ class WeaponBaker : Baker<WeaponAuthoring>
             expired = authoring.expired,
         });
 
-        DynamicBuffer<BufferWeaponStore> weaponStoresBuffer = AddBuffer<BufferWeaponStore>(entity);;
+        AddBuffer<BufferBulletDisable>(entity);
+        DynamicBuffer<BufferWeaponStore> weaponStoresBuffer = AddBuffer<BufferWeaponStore>(entity);
         foreach (var weapon in authoring.data.weapons)
         {
             weaponStoresBuffer.Add(new BufferWeaponStore()

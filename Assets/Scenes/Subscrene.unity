@@ -250,7 +250,9 @@ MonoBehaviour:
   speed: 3.5
   radius: 0.35
   aimNearestEnemy: 1
-  moveToWard: 800
+  distanceSetChangeRota: 20
+  moveToWardMax: 600
+  moveToWardMin: 200
   numberSpawnDefault: 3
   spaceGrid:
     x: 1
@@ -656,7 +658,7 @@ MonoBehaviour:
   allowRespawn: 1
   applyTotalCount: 1
   numberSpawn: 50
-  numberSpawnPerFrame: 2
+  numberSpawnPerFrame: 15
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}
   pointDir1: {fileID: 1398424327}

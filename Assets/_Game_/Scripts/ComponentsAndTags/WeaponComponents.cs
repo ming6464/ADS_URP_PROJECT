@@ -97,8 +97,7 @@ public readonly partial struct BulletAspect : IAspect
     public LocalTransform LocalTransform => _localTransform.ValueRO;
 }
 
-
-// public partial struct BufferBulletDisable : IBufferElementData
-// {
-//     
-// }
+public partial struct BufferBulletDisable : IBufferElementData
+{
+    public Entity entity;
+}

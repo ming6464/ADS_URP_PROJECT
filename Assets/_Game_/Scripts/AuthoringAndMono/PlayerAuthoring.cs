@@ -11,7 +11,9 @@ public class PlayerAuthoring : MonoBehaviour
     public float radius;
     //
     public bool aimNearestEnemy;
-    public float moveToWard;
+    public float distanceSetChangeRota;
+    public float moveToWardMax;
+    public float moveToWardMin;
     public int numberSpawnDefault;
     public float2 spaceGrid;
     public int countOfCol;
@@ -34,9 +36,11 @@ class AuthoringBaker : Baker<PlayerAuthoring>
             countOfCol = authoring.countOfCol,
             numberSpawnDefault = authoring.numberSpawnDefault,
             aimNearestEnemy = authoring.aimNearestEnemy,
-            moveToWard = authoring.moveToWard,
             characterRadius = authoring.radius,
             idWeaponDefault = authoring.idWeaponDefault,
+            distanceSetChangeRota = authoring.distanceSetChangeRota,
+            moveToWardMin = authoring.moveToWardMin,
+            moveToWardMax = authoring.moveToWardMax
         });
         
         AddComponent(entity, new PlayerInput

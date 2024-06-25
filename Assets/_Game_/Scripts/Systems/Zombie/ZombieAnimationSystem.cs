@@ -7,7 +7,7 @@ using Unity.Physics;
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 public partial class ZombieAnimationSystem : SystemBase
 {
-    private FastAnimatorParameter _dyingAnimatorParameter = new FastAnimatorParameter("Die");
+    private readonly FastAnimatorParameter _dyingAnimatorParameter = new("Die");
     
     protected override void OnUpdate()
     {

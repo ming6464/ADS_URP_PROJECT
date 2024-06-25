@@ -13,7 +13,10 @@ public struct PlayerProperty : IComponentData
     public float2 spaceGrid;
     public int countOfCol;
     public bool aimNearestEnemy;
-    public float moveToWard;
+    public float distanceSetChangeRota;
+    public float moveToWardMax;
+    public float moveToWardMin;
+    
 }
 
 public struct PlayerInfo : IComponentData

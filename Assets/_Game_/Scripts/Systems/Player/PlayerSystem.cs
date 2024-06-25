@@ -17,7 +17,11 @@ public partial struct PlayerSystem : ISystem
     private bool _init;
     private bool _aimNearestEnemy;
     private PlayerAspect _playerAspect;
-    private float _moveToWard;
+    private float _moveToWardMin;
+    private float _moveToWardMax;
+    private float _distanceSetChangeRota;
+
+    private EntityQuery _entityQueryPlayer;
     //
     private int _maxXGridCharacter;
     private int _maxYGridCharacter;
@@ -38,6 +42,7 @@ public partial struct PlayerSystem : ISystem
         state.RequireForUpdate<PlayerInfo>();
         state.RequireForUpdate<CharacterInfo>();
         _arrHitItem = new NativeList<ColliderCastHit>(Allocator.Persistent);
+        _entityQueryPlayer = SystemAPI.QueryBuilder().WithAll<CharacterInfo>().Build();
     }
 
 
@@ -54,7 +59,11 @@ public partial struct PlayerSystem : ISystem
             _playerProperty = SystemAPI.GetSingleton<PlayerProperty>();
             _playerEntity = SystemAPI.GetSingletonEntity<PlayerInfo>();
             _aimNearestEnemy = _playerProperty.aimNearestEnemy;
-            _moveToWard = _playerProperty.moveToWard;
+            
+            _moveToWardMin = _playerProperty.moveToWardMin;
+            _moveToWardMax = _playerProperty.moveToWardMax;
+            _distanceSetChangeRota = _playerProperty.distanceSetChangeRota;
+            
             _characterRadius = _playerProperty.characterRadius;
             _layerStore = SystemAPI.GetSingleton<LayerStoreComponent>();
             _filterItem = new CollisionFilter()
@@ -69,22 +78,83 @@ public partial struct PlayerSystem : ISystem
             _entityManager = state.EntityManager;
         }
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
-        _playerMoveInput = SystemAPI.GetSingleton<PlayerInput>();
-        _playerAspect = SystemAPI.GetAspect<PlayerAspect>(_playerEntity);
-        float2 direct = _playerMoveInput.directMove;
-        _playerAspect.Position += new float3(direct.x, 0, direct.y) * _playerProperty.speed * SystemAPI.Time.DeltaTime;
-        
-        state.Dependency = new CharacterRotate()
-        {
-            ltComponentTypeHandle = state.GetComponentTypeHandle<LocalTransform>(),
-            directRota = GetDirectRota(ref state),
-            moveToWard = _moveToWard,
-            deltaTime = SystemAPI.Time.DeltaTime,
-        }.ScheduleParallel(SystemAPI.QueryBuilder().WithAll<CharacterInfo>().Build(), state.Dependency);
+
+        Move(ref state);
+        Rota(ref state);
         state.Dependency.Complete();
         CheckCollider(ref state,ref ecb);
         ecb.Playback(_entityManager);
         ecb.Dispose();
+    }
+
+    private void Move(ref SystemState state)
+    {
+        _playerMoveInput = SystemAPI.GetSingleton<PlayerInput>();
+        _playerAspect = SystemAPI.GetAspect<PlayerAspect>(_playerEntity);
+        float2 direct = _playerMoveInput.directMove;
+        _playerAspect.Position += new float3(direct.x, 0, direct.y) * _playerProperty.speed * SystemAPI.Time.DeltaTime;
+    }
+
+
+    private void Rota(ref SystemState state)
+    {
+        
+        float3 dirRota;
+        float moveToWard = _moveToWardMax;
+        if (_aimNearestEnemy)
+        {
+            float spaceNearest = 99999f;
+            float3 playerPosWorld = _playerAspect.PositionWorld;
+            float3 positionNearest = float3.zero;
+            bool check = false;
+            foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAll<ZombieInfo>()
+                         .WithNone<Disabled, SetActiveSP>())
+            {
+                check = true;
+                float space = math.distance(playerPosWorld, ltw.ValueRO.Position);
+                if (space < spaceNearest)
+                {
+                    positionNearest = ltw.ValueRO.Position;
+                    spaceNearest = space;
+                }
+            }
+
+            if (!check)
+            {
+                dirRota = _playerAspect.LocalToWorld.Forward;
+            }
+            else
+            {
+                dirRota = positionNearest - playerPosWorld;
+                if (!dirRota.Equals(float3.zero))
+                {
+                    dirRota = math.normalize(dirRota);
+                }
+            }
+
+            float ratio = 0;
+            if (spaceNearest < _distanceSetChangeRota)
+            {
+                ratio = 1 - (spaceNearest * 1.0f / _distanceSetChangeRota);
+            }
+
+            moveToWard = math.lerp(_moveToWardMin, _moveToWardMax,ratio);
+        }
+        else
+        {
+            float x = math.remap(0, 1920, -1, 1, _playerMoveInput.mousePos.x);
+            float y = 1 - math.abs(x);
+            dirRota = math.normalize(new float3(x, 0, y));
+        }
+        
+        
+        state.Dependency = new CharacterRotate()
+        {
+            ltComponentTypeHandle = state.GetComponentTypeHandle<LocalTransform>(),
+            directRota = dirRota,
+            moveToWard = moveToWard,
+            deltaTime = SystemAPI.Time.DeltaTime,
+        }.ScheduleParallel(_entityQueryPlayer, state.Dependency);
     }
 
     private void CheckCollider(ref SystemState state, ref EntityCommandBuffer ecb)
@@ -146,50 +216,7 @@ public partial struct PlayerSystem : ISystem
 
         _arrHitItem.Clear();
     }
-
-    private float3 GetDirectRota(ref SystemState state)
-    {
-        float3 dirRota;
-        if (_aimNearestEnemy)
-        {
-            float3 playerPosWorld = _playerAspect.PositionWorld;
-            float3 positionNearest = float3.zero;
-            float spaceNearest = 99999f;
-            bool check = false;
-            foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAll<ZombieInfo>()
-                         .WithNone<Disabled, SetActiveSP>())
-            {
-                check = true;
-                float space = math.distance(playerPosWorld, ltw.ValueRO.Position);
-                if (space < spaceNearest)
-                {
-                    positionNearest = ltw.ValueRO.Position;
-                    spaceNearest = space;
-                }
-            }
-
-            if (!check)
-            {
-                dirRota = _playerAspect.LocalToWorld.Forward;
-            }
-            else
-            {
-                dirRota = positionNearest - playerPosWorld;
-                if (!dirRota.Equals(float3.zero))
-                {
-                    dirRota = math.normalize(dirRota);
-                }
-            }
-            
-        }
-        else
-        {
-            float x = math.remap(0, 1920, -1, 1, _playerMoveInput.mousePos.x);
-            float y = 1 - math.abs(x);
-            dirRota = math.normalize(new float3(x, 0, y));
-        }
-        return dirRota;
-    }
+    
 
     private partial struct CharacterRotate : IJobChunk
     {

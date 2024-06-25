@@ -151,10 +151,10 @@ public partial struct BulletMovementSystem : ISystem
             };
 
             var eff = new EffectComponent();
-            var lt_hide = new LocalTransform()
+            var ltHide = new LocalTransform()
             {
                 Scale = 1,
-                Position = new float3(1, 1, 1) * 999,
+                Position = new float3(999, 999, 999),
             };
             
             for (int i = 0; i < chunk.Count; i++)
@@ -164,8 +164,9 @@ public partial struct BulletMovementSystem : ISystem
                 var bulletInfo = bulletInfos[i];
                 if ((currentTime - bulletInfo.startTime) >= expired)
                 {
-                    ecb.SetComponent(unfilteredChunkIndex,entity,lt_hide);
-                    ecb.AddComponent(unfilteredChunkIndex,entities,setActiveSP);
+                    ecb.SetComponent(unfilteredChunkIndex,entity,ltHide);
+                    ecb.AddComponent<AddToBuffer>(unfilteredChunkIndex,entity);
+                    ecb.AddComponent(unfilteredChunkIndex,entity,setActiveSP);
                     continue;
                 }
                 
@@ -188,7 +189,8 @@ public partial struct BulletMovementSystem : ISystem
                         entity = hit.Entity,
                     });
                     
-                    ecb.SetComponent(unfilteredChunkIndex,entity,lt_hide);
+                    ecb.SetComponent(unfilteredChunkIndex,entity,ltHide);
+                    ecb.AddComponent<AddToBuffer>(unfilteredChunkIndex,entity);
                     ecb.AddComponent(unfilteredChunkIndex, entity, setActiveSP);
                     eff.position = hit.Position;
                     eff.rotation = quaternion.LookRotationSafe(hit.SurfaceNormal, math.up());
