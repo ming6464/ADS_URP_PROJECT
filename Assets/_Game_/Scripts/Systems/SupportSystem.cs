@@ -205,7 +205,8 @@ public partial struct HandlePoolZombie : ISystem
         if (_currentCountZombieDie - _passCountZombieDie < _countCheck)
         {
             _zombieDieToPoolList.Dispose();
-            _zombieDieToPoolList = new NativeList<BufferZombieDie>(_passCountZombieDie + _countCheck, Allocator.Persistent);
+            _currentCountZombieDie = _passCountZombieDie + _countCheck;
+            _zombieDieToPoolList = new NativeList<BufferZombieDie>(_currentCountZombieDie, Allocator.Persistent);
         }
         else
         {
@@ -303,7 +304,8 @@ public partial struct HandlePoolBullet : ISystem
         if (_currentCountWeaponDisable - _passCountWeaponDisable < _countCheck)
         {
             _bufferBulletDisables.Dispose();
-            _bufferBulletDisables = new NativeList<BufferBulletDisable>(_passCountWeaponDisable + _countCheck, Allocator.Persistent);
+            _currentCountWeaponDisable = _passCountWeaponDisable + _countCheck;
+            _bufferBulletDisables = new NativeList<BufferBulletDisable>(_currentCountWeaponDisable, Allocator.Persistent);
         }
         else
         {
