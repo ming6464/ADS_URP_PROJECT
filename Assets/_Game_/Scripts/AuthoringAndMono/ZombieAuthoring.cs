@@ -1,15 +1,16 @@
-﻿using Unity.Entities;
+﻿using System;
+using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 
 public class ZombieAuthoring : MonoBehaviour
 {
-    public GameObject zombiePrefab;
-    public float hp;
-    public float speed;
+    public ZombieSO data;
+    public SpawnData[] spawnDataArr;
     public float timeDelaySpawn;
     public bool spawnInfinity;
     public bool allowRespawn;
+    public bool applyTotalCount;
     public int numberSpawn;
     public int numberSpawnPerFrame;
     public Transform pointRange1;
@@ -23,7 +24,6 @@ class ZombieBaker : Baker<ZombieAuthoring>
 {
     public override void Bake(ZombieAuthoring authoring)
     {
-
         Entity entity = GetEntity(TransformUsageFlags.Dynamic);
         float3 posMin = authoring.pointRange1.position;
         float3 posMax = authoring.pointRange2.position;
@@ -31,10 +31,8 @@ class ZombieBaker : Baker<ZombieAuthoring>
         dirNormal.y = 0;
         AddComponent(entity,new ZombieProperty
         {
-            entity = GetEntity(authoring.zombiePrefab,TransformUsageFlags.Dynamic),
-            hp = authoring.hp,
-            speed = authoring.speed,
             directNormal = dirNormal,
+            applyTotalCount = authoring.applyTotalCount,
             spawner = new ZombieSpawner
             {
                 numberSpawn = authoring.numberSpawn,
@@ -46,5 +44,39 @@ class ZombieBaker : Baker<ZombieAuthoring>
                 posMin = posMin,
             }
         });
+        AddBuffer<BufferZombieDie>(entity);
+        var buffer = AddBuffer<BufferZombieStore>(entity);
+
+        foreach (var spawn in authoring.spawnDataArr)
+        {
+            var zombie = GetZombieData_L(spawn.id);
+            
+            if(!authoring.applyTotalCount && spawn.count <= 0) continue;
+            
+            buffer.Add(new BufferZombieStore()
+            {
+                id = spawn.id,
+                entity = GetEntity(zombie.prefab,TransformUsageFlags.Dynamic),
+                hp = zombie.hp,
+                speed = zombie.speed,
+                damage = zombie.damage,
+                attackRange = zombie.attackRange,
+                delayAttack = zombie.delayAttack,
+                numberSpawn = spawn.count,
+            });
+        }
+
+        Zombie GetZombieData_L(int id)
+        {
+            return Array.Find(authoring.data.zombies, x => x.id == id);
+        }
+        
     }
+}
+
+[Serializable]
+public struct SpawnData
+{
+    public int id;
+    public int count;
 }

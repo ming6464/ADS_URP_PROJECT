@@ -15,6 +15,8 @@ public partial struct ZombieMovermentSystem : ISystem
     private bool _init;
     private ZombieProperty _zombieProperty;
     private EntityTypeHandle _entityTypeHandle;
+    private EntityQuery _enQueryCheckZone;
+    private EntityQuery _enQueryMove;
 
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -22,6 +24,8 @@ public partial struct ZombieMovermentSystem : ISystem
         state.RequireForUpdate<ZombieProperty>();
         state.RequireForUpdate<ActiveZoneProperty>();
         state.RequireForUpdate<ZombieInfo>();
+        _enQueryCheckZone =
+            SystemAPI.QueryBuilder().WithAll<ZombieInfo>().WithNone<Disabled, SetActiveSP>().Build();
     }
 
     [BurstCompile]
@@ -31,9 +35,10 @@ public partial struct ZombieMovermentSystem : ISystem
         {
             _init = true;
 
-            var zone = SystemAPI.GetComponent<ActiveZoneProperty>(SystemAPI.GetSingletonEntity<ActiveZoneProperty>());
+            var zone = SystemAPI.GetSingleton<ActiveZoneProperty>();
             _pointZoneMin = zone.pointRangeMin;
             _pointZoneMax = zone.pointRangeMax;
+            _enQueryMove = SystemAPI.QueryBuilder().WithAll<ZombieInfo, LocalTransform>().Build();
             _zombieProperty = SystemAPI
                 .GetComponentRO<ZombieProperty>(SystemAPI.GetSingletonEntity<ZombieProperty>()).ValueRO;
         }
@@ -49,34 +54,30 @@ public partial struct ZombieMovermentSystem : ISystem
 
     private void Move(ref SystemState state)
     {
-        EntityQuery entityQuery = SystemAPI.QueryBuilder().WithAll<ZombieInfo, LocalTransform>().Build();
         float deltaTime = SystemAPI.Time.DeltaTime;
         ZombieMovementJOB job = new ZombieMovementJOB()
         {
-            speed = _zombieProperty.speed,
             deltaTime = deltaTime,
             ltTypeHandle = state.GetComponentTypeHandle<LocalTransform>(),
             zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>(true)
         };
-        state.Dependency = job.ScheduleParallel(entityQuery, state.Dependency);
+        state.Dependency = job.ScheduleParallel(_enQueryMove, state.Dependency);
     }
 
     private void CheckZombieToDeadZone(ref SystemState state, ref EntityCommandBuffer ecb)
     {
         _entityTypeHandle.Update(ref state);
 
-        EntityQuery entityQuery =
-            SystemAPI.QueryBuilder().WithAll<ZombieInfo>().WithNone<Disabled, SetActiveSP>().Build();
-
         var chunkJob = new CheckDeadZoneJOB
         {
             ecb = ecb.AsParallelWriter(),
             entityTypeHandle = _entityTypeHandle,
             ltwTypeHandle = state.GetComponentTypeHandle<LocalToWorld>(true),
+            zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>(),
             minPointRange = _pointZoneMin,
             maxPointRange = _pointZoneMax,
         };
-        state.Dependency = chunkJob.ScheduleParallel(entityQuery, state.Dependency);
+        state.Dependency = chunkJob.ScheduleParallel(_enQueryCheckZone, state.Dependency);
     }
 
     [BurstCompile]
@@ -84,7 +85,6 @@ public partial struct ZombieMovermentSystem : ISystem
     {
         public ComponentTypeHandle<LocalTransform> ltTypeHandle;
         [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
-        [ReadOnly] public float speed;
         [ReadOnly] public float deltaTime;
 
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
@@ -97,7 +97,7 @@ public partial struct ZombieMovermentSystem : ISystem
             {
                 var lt = lts[i];
                 var zombie = zombieInfos[i];
-                lt.Position += zombie.directNormal * speed * deltaTime;
+                lt.Position += zombie.directNormal * zombie.speed * deltaTime;
                 lt.Rotation = quaternion.LookRotation(zombie.directNormal, math.up());
                 lts[i] = lt;
             }
@@ -111,21 +111,32 @@ public partial struct ZombieMovermentSystem : ISystem
         public EntityCommandBuffer.ParallelWriter ecb;
         [ReadOnly] public EntityTypeHandle entityTypeHandle;
         [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwTypeHandle;
+        public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
         [ReadOnly] public float3 minPointRange;
         [ReadOnly] public float3 maxPointRange;
 
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
             in v128 chunkEnabledMask)
         {
-            var ltwArr = chunk.GetNativeArray(ref ltwTypeHandle);
+            var ltwArr = chunk.GetNativeArray(ltwTypeHandle);
+            var zombieInfos = chunk.GetNativeArray(zombieInfoTypeHandle);
             var entities = chunk.GetNativeArray(entityTypeHandle);
 
             for (int i = 0; i < chunk.Count; i++)
             {
                 if (CheckInRange(ltwArr[i].Position, minPointRange, maxPointRange)) continue;
+                var zombieInfo = zombieInfos[i];
+                zombieInfo.hp = 0;
+                zombieInfos[i] = zombieInfo;
                 ecb.AddComponent(unfilteredChunkIndex, entities[i], new SetActiveSP
                 {
                     state = StateID.Disable,
+                });
+                
+                ecb.AddComponent(unfilteredChunkIndex, entities[i], new AddToBuffer()
+                {
+                    id = zombieInfo.id,
+                    entity = entities[i],
                 });
             }
 

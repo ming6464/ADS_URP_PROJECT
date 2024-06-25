@@ -5,7 +5,6 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
-using UnityEngine;
 using Random = Unity.Mathematics.Random;
 using RaycastHit = Unity.Physics.RaycastHit;
 
@@ -20,9 +19,9 @@ public partial struct BulletMovementSystem : ISystem
     private EntityTypeHandle _entityTypeHandle;
     private CollisionFilter _collisionFilter;
     private PhysicsWorldSingleton _physicsWorld;
-    private NativeArray<Entity> _pointsEffectDisable;
     private NativeQueue<ZombieTakeDamage> _zombieDamageMapQueue;
     private NativeHashMap<Entity, float> _zombieTakeDamageMap;
+    private EntityQuery _enQueryBulletInfoAlive;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -35,13 +34,12 @@ public partial struct BulletMovementSystem : ISystem
         _entityTypeHandle = state.GetEntityTypeHandle();
         _zombieDamageMapQueue = new NativeQueue<ZombieTakeDamage>( Allocator.Persistent);
         _zombieTakeDamageMap =
-            new NativeHashMap<Entity, float>(1000, Allocator.Persistent);
+            new NativeHashMap<Entity, float>(100, Allocator.Persistent);
+        _enQueryBulletInfoAlive = SystemAPI.QueryBuilder().WithAll<BulletInfo>().WithNone<Disabled, SetActiveSP>().Build();
     }
 
     public void OnDestroy(ref SystemState state)
     {
-        if (_pointsEffectDisable.IsCreated)
-            _pointsEffectDisable.Dispose();
         if (_zombieDamageMapQueue.IsCreated)
             _zombieDamageMapQueue.Dispose();
         if (_zombieTakeDamageMap.IsCreated)
@@ -69,14 +67,9 @@ public partial struct BulletMovementSystem : ISystem
 
     private void MovementBulletAndCheckExpiredBullet(ref SystemState state)
     {
-        _zombieDamageMapQueue.Clear();
-        _zombieTakeDamageMap.Clear();
         float curTime = (float)SystemAPI.Time.ElapsedTime;
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
-        EntityQuery euQuery = SystemAPI.QueryBuilder().WithAll<BulletInfo>().WithNone<Disabled, SetActiveSP>().Build();
-        _pointsEffectDisable = SystemAPI.QueryBuilder().WithAll<EffectComponent, Disabled>().Build()
-            .ToEntityArray(Allocator.TempJob);
         _entityTypeHandle.Update(ref state);
         var jobChunk = new BulletMovementJOB()
         {
@@ -88,13 +81,12 @@ public partial struct BulletMovementSystem : ISystem
             deltaTime = SystemAPI.Time.DeltaTime,
             localTransformType = state.GetComponentTypeHandle<LocalTransform>(),
             entityTypeHandle = _entityTypeHandle,
-            hitFlashPointDisable = _pointsEffectDisable,
             currentTime = curTime,
             bulletInfoTypeHandle = state.GetComponentTypeHandle<BulletInfo>(),
             expired = _expired,
             zombieDamageMapQueue = _zombieDamageMapQueue.AsParallelWriter(),
         };
-        state.Dependency = jobChunk.Schedule(euQuery, state.Dependency);
+        state.Dependency = jobChunk.Schedule(_enQueryBulletInfoAlive, state.Dependency);
         state.Dependency.Complete();
         if (_zombieDamageMapQueue.Count > 0)
         {
@@ -122,9 +114,10 @@ public partial struct BulletMovementSystem : ISystem
                 });
             }
         }
+        _zombieDamageMapQueue.Clear();
+        _zombieTakeDamageMap.Clear();
         ecb.Playback(_entityManager);
         ecb.Dispose();
-        _pointsEffectDisable.Dispose();
     }
 
     //Jobs {
@@ -137,7 +130,6 @@ public partial struct BulletMovementSystem : ISystem
         [ReadOnly] public ComponentTypeHandle<BulletInfo> bulletInfoTypeHandle;
         [ReadOnly] public PhysicsWorldSingleton physicsWorld;
         [ReadOnly] public CollisionFilter filter;
-        [ReadOnly] public NativeArray<Entity> hitFlashPointDisable;
         [ReadOnly] public float length;
         [ReadOnly] public float time;
         [ReadOnly] public float deltaTime;
@@ -152,16 +144,19 @@ public partial struct BulletMovementSystem : ISystem
             var ltArr = chunk.GetNativeArray(localTransformType);
             var entities = chunk.GetNativeArray(entityTypeHandle);
             var bulletInfos = chunk.GetNativeArray(bulletInfoTypeHandle);
-            int countPointUsed = 0;
-            int totalCountPoint = hitFlashPointDisable.Length;
-            var lt_eff = new LocalTransform()
-            {
-                Scale = 1,
-            };
             var setActiveSP = new SetActiveSP()
             {
+                state = StateID.Disable,
                 startTime = time,
             };
+
+            var eff = new EffectComponent();
+            var lt_hide = new LocalTransform()
+            {
+                Scale = 1,
+                Position = new float3(1, 1, 1) * 999,
+            };
+            
             for (int i = 0; i < chunk.Count; i++)
             {
 
@@ -169,11 +164,8 @@ public partial struct BulletMovementSystem : ISystem
                 var bulletInfo = bulletInfos[i];
                 if ((currentTime - bulletInfo.startTime) >= expired)
                 {
-                    ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entity);
-                    ecb.AddComponent(unfilteredChunkIndex,entities,new SetActiveSP()
-                    {
-                        state = StateID.Disable
-                    });
+                    ecb.SetComponent(unfilteredChunkIndex,entity,lt_hide);
+                    ecb.AddComponent(unfilteredChunkIndex,entities,setActiveSP);
                     continue;
                 }
                 
@@ -181,7 +173,6 @@ public partial struct BulletMovementSystem : ISystem
                 float speed_New = Random.CreateFromIndex((uint)(i + 1 + (time % deltaTime)))
                     .NextFloat(bulletInfo.speed - 10f, bulletInfo.speed + 10f);
                 float3 newPosition = lt.Position + lt.Forward() * speed_New * deltaTime;
-
                 RaycastInput raycastInput = new RaycastInput()
                 {
                     Start = lt.Position,
@@ -197,28 +188,11 @@ public partial struct BulletMovementSystem : ISystem
                         entity = hit.Entity,
                     });
                     
-                    ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex, entity);
-                    setActiveSP.state = StateID.Disable;
+                    ecb.SetComponent(unfilteredChunkIndex,entity,lt_hide);
                     ecb.AddComponent(unfilteredChunkIndex, entity, setActiveSP);
-                    Entity effNew;
-
-                    if (countPointUsed < totalCountPoint)
-                    {
-                        effNew = hitFlashPointDisable[countPointUsed];
-                        ecb.RemoveComponent<Disabled>(unfilteredChunkIndex,effNew);
-                        setActiveSP.state = StateID.Enable;
-                        ecb.AddComponent(unfilteredChunkIndex,effNew,setActiveSP);
-                        ++countPointUsed;
-                    }
-                    else
-                    {
-                        effNew = ecb.CreateEntity(unfilteredChunkIndex);
-                        ecb.AddComponent<EffectComponent>(unfilteredChunkIndex, effNew);
-                    }
-
-                    lt_eff.Position = hit.Position;
-                    lt_eff.Rotation = quaternion.LookRotationSafe(hit.SurfaceNormal, math.up());
-                    ecb.AddComponent(unfilteredChunkIndex, effNew, lt_eff);
+                    eff.position = hit.Position;
+                    eff.rotation = quaternion.LookRotationSafe(hit.SurfaceNormal, math.up());
+                    ecb.AddComponent(unfilteredChunkIndex, hit.Entity, eff);
                 }
                 else
                 {

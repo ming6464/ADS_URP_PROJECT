@@ -71,6 +71,10 @@ namespace _Game.Scripts.Systems.Zombie
                     state = StateID.Wait,
                     startTime = time,
                 };
+                var addToBuffer = new AddToBuffer()
+                {
+                    
+                };
                 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -78,14 +82,16 @@ namespace _Game.Scripts.Systems.Zombie
                     var zombieInfo = zombieInfos[i];
                     var takeDamage = takeDamages[i];
                     zombieInfo.hp -= takeDamage.value;
-                    
+                    zombieInfos[i] = zombieInfo;
                     if (zombieInfo.hp <= 0)
                     {
+                        addToBuffer.id = zombieInfo.id;
+                        addToBuffer.entity = entity;
                         ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entity);
                         ecb.AddComponent(unfilteredChunkIndex,entity,setActive);
-                        continue;
+                        ecb.AddComponent(unfilteredChunkIndex,entity,addToBuffer);
                     }
-                    zombieInfos[i] = zombieInfo;
+                    
                 }
                 ecb.RemoveComponent<TakeDamage>(unfilteredChunkIndex,entities);
             }

@@ -26,7 +26,8 @@ public struct LayerStoreComponent : IComponentData
 
 public struct EffectComponent : IComponentData
 {
-    
+    public float3 position;
+    public quaternion rotation;
 }
 
 public struct SetActiveSP : IComponentData
@@ -60,16 +61,15 @@ public enum CameraType
 
 //Events {
 
-public struct EventChangeWeapon : IComponentData
-{
-    public WeaponStore value;
-}
-
 //Events }
 
 //other components
 
-    
+public struct AddToBuffer : IComponentData
+{
+    public int id;
+    public Entity entity;
+}
 
 //
 

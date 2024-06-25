@@ -11,19 +11,20 @@ using UnityEngine;
 [BurstCompile,UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial struct CameraSystem : ISystem
 {
+    private EntityQuery _enQueryPlayerInfo;
     
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<PlayerInfo>();
         state.RequireForUpdate<CameraProperty>();
+        _enQueryPlayerInfo = SystemAPI.QueryBuilder().WithAll<PlayerInfo>().Build();
     }
 
     public void OnUpdate(ref SystemState state)
     {
-        EntityQuery entityQuery = SystemAPI.QueryBuilder().WithAll<PlayerInfo>().Build();
-        if (!entityQuery.IsEmpty)
+        if (!_enQueryPlayerInfo.IsEmpty)
         {
-            Entity entityParent = entityQuery.GetSingletonEntity();
+            Entity entityParent = _enQueryPlayerInfo.GetSingletonEntity();
             var camProperty = SystemAPI.GetSingleton<CameraProperty>();
             EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
             var entityCamFirst = ecb.CreateEntity();
@@ -57,19 +58,20 @@ public partial struct CameraSystem : ISystem
 [BurstCompile,UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial struct HandleSetActiveSystem : ISystem
 {
-
     private EntityTypeHandle _entityTypeHandle;
+    private EntityQuery _enQuerySetActive;
 
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
-        _entityTypeHandle = state.GetEntityTypeHandle();
         state.RequireForUpdate<SetActiveSP>();
+        _entityTypeHandle = state.GetEntityTypeHandle();
+        _enQuerySetActive = SystemAPI.QueryBuilder().WithAll<SetActiveSP>().Build();
     }
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        EntityQuery entityQuery = SystemAPI.QueryBuilder().WithAll<SetActiveSP>().Build();
+        
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
         _entityTypeHandle.Update(ref state);
         var active = new HandleSetActiveJob
@@ -80,7 +82,7 @@ public partial struct HandleSetActiveSystem : ISystem
             entityTypeHandle = _entityTypeHandle,
             setActiveSpTypeHandle = state.GetComponentTypeHandle<SetActiveSP>(true)
         };
-        state.Dependency = active.ScheduleParallel(entityQuery,state.Dependency);
+        state.Dependency = active.ScheduleParallel(_enQuerySetActive,state.Dependency);
         state.Dependency.Complete();
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
@@ -159,6 +161,107 @@ public partial struct HandleSetActiveSystem : ISystem
     
 }
 //
+[BurstCompile,UpdateInGroup(typeof(PresentationSystemGroup)),UpdateAfter(typeof(HandleSetActiveSystem))]
+public partial struct HandlePoolZombie : ISystem
+{
+    private NativeList<BufferZombieDie> _zombieDieToPoolList;
+    private Entity _entityZombieProperty;
+    private EntityQuery _entityQuery;
+    private EntityTypeHandle _entityTypeHandle;
+    private EntityManager _entityManager;
+    private bool _isInit;
+
+    private int _currentCountZombieAlive;
+    private int _currentCountZombieDie;
+    private int _passCountZombieAlive;
+    private int _passCountZombieDie;
+    
+    [BurstCompile]
+    public void OnCreate(ref SystemState state)
+    {
+        state.RequireForUpdate<ZombieProperty>();
+        state.RequireForUpdate<AddToBuffer>();
+        _entityQuery = SystemAPI.QueryBuilder().WithAll<ZombieInfo, AddToBuffer,Disabled>().Build();
+        _entityTypeHandle = state.GetEntityTypeHandle();
+    }
+
+    [BurstCompile]
+    public void OnDestroy(ref SystemState state)
+    {
+        if (_zombieDieToPoolList.IsCreated)
+            _zombieDieToPoolList.Dispose();
+    }
+
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
+        _entityManager = state.EntityManager;
+        if (!_isInit)
+        {
+            _isInit = true;
+            _entityZombieProperty = SystemAPI.GetSingletonEntity<ZombieProperty>();
+        }
+
+        if (_currentCountZombieDie - _passCountZombieDie < 100)
+        {
+            _zombieDieToPoolList.Dispose();
+            _zombieDieToPoolList = new NativeList<BufferZombieDie>(_passCountZombieDie + 100, Allocator.Persistent);
+        }
+        else
+        {
+            _zombieDieToPoolList.Clear();
+        }
+        
+        
+        
+        _entityTypeHandle.Update(ref state);
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+        var job = new GetListDataToPool()
+        {
+            zombieDieToPoolList = _zombieDieToPoolList.AsParallelWriter(),
+            entityTypeHandle = _entityTypeHandle,
+            zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>(),
+            ecb = ecb.AsParallelWriter(),
+        };
+        state.Dependency = job.ScheduleParallel(_entityQuery, state.Dependency);
+        state.Dependency.Complete();
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
+        _passCountZombieDie = _zombieDieToPoolList.Length;
+        _entityManager.GetBuffer<BufferZombieDie>(_entityZombieProperty).AddRange(_zombieDieToPoolList);
+    }
+    
+    
+    partial struct GetListDataToPool : IJobChunk
+    {
+        public EntityCommandBuffer.ParallelWriter ecb;
+        [WriteOnly] public NativeList<BufferZombieDie>.ParallelWriter zombieDieToPoolList;
+        [ReadOnly] public EntityTypeHandle entityTypeHandle;
+        [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
+        
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+        {
+            var entities = chunk.GetNativeArray(entityTypeHandle);
+            var zombieInfos = chunk.GetNativeArray(zombieInfoTypeHandle);
+
+            for (int i = 0; i < chunk.Count; i++)
+            {
+                var entity = entities[i];
+                var zombieInfo = zombieInfos[i];
+                zombieDieToPoolList.AddNoResize(new BufferZombieDie()
+                {
+                    id = zombieInfo.id,
+                    entity = entity,
+                });
+            }
+            ecb.RemoveComponent<AddToBuffer>(unfilteredChunkIndex,entities);
+        }
+    }
+}
+
+
+
+//
 [UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial class UpdateHybrid : SystemBase
 {
@@ -172,7 +275,8 @@ public partial class UpdateHybrid : SystemBase
     
     public EventHitFlashEffect UpdateHitFlashEff;
     private NativeQueue<LocalTransform> _hitFlashQueue;
-    
+
+    private EntityQuery _enQuery;
     //Effect }
     
     protected override void OnStartRunning()
@@ -180,6 +284,7 @@ public partial class UpdateHybrid : SystemBase
         base.OnStartRunning();
         RequireForUpdate<CameraComponent>();
         _hitFlashQueue = new NativeQueue<LocalTransform>(Allocator.Persistent);
+        _enQuery = SystemAPI.QueryBuilder().WithAll<EffectComponent>().Build();
     }
 
     protected override void OnStopRunning()
@@ -196,24 +301,23 @@ public partial class UpdateHybrid : SystemBase
 
     private void UpdateEffectEvent()
     {
-        Dependency.Complete();
+        _hitFlashQueue.Clear();
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         var hitFlashEff = new HandleHitFlashEffectEventJOB()
         {
-            ltwTypeHandle = GetComponentTypeHandle<LocalTransform>(),
+            effTypeHandle = GetComponentTypeHandle<EffectComponent>(),
             hitFlashQueue = _hitFlashQueue.AsParallelWriter(),
             entityTypeHandle = GetEntityTypeHandle(),
             ecb = ecb.AsParallelWriter(),
         };
-        var enQuery = GetEntityQuery(ComponentType.ReadOnly<EffectComponent>());
-        Dependency = hitFlashEff.ScheduleParallel(enQuery, Dependency); 
+        Dependency = hitFlashEff.ScheduleParallel(_enQuery, Dependency); 
         Dependency.Complete();
-        ecb.Playback(EntityManager);
-        ecb.Dispose();
         while (_hitFlashQueue.TryDequeue(out var lt))
         {
             UpdateHitFlashEff?.Invoke(lt.Position,lt.Rotation);
         }
+        ecb.Playback(EntityManager);
+        ecb.Dispose();
     }
     private void UpdateCameraEvent()
     {
@@ -229,22 +333,24 @@ public partial class UpdateHybrid : SystemBase
     {
         public EntityCommandBuffer.ParallelWriter ecb;
         public EntityTypeHandle entityTypeHandle;
-        public NativeQueue<LocalTransform>.ParallelWriter hitFlashQueue;
-        [ReadOnly] public ComponentTypeHandle<LocalTransform> ltwTypeHandle;
+        [WriteOnly] public NativeQueue<LocalTransform>.ParallelWriter hitFlashQueue;
+        [ReadOnly] public ComponentTypeHandle<EffectComponent> effTypeHandle;
         
         public void Execute(in ArchetypeChunk chunk, int indexQuery, bool useEnabledMask, in v128 chunkEnabledMask)
         {
-            var lts = chunk.GetNativeArray(ltwTypeHandle);
+            var effs = chunk.GetNativeArray(effTypeHandle);
             var entities = chunk.GetNativeArray(entityTypeHandle);
+            LocalTransform lt;
             for (int i = 0; i < chunk.Count; i++)
             {
-                ecb.AddComponent(indexQuery,entities[i],new SetActiveSP()
+                lt = new LocalTransform()
                 {
-                    state = StateID.Disable,
-                });
-                hitFlashQueue.Enqueue(lts[i]);
+                    Position = effs[i].position,
+                    Rotation = effs[i].rotation,
+                };
+                hitFlashQueue.Enqueue(lt);
+                ecb.RemoveComponent<EffectComponent>(indexQuery,entities[i]);
             }
-            ecb.RemoveComponent<EffectComponent>(indexQuery,entities);
         }
     }
     //JOB

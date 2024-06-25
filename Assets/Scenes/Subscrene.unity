@@ -250,7 +250,7 @@ MonoBehaviour:
   speed: 3.5
   radius: 0.35
   aimNearestEnemy: 1
-  moveToWard: 130
+  moveToWard: 800
   numberSpawnDefault: 3
   spaceGrid:
     x: 1
@@ -641,15 +641,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 44bd12d5ee694480a10ab3fee341253c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  zombiePrefab: {fileID: 7846563739282400770, guid: 916e68ea8558c93499f2a84488006f19,
-    type: 3}
-  hp: 30
-  speed: 4.5
+  data: {fileID: 11400000, guid: d8be5c147f056f34fb5c6fd108543aaa, type: 2}
+  spawnDataArr:
+  - id: 0
+    count: 0
+  - id: 1
+    count: 0
+  - id: 2
+    count: 0
+  - id: 3
+    count: 0
   timeDelaySpawn: 0.05
   spawnInfinity: 1
   allowRespawn: 1
+  applyTotalCount: 1
   numberSpawn: 50
-  numberSpawnPerFrame: 3
+  numberSpawnPerFrame: 2
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}
   pointDir1: {fileID: 1398424327}

@@ -4,11 +4,9 @@ using Unity.Transforms;
 
 public struct ZombieProperty : IComponentData
 {
-    public Entity entity;
-    public float hp;
-    public float speed;
     public ZombieSpawner spawner;
     public float3 directNormal;
+    public bool applyTotalCount;
 }
 
 public struct ZombieSpawner
@@ -24,9 +22,34 @@ public struct ZombieSpawner
 
 public struct ZombieInfo : IComponentData
 {
-    public float hp;
+    public int id;
+    public float hp;    
+    public float speed;
+    public float damage;
+    public float attackRange;
+    public float delayAttack;
     public float3 directNormal;
 }
+
+public struct BufferZombieStore : IBufferElementData
+{
+    public int id;
+    public Entity entity;
+    public float hp;
+    public float speed;
+    public float damage;
+    public float attackRange;
+    public float delayAttack;
+    //
+    public int numberSpawn;
+}
+
+public struct BufferZombieDie : IBufferElementData
+{
+    public int id;
+    public Entity entity;
+}
+
 
 public struct TakeDamage : IComponentData
 {
@@ -35,9 +58,7 @@ public struct TakeDamage : IComponentData
 
 public struct NotUnique : IComponentData
 {
-    
 }
-
 
 public readonly partial struct ZombieAspect : IAspect
 {

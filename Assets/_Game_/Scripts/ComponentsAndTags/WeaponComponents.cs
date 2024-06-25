@@ -17,7 +17,7 @@ public struct WeaponInfo : IComponentData
     public int id;
 }
 
-public struct WeaponStore : IBufferElementData
+public struct BufferWeaponStore : IBufferElementData
 {
     public int id;
     public Entity entity;
@@ -96,3 +96,9 @@ public readonly partial struct BulletAspect : IAspect
 
     public LocalTransform LocalTransform => _localTransform.ValueRO;
 }
+
+
+// public partial struct BufferBulletDisable : IBufferElementData
+// {
+//     
+// }
