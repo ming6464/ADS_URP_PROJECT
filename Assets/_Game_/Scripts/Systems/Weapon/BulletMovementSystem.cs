@@ -15,7 +15,7 @@ public partial struct BulletMovementSystem : ISystem
     private float _expired;
     private bool _isGetComponent;
     private EntityManager _entityManager;
-    private WeaponProperties _weaponProperties;
+    private WeaponProperty _weaponProperties;
     private EntityTypeHandle _entityTypeHandle;
     private CollisionFilter _collisionFilter;
     private PhysicsWorldSingleton _physicsWorld;
@@ -28,7 +28,7 @@ public partial struct BulletMovementSystem : ISystem
     {
         state.RequireForUpdate<LayerStoreComponent>();
         state.RequireForUpdate<EffectProperty>();
-        state.RequireForUpdate<WeaponProperties>();
+        state.RequireForUpdate<WeaponProperty>();
         state.RequireForUpdate<PhysicsWorldSingleton>();
         state.RequireForUpdate<WeaponInfo>();
         _entityTypeHandle = state.GetEntityTypeHandle();
@@ -52,7 +52,7 @@ public partial struct BulletMovementSystem : ISystem
         {
             _entityManager = state.EntityManager;
             _isGetComponent = true;
-            _weaponProperties = SystemAPI.GetSingleton<WeaponProperties>();
+            _weaponProperties = SystemAPI.GetSingleton<WeaponProperty>();
             _expired = _weaponProperties.expired;
             var layerStore = SystemAPI.GetSingleton<LayerStoreComponent>();
             _collisionFilter = new CollisionFilter()

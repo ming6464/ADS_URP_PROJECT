@@ -5,17 +5,18 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 
-[BurstCompile, UpdateInGroup(typeof(InitializationSystemGroup)),UpdateAfter(typeof(PlayerSystem))]
+[BurstCompile, UpdateInGroup(typeof(InitializationSystemGroup))]
 public partial struct PlayerSpawnSystem : ISystem
 {
     private byte _spawnPlayerState;
     private Entity _characterEntityInstantiate;
-    private Entity _playerEntity;
+    private Entity _entityPlayerInfo;
     private Entity _parentCharacterEntity;
-    private PlayerProperty _playerProperty;
     private bool _spawnInit;
     private EntityManager _entityManager;
     private float2 _spaceGrid;
+    private PlayerProperty _playerProperty;
+    private int _passCountOfCol;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -23,7 +24,6 @@ public partial struct PlayerSpawnSystem : ISystem
         state.RequireForUpdate<PlayerProperty>();
     }
 
-    [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
@@ -32,6 +32,8 @@ public partial struct PlayerSpawnSystem : ISystem
             if (_spawnPlayerState == 0)
             {
                 _playerProperty = SystemAPI.GetSingleton<PlayerProperty>();
+                var entityPlayerAuthoring =
+                    SystemAPI.GetSingletonEntity<PlayerProperty>();
                 var entityPlayer = ecb.CreateEntity();
                 ecb.AddComponent(entityPlayer, new PlayerInfo()
                 {
@@ -44,8 +46,8 @@ public partial struct PlayerSpawnSystem : ISystem
                     Rotation = quaternion.identity,
                     Scale = 1,
                 });
-                ecb.AddBuffer<CharacterNewBuffer>(entityPlayer);
-                
+                ecb.AddBuffer<BufferCharacterNew>(entityPlayer);
+                ecb.AddBuffer<BufferCharacterDie>(entityPlayer);
                 var parentCharacter = ecb.CreateEntity();
                 ecb.AddComponent<ParentCharacter>(parentCharacter);
                 ecb.AddComponent(parentCharacter, new Parent()
@@ -60,7 +62,7 @@ public partial struct PlayerSpawnSystem : ISystem
                 return;
             }
             _parentCharacterEntity = SystemAPI.GetSingletonEntity<ParentCharacter>();
-            _playerEntity = SystemAPI.GetSingletonEntity<PlayerInfo>();
+            _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
             _characterEntityInstantiate = _playerProperty.characterEntity;
             _entityManager = state.EntityManager;
             _spawnPlayerState = 2;
@@ -81,12 +83,13 @@ public partial struct PlayerSpawnSystem : ISystem
             spawnChange = _playerProperty.numberSpawnDefault;
         }
 
-        foreach(var (collect,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess().WithNone<Disabled,SetActiveSP>())
+        foreach (var (collection,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess()
+                     .WithNone<Disabled, SetActiveSP>())
         {
-            switch (collect.ValueRO.type)
+            switch (collection.ValueRO.type)
             {
                 case ItemType.Character:
-                    spawnChange += collect.ValueRO.count;
+                    spawnChange += collection.ValueRO.count;
                     ecb.AddComponent(entity,new SetActiveSP()
                     {
                         state = StateID.Disable,
@@ -103,7 +106,6 @@ public partial struct PlayerSpawnSystem : ISystem
     {
         if(count == 0) return;
         var lt = DotsEX.LocalTransformDefault();
-        int countOfCol = _playerProperty.countOfCol;
         NativeArray<Entity> characterAlive = SystemAPI.QueryBuilder().WithAll<CharacterInfo>().WithNone<Disabled>().Build().ToEntityArray(Allocator.Temp);
         int characterAliveCount = characterAlive.Length;
         var totalNumber = count + characterAliveCount;
@@ -117,65 +119,85 @@ public partial struct PlayerSpawnSystem : ISystem
             totalNumber = 0;
         }
 
+        int countOfCol = math.max(2,(int)math.ceil(math.sqrt(totalNumber)));
+        bool changeSizeCol = false;
+
+        if (countOfCol != _passCountOfCol)
+        {
+            changeSizeCol = true;
+            _passCountOfCol = countOfCol;
+        }
+
+        var bufferDisable = _entityManager.GetBuffer<BufferCharacterDie>(_entityPlayerInfo);
+        
         if (count > 0)
         {
-            var characterBuffer = _entityManager.GetBuffer<CharacterNewBuffer>(_playerEntity);
-            NativeArray<Entity> characterDisable = SystemAPI.QueryBuilder().WithAll<CharacterInfo>().WithAll<Disabled>().Build().ToEntityArray(Allocator.Temp);
-            int maxIndexUsing = -1;
-            int maxIndexCharacterDisable = characterDisable.Length - 1;
-
-            for (int i = characterAliveCount; i < totalNumber; i++)
+            var characterBuffer = _entityManager.GetBuffer<BufferCharacterNew>(_entityPlayerInfo);
+            int i = changeSizeCol ? 0 : characterAliveCount;
+            for (;i < totalNumber; i++)
             {
-                maxIndexUsing++;
                 lt.Position = GetPositionLocal_L(i, countOfCol, _spaceGrid);
-
-                Entity entityNew;
-                if (maxIndexUsing <= maxIndexCharacterDisable)
+                Entity entitySet;
+                
+                if (i < characterAliveCount)
                 {
-                    entityNew = characterDisable[maxIndexUsing];
-                    ecb.RemoveComponent<Disabled>(entityNew);
-                    ecb.AddComponent(entityNew,new SetActiveSP()
-                    {
-                        state = StateID.Enable,
-                    });
-                    
+                    entitySet = characterAlive[i];
                 }
                 else
                 {
-                    entityNew = _entityManager.Instantiate(_characterEntityInstantiate);
-                    ecb.AddComponent<LocalToWorld>(entityNew);
-                    ecb.AddComponent(entityNew, new Parent()
+                    if (bufferDisable.Length > 1)
                     {
-                        Value = _parentCharacterEntity,
+                        entitySet = bufferDisable[0].entity;
+                        bufferDisable.RemoveAt(0);
+                        ecb.RemoveComponent<Disabled>(entitySet);
+                        ecb.AddComponent(entitySet,new SetActiveSP()
+                        {
+                            state = StateID.Enable,
+                        });
+                    }
+                    else
+                    {
+                        entitySet = _entityManager.Instantiate(_characterEntityInstantiate);
+                        ecb.AddComponent<LocalToWorld>(entitySet);
+                        ecb.AddComponent(entitySet, new Parent()
+                        {
+                            Value = _parentCharacterEntity,
+                        });
+                    }
+                    characterBuffer.Add(new BufferCharacterNew()
+                    {
+                        entity = entitySet,
+                    });
+                    ecb.AddComponent(entitySet, new CharacterInfo()
+                    {
+                        index = i
                     });
                 }
-                characterBuffer.Add(new CharacterNewBuffer()
-                {
-                    entity = entityNew,
-                });
-                ecb.AddComponent(entityNew, lt);
-                ecb.AddComponent(entityNew, new CharacterInfo()
-                {
-                    index = i
-                });
+                ecb.AddComponent(entitySet, lt);
             }
-            characterDisable.Dispose();
         }
         else
         {
             int maxIndex = totalNumber - 1;
-            int numberDisable = 0;
-            for (int i = characterAliveCount - 1; i >= 0; i--)
+            int condition = totalNumber;
+            if (changeSizeCol)
             {
-                if (numberDisable + count == 0) break;
-                var characterInfo = _entityManager.GetComponentData<CharacterInfo>(characterAlive[i]);
-                if (characterInfo.index > maxIndex)
+                condition = 0;
+            }
+            for (int i = characterAliveCount - 1; i >= condition; i--)
+            {
+                if (i > maxIndex)
                 {
-                    numberDisable++;
+                    var characterInfo = _entityManager.GetComponentData<CharacterInfo>(characterAlive[i]);
+                    bufferDisable.Add(new BufferCharacterDie()
+                    {
+                        entity = characterAlive[i],
+                    });
                     ecb.AddComponent(characterAlive[i], new SetActiveSP()
                     {
                         state = StateID.Disable
                     });
+                    
 
                     if (!characterInfo.weaponEntity.Equals(default))
                     {
@@ -185,6 +207,12 @@ public partial struct PlayerSpawnSystem : ISystem
                             state = StateID.Disable,
                         });
                     }
+                }
+                else
+                {
+                    if(!changeSizeCol) break;
+                    lt.Position = GetPositionLocal_L(i, countOfCol, _spaceGrid);
+                    ecb.AddComponent(characterAlive[i], lt);
                 }
             }
         }
@@ -207,7 +235,7 @@ public partial struct PlayerSpawnSystem : ISystem
             Rotation = quaternion.identity,
         });
 
-        var playInfo = SystemAPI.GetComponentRW<PlayerInfo>(_playerEntity);
+        var playInfo = SystemAPI.GetComponentRW<PlayerInfo>(_entityPlayerInfo);
         playInfo.ValueRW.maxXGridCharacter = maxX;
         playInfo.ValueRW.maxYGridCharacter = maxY;
         characterAlive.Dispose();

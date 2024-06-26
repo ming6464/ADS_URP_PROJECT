@@ -17,7 +17,7 @@ class WeaponBaker : Baker<WeaponAuthoring>
     public override void Bake(WeaponAuthoring authoring)
     {
         Entity entity = GetEntity(TransformUsageFlags.None);
-        AddComponent(entity,new WeaponProperties()
+        AddComponent(entity,new WeaponProperty()
         {
             shootAuto = authoring.shootAuto,
             entityBullet = GetEntity(authoring.bulletPrefab,TransformUsageFlags.Dynamic),

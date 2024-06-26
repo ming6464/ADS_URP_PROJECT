@@ -194,13 +194,14 @@ public partial struct PlayerSystem : ISystem
                 }
                 else
                 {
-                    entityItemCollection = ecb.CreateEntity();
+                    entityItemCollection = _entityManager.CreateEntity();
                 }
                 ecb.AddComponent(entityItemCollection,new ItemCollection()
                 {
                     type = itemInfo.type,
                     count = itemInfo.count,
                     id = itemInfo.id,
+                    entityItem = _arrHitItem[i].Entity,
                 });
                 
                 ecb.RemoveComponent<PhysicsCollider>(entityItem);

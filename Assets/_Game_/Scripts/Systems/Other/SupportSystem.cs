@@ -273,11 +273,10 @@ public partial struct HandlePoolBullet : ISystem
     private int _passCountWeaponDisable;
     private int _countCheck;
     
-    
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
-        state.RequireForUpdate<WeaponProperties>();
+        state.RequireForUpdate<WeaponProperty>();
         state.RequireForUpdate<AddToBuffer>();
         _countCheck = 200;
         _entityQuery = SystemAPI.QueryBuilder().WithAll<BulletInfo, AddToBuffer,Disabled>().Build();
@@ -298,9 +297,10 @@ public partial struct HandlePoolBullet : ISystem
         if (!_isInit)
         {
             _isInit = true;
-            _entityWeaponProperty = SystemAPI.GetSingletonEntity<WeaponProperties>();
+            _entityWeaponProperty = SystemAPI.GetSingletonEntity<WeaponProperty>();
         }
-
+        
+        
         if (_currentCountWeaponDisable - _passCountWeaponDisable < _countCheck)
         {
             _bufferBulletDisables.Dispose();
@@ -326,6 +326,12 @@ public partial struct HandlePoolBullet : ISystem
         state.Dependency.Complete();
         ecb.Playback(_entityManager);
         ecb.Dispose();
+
+        if (_countCheck < (_bufferBulletDisables.Length - _passCountWeaponDisable))
+        {
+            _countCheck = _bufferBulletDisables.Length - _passCountWeaponDisable;
+        }
+        
         _passCountWeaponDisable = _bufferBulletDisables.Length;
         _entityManager.GetBuffer<BufferBulletDisable>(_entityWeaponProperty).AddRange(_bufferBulletDisables);
     }

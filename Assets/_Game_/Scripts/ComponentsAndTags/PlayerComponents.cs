@@ -11,7 +11,6 @@ public struct PlayerProperty : IComponentData
     public float3 spawnPosition;
     public int numberSpawnDefault;
     public float2 spaceGrid;
-    public int countOfCol;
     public bool aimNearestEnemy;
     public float distanceSetChangeRota;
     public float moveToWardMax;
@@ -26,7 +25,12 @@ public struct PlayerInfo : IComponentData
     public int maxYGridCharacter;
 }
 
-public struct CharacterNewBuffer : IBufferElementData
+public struct BufferCharacterNew : IBufferElementData
+{
+    public Entity entity;
+}
+
+public struct BufferCharacterDie : IBufferElementData
 {
     public Entity entity;
 }
@@ -77,6 +81,7 @@ public struct PlayerInput : IComponentData
 }
 
 // Character
+
 
 public struct ParentCharacter : IComponentData
 {

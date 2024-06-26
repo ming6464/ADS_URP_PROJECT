@@ -71,5 +71,5 @@ public struct AddToBuffer : IComponentData
     public Entity entity;
 }
 
-//
 
+//

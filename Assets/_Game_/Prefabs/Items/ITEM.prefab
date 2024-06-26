@@ -151,9 +151,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: baf9e49520064ee19c7bb2a4520b61e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  prefab: {fileID: 0}
   count: 3
   type: 0
+  id: 0
+  textObj: {fileID: 2035862929969342748}
+  spawnPoints: []
 --- !u!1 &7910497903320759565
 GameObject:
   m_ObjectHideFlags: 0
@@ -237,7 +239,7 @@ TextMesh:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7910497903320759565}
-  m_Text: +3
+  m_Text: + 3
   m_OffsetZ: 0
   m_CharacterSize: 1
   m_LineSpacing: 1

@@ -13,7 +13,7 @@ public partial struct WeaponSystem : ISystem
     private Entity _entityPlayer;
     private Entity _bulletEntityPrefab;
     private Entity _entityWeaponProperty;
-    private WeaponProperties _weaponProperties;
+    private WeaponProperty _weaponProperties;
     private float _timeLatest;
     
     private bool _isSpawnDefault;
@@ -36,7 +36,7 @@ public partial struct WeaponSystem : ISystem
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<PlayerInput>();
-        state.RequireForUpdate<WeaponProperties>();
+        state.RequireForUpdate<WeaponProperty>();
         state.RequireForUpdate<PlayerInfo>();
         state.RequireForUpdate<CharacterInfo>();
         _isSpawnDefault = false;
@@ -52,8 +52,8 @@ public partial struct WeaponSystem : ISystem
         
         if (!_isSpawnDefault)
         {
-            _entityWeaponProperty = SystemAPI.GetSingletonEntity<WeaponProperties>();
-            _weaponProperties = SystemAPI.GetSingleton<WeaponProperties>();
+            _entityWeaponProperty = SystemAPI.GetSingletonEntity<WeaponProperty>();
+            _weaponProperties = SystemAPI.GetSingleton<WeaponProperty>();
             _weaponStores = SystemAPI.GetBuffer<BufferWeaponStore>(_entityWeaponProperty).ToNativeArray(Allocator.Persistent);
             _entityPlayer = SystemAPI.GetSingletonEntity<PlayerInfo>();
             _shootAuto = _weaponProperties.shootAuto;
@@ -94,17 +94,18 @@ public partial struct WeaponSystem : ISystem
         }
         else
         {
-            foreach(var (collect,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess().WithNone<Disabled,SetActiveSP>())
+            foreach (var (collection,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess()
+                         .WithNone<Disabled, SetActiveSP>())
             {
-                switch (collect.ValueRO.type)
+                switch (collection.ValueRO.type)
                 {
                     case ItemType.Weapon:
                         ecb.AddComponent(entity,new SetActiveSP()
                         {
                             state = StateID.Disable,
                         });
-                        if(_idCurrentWeapon == collect.ValueRO.id) continue;
-                        ChangeWeapon(collect.ValueRO.id,ref ecb);
+                        if(_idCurrentWeapon == collection.ValueRO.id) continue;
+                        ChangeWeapon(collection.ValueRO.id,ref ecb);
                         break;
                 }
            
@@ -167,7 +168,7 @@ public partial struct WeaponSystem : ISystem
             _isNewWeapon = false;
         }
         
-        var buffer = _entityManager.GetBuffer<CharacterNewBuffer>(_entityPlayer);
+        var buffer = _entityManager.GetBuffer<BufferCharacterNew>(_entityPlayer);
         if(buffer.Length == 0) return;
         foreach (var b in buffer)
         {

@@ -2,7 +2,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 
-public struct WeaponProperties : IComponentData
+public struct WeaponProperty : IComponentData
 {
     public bool shootAuto;
     //
