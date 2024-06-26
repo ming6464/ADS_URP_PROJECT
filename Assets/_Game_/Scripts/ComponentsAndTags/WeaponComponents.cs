@@ -70,6 +70,16 @@ public struct BulletInfo : IComponentData
     public float speed;
 }
 
+public struct BufferBulletSpawner : IBufferElementData
+{
+    public float damage;
+    public float speed;
+    public LocalTransform lt;
+    public float bulletPerShot;
+    public float spaceAnglePerBullet;
+    public bool parallelOrbit;
+}
+
 public readonly partial struct BulletAspect : IAspect
 {
     public readonly Entity entity;

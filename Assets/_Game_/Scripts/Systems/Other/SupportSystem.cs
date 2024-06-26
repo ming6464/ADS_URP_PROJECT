@@ -232,7 +232,7 @@ public partial struct HandlePoolZombie : ISystem
         _entityManager.GetBuffer<BufferZombieDie>(_entityZombieProperty).AddRange(_zombieDieToPoolList);
     }
     
-    
+    [BurstCompile]
     partial struct GetListZombieDataToPool : IJobChunk
     {
         public EntityCommandBuffer.ParallelWriter ecb;
@@ -260,6 +260,7 @@ public partial struct HandlePoolZombie : ISystem
     }
 }
 //
+[BurstCompile,UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial struct HandlePoolBullet : ISystem
 {
     private NativeList<BufferBulletDisable> _bufferBulletDisables;

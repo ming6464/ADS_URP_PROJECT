@@ -6,7 +6,6 @@ namespace _Game_.Scripts.ComponentsAndTags.Obstacle
 {
     public class BarrelAuthoring : MonoBehaviour
     {
-        public GameObject bulletPrefab;
         public float3 pivotFireOffset;
         public int bulletPerShot;
         public float spaceAnglePerBullet;
@@ -24,7 +23,6 @@ namespace _Game_.Scripts.ComponentsAndTags.Obstacle
                 Entity entity = GetEntity(TransformUsageFlags.None);
                 AddComponent(entity,new BarrelInfo()
                 {
-                    entityBullet = GetEntity(authoring.bulletPrefab,TransformUsageFlags.None),
                     damage = authoring.damage,
                     distanceSetChangeRota = authoring.distanceSetChangeRota,
                     moveToWardMax = authoring.moveToWardMax,

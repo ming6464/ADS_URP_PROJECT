@@ -26,6 +26,7 @@ class WeaponBaker : Baker<WeaponAuthoring>
         });
 
         AddBuffer<BufferBulletDisable>(entity);
+        AddBuffer<BufferBulletSpawner>(entity);
         DynamicBuffer<BufferWeaponStore> weaponStoresBuffer = AddBuffer<BufferWeaponStore>(entity);
         foreach (var weapon in authoring.data.weapons)
         {

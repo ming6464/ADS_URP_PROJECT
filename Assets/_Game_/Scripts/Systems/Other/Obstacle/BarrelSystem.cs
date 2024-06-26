@@ -1,4 +1,5 @@
-﻿using Unity.Burst;
+﻿using _Game_.Scripts.Systems.Weapon;
+using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
@@ -7,29 +8,39 @@ using Unity.Transforms;
 
 namespace _Game_.Scripts.Systems.Other.Obstacle
 {
+    [BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup)),UpdateAfter(typeof(BulletSpawnerSystem)),UpdateBefore(typeof(BulletSpawnerSystem))]
     public partial struct BarrelSystem : ISystem
     {
         private NativeList<LocalTransform> _ltEnemy;
+        private NativeQueue<BufferBulletSpawner> _bulletSpawnQueue;
         private EntityQuery _entityQuery;
+        private Entity _entityWeaponAuthoring;
+        private bool _isInit;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
+            state.RequireForUpdate<BarrelInfo>();
+            state.RequireForUpdate<WeaponProperty>();
             _ltEnemy = new NativeList<LocalTransform>(Allocator.Persistent);
             _entityQuery = SystemAPI.QueryBuilder().WithAll<BarrelInfo>().WithNone<Disabled, SetActiveSP>().Build();
-            state.RequireForUpdate<BarrelInfo>();
+            _bulletSpawnQueue = new NativeQueue<BufferBulletSpawner>(Allocator.Persistent);
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            if (!_isInit)
+            {
+                _entityWeaponAuthoring = SystemAPI.GetSingletonEntity<WeaponProperty>();
+                _isInit = true;
+            }
             _ltEnemy.Clear();
+            _bulletSpawnQueue.Clear();
             foreach(var lt in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<ZombieInfo>().WithNone<Disabled,SetActiveSP>())
             {
                 _ltEnemy.Add(lt.ValueRO);
             }
-
-            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
             var job = new BarrelOB()
             {
                 ltComponentType = state.GetComponentTypeHandle<LocalTransform>(),
@@ -38,13 +49,20 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                 deltaTime = SystemAPI.Time.DeltaTime,
                 barrelRunTimeComponentType = state.GetComponentTypeHandle<BarrelRunTime>(),
                 time = (float)SystemAPI.Time.ElapsedTime,
-                ecb = ecb.AsParallelWriter(),
-                ltwComponentTypeHandle = state.GetComponentTypeHandle<LocalToWorld>()
+                ltwComponentTypeHandle = state.GetComponentTypeHandle<LocalToWorld>(),
+                bulletSpawnQueue = _bulletSpawnQueue.AsParallelWriter(),
             };
             state.Dependency = job.ScheduleParallel(_entityQuery, state.Dependency);
             state.Dependency.Complete();
-            ecb.Playback(state.EntityManager);
-            ecb.Dispose();
+            if (_bulletSpawnQueue.Count > 0)
+            {
+                var bufferSpawnBullet = state.EntityManager.AddBuffer<BufferBulletSpawner>(_entityWeaponAuthoring);
+                while(_bulletSpawnQueue.TryDequeue(out var queue))
+                {
+                    bufferSpawnBullet.Add(queue);
+                }
+            }
+            
         }
 
         [BurstCompile]
@@ -52,13 +70,15 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
         {
             if (_ltEnemy.IsCreated)
                 _ltEnemy.Dispose();
+            if (_bulletSpawnQueue.IsCreated)
+                _bulletSpawnQueue.Dispose();
         }
         
         partial struct BarrelOB : IJobChunk
         {
-            public EntityCommandBuffer.ParallelWriter ecb;
             public ComponentTypeHandle<LocalTransform> ltComponentType;
             public ComponentTypeHandle<BarrelRunTime> barrelRunTimeComponentType;
+            public NativeQueue<BufferBulletSpawner>.ParallelWriter bulletSpawnQueue;
             [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwComponentTypeHandle;
             [ReadOnly] public NativeList<LocalTransform> ltEnemy;
             [ReadOnly] public ComponentTypeHandle<BarrelInfo> barrelInfoComponentType;
@@ -71,13 +91,16 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                 var barrelInfos = chunk.GetNativeArray(barrelInfoComponentType);
                 var barrelRunTimes = chunk.GetNativeArray(barrelRunTimeComponentType);
                 var ltws = chunk.GetNativeArray(ltwComponentTypeHandle);
-               
+                var lt_bullet = new LocalTransform()
+                {
+                    Scale = 1
+                };
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var lt = lts[i];
                     var ltw = ltws[i];
-                    var barrel = barrelInfos[i];
-                    var moveToWard = barrel.moveToWardMax;
+                    var info = barrelInfos[i];
+                    var moveToWard = info.moveToWardMax;
                     var ltEnemy = GetLocalTransformNearestEnemy(ltw.Position);
                     var direct = lt.Forward();
                     if (ltEnemy.Scale > 0)
@@ -85,34 +108,31 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                         var distance = math.distance(ltw.Position, ltEnemy.Position);
                         direct = ltEnemy.Position - ltw.Position;
                         var ratio = 0f;
-                        if (distance < barrel.distanceSetChangeRota)
+                        if (distance < info.distanceSetChangeRota)
                         {
-                            ratio = 1 - (distance * 1.0f / barrel.distanceSetChangeRota);
+                            ratio = 1 - (distance * 1.0f / info.distanceSetChangeRota);
                         }
-                        moveToWard = math.lerp(barrel.moveToWardMin, barrel.moveToWardMax,ratio);
+                        moveToWard = math.lerp(info.moveToWardMin, info.moveToWardMax,ratio);
                     }
                     lt.Rotation = MathExt.MoveTowards(lt.Rotation, quaternion.LookRotationSafe(direct, math.up()),
                         moveToWard * deltaTime);
                     lts[i] = lt;
                     //
                     var barrelRunTime = barrelRunTimes[i];
-                    if ((time - barrelRunTime.value) > barrel.cooldown)
+                    if ((time - barrelRunTime.value) > info.cooldown)
                     {
-                        var bullet = ecb.Instantiate(unfilteredChunkIndex,barrel.entityBullet);
-                        var lt_bullet = new LocalTransform()
+                        lt_bullet.Position = ltws[i].Position + info.pivotFireOffset;
+                        lt_bullet.Rotation = lt.Rotation;
+                        bulletSpawnQueue.Enqueue(new BufferBulletSpawner()
                         {
-                            Position = ltws[i].Position + barrel.pivotFireOffset,
-                            Rotation = lt.Rotation,
-                            Scale = 1,
-                        };
-                        ecb.AddComponent(unfilteredChunkIndex,bullet,lt_bullet);
-                        ecb.AddComponent(unfilteredChunkIndex,bullet,new BulletInfo()
-                        {
-                            damage = barrel.damage,
-                            speed = barrel.speed,
-                            startTime = time,
+                            bulletPerShot = info.bulletPerShot,
+                            damage = info.damage,
+                            lt = lt_bullet,
+                            parallelOrbit = info.parallelOrbit,
+                            speed = info.speed,
+                            spaceAnglePerBullet = info.spaceAnglePerBullet,
                         });
-                        barrelRunTime.value = time;
+                        
                         barrelRunTimes[i] = barrelRunTime;
                     }
                     
