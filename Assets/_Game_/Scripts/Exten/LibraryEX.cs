@@ -166,6 +166,7 @@ public static class MathExt
         rotation = quaternion.LookRotationSafe(matrix.c2.xyz, matrix.c1.xyz);
         scale = new float3(math.length(matrix.c0.xyz), math.length(matrix.c1.xyz), math.length(matrix.c2.xyz));
     }
+    
 
     #region Random
 

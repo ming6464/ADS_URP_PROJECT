@@ -23,8 +23,8 @@ MonoBehaviour:
     damage: 15
     speed: 80
     cooldown: 0.1
-    bulletPerShot: 10
-    spaceAnglePerBullet: 1
+    bulletPerShot: 4
+    spaceAnglePerBullet: 1.4
     parallelOrbit: 0
   - id: 1
     weaponPrefab: {fileID: 4502064372477858661, guid: d827824cc1754874a8696dc4c9316b75,

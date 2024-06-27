@@ -580,12 +580,12 @@ PrefabInstance:
     - target: {fileID: 2333079132952480295, guid: 2c8a88245575f2749b91cb56ecd70877,
         type: 3}
       propertyPath: InitialModule.startSize.scalar
-      value: 3
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 2333079132952480295, guid: 2c8a88245575f2749b91cb56ecd70877,
         type: 3}
       propertyPath: InitialModule.startSize.minScalar
-      value: 2
+      value: 1.5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

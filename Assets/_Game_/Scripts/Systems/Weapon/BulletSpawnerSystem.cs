@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace _Game_.Scripts.Systems.Weapon
 {
-    [BurstCompile, UpdateInGroup(typeof(PresentationSystemGroup)),UpdateAfter(typeof(TurretSystem))]
+    [BurstCompile, UpdateInGroup(typeof(PresentationSystemGroup))]
     public partial struct BulletSpawnerSystem : ISystem
     {
         private EntityManager _entityManager;

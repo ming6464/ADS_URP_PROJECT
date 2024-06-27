@@ -4,7 +4,6 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
 
 namespace _Game_.Scripts.Systems.Other
 {
@@ -31,9 +30,9 @@ namespace _Game_.Scripts.Systems.Other
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            _entityManager = state.EntityManager;
             if (!_isInit)
             {
+                _entityManager = state.EntityManager;
                 _isInit = true;
                 _buffetObstacle = SystemAPI.GetSingletonBuffer<BufferTurretObstacle>().ToNativeArray(Allocator.Persistent);
 

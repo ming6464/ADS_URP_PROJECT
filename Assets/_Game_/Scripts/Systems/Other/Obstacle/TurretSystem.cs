@@ -8,7 +8,7 @@ using Unity.Transforms;
 
 namespace _Game_.Scripts.Systems.Other.Obstacle
 {
-    [BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup)),UpdateAfter(typeof(BulletSpawnerSystem)),UpdateBefore(typeof(BulletSpawnerSystem))]
+    [BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup))]
     public partial struct TurretSystem : ISystem
     {
         private NativeArray<BufferTurretObstacle> _bufferTurretObstacles;
@@ -130,7 +130,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
             public ComponentTypeHandle<LocalTransform> ltComponentType;
             public ComponentTypeHandle<BarrelRunTime> barrelRunTimeComponentType;
             public NativeQueue<BufferBulletSpawner>.ParallelWriter bulletSpawnQueue;
-            [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwComponentTypeHandle;
+            public ComponentTypeHandle<LocalToWorld> ltwComponentTypeHandle;
             [ReadOnly] public NativeList<LocalTransform> ltEnemy;
             [ReadOnly] public ComponentTypeHandle<BarrelInfo> barrelInfoComponentType;
             [ReadOnly] public float deltaTime;
@@ -165,14 +165,14 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                         }
                         moveToWard = math.lerp(info.moveToWardMin, info.moveToWardMax,ratio);
                     }
-                    lt.Rotation = MathExt.MoveTowards(lt.Rotation, quaternion.LookRotationSafe(direct, math.up()),
+                    lt.Rotation = MathExt.MoveTowards(ltw.Rotation, quaternion.LookRotationSafe(direct, math.up()),
                         moveToWard * deltaTime);
                     lts[i] = lt;
-                    //
+
                     var barrelRunTime = barrelRunTimes[i];
                     if ((time - barrelRunTime.value) > info.cooldown)
                     {
-                        lt_bullet.Position = ltws[i].Position + info.pivotFireOffset;
+                        lt_bullet.Position = lt.TransformPoint(info.pivotFireOffset) + ltw.Position;
                         lt_bullet.Rotation = lt.Rotation;
                         bulletSpawnQueue.Enqueue(new BufferBulletSpawner()
                         {

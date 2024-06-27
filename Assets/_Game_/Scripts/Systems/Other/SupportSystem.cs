@@ -180,7 +180,7 @@ public partial struct HandlePoolZombie : ISystem
     {
         state.RequireForUpdate<ZombieProperty>();
         state.RequireForUpdate<AddToBuffer>();
-        _countCheck = 100;
+        _countCheck = 200;
         _entityQuery = SystemAPI.QueryBuilder().WithAll<ZombieInfo, AddToBuffer,Disabled>().Build();
         _entityTypeHandle = state.GetEntityTypeHandle();
     }
@@ -200,6 +200,10 @@ public partial struct HandlePoolZombie : ISystem
         {
             _isInit = true;
             _entityZombieProperty = SystemAPI.GetSingletonEntity<ZombieProperty>();
+            var property = SystemAPI.GetSingleton<ZombieProperty>();
+            _currentCountZombieDie = property.spawner.numberSpawn/2;
+            _zombieDieToPoolList = new NativeList<BufferZombieDie>(_currentCountZombieDie,Allocator.Persistent);
+            
         }
 
         if (_currentCountZombieDie - _passCountZombieDie < _countCheck)
@@ -228,6 +232,12 @@ public partial struct HandlePoolZombie : ISystem
         state.Dependency.Complete();
         ecb.Playback(_entityManager);
         ecb.Dispose();
+        
+        if (_countCheck < (_zombieDieToPoolList.Length - _passCountZombieDie))
+        {
+            _countCheck = _zombieDieToPoolList.Length - _passCountZombieDie + 100;
+        }
+        
         _passCountZombieDie = _zombieDieToPoolList.Length;
         _entityManager.GetBuffer<BufferZombieDie>(_entityZombieProperty).AddRange(_zombieDieToPoolList);
     }
@@ -281,6 +291,8 @@ public partial struct HandlePoolBullet : ISystem
         state.RequireForUpdate<AddToBuffer>();
         _countCheck = 200;
         _entityQuery = SystemAPI.QueryBuilder().WithAll<BulletInfo, AddToBuffer,Disabled>().Build();
+        _bufferBulletDisables = new NativeList<BufferBulletDisable>(_countCheck, Allocator.Persistent);
+        _currentCountWeaponDisable = _countCheck;
         _entityTypeHandle = state.GetEntityTypeHandle();
     }
 
@@ -330,7 +342,7 @@ public partial struct HandlePoolBullet : ISystem
 
         if (_countCheck < (_bufferBulletDisables.Length - _passCountWeaponDisable))
         {
-            _countCheck = _bufferBulletDisables.Length - _passCountWeaponDisable;
+            _countCheck = _bufferBulletDisables.Length - _passCountWeaponDisable + 100;
         }
         
         _passCountWeaponDisable = _bufferBulletDisables.Length;

@@ -15,3 +15,7 @@ MonoBehaviour:
   obstacles:
   - id: 0
     obstacle: {fileID: 11400000, guid: 63e571b248ab2c740a2c4a6725bef6f0, type: 2}
+  - id: 1
+    obstacle: {fileID: 11400000, guid: 08c0a29f8b6411647b733b908fee9fd5, type: 2}
+  - id: 2
+    obstacle: {fileID: 11400000, guid: d0a2d57b21d222b4b9504d057cf9e266, type: 2}
