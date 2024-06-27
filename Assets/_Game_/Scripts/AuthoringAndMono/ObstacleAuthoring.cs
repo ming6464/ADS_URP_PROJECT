@@ -7,6 +7,7 @@ namespace _Game_.Scripts.AuthoringAndMono
     public class ObstacleAuthoring : MonoBehaviour
     {
         public ObstacleSO obstacleSo;
+        public bool check;
         
         private class ObstacleAuthoringBaker : Baker<ObstacleAuthoring>
         {
@@ -14,9 +15,9 @@ namespace _Game_.Scripts.AuthoringAndMono
             {
                 var entity = GetEntity(TransformUsageFlags.None);
                 var buffer = AddBuffer<BufferObstacle>(entity);
-                for (int i = 0; i < authoring.obstacleSo.obstacles.Length; i++)
+                var arr = authoring.obstacleSo.obstacles;
+                foreach (var obs in arr)
                 {
-                    var obs = authoring.obstacleSo.obstacles[i];
                     buffer.Add(new BufferObstacle()
                     {
                         id = obs.id,

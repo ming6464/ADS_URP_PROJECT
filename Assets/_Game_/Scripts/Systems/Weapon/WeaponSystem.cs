@@ -12,7 +12,6 @@ public partial struct WeaponSystem : ISystem
     private Entity _weaponEntityInstantiate;
     private EntityManager _entityManager;
     private Entity _entityPlayer;
-    private Entity _bulletEntityPrefab;
     private Entity _entityWeaponAuthoring;
     private WeaponProperty _weaponProperties;
     private float _timeLatest;
@@ -78,15 +77,13 @@ public partial struct WeaponSystem : ISystem
         }
         if (!_isGetComponent)
         {
-            _bulletEntityPrefab = _weaponProperties.entityBullet;
             _isGetComponent = true;
         }
         if (!_shootAuto)
         {
             _pullTrigger = SystemAPI.GetSingleton<PlayerInput>().pullTrigger;
         }
-        // Shot(ref state);
-        Shot2(ref state);
+        Shot(ref state);
         UpdateDataWeapon(ref state,ref ecb);
         UpdateWeapon(ref state,ref ecb);
         
@@ -199,7 +196,7 @@ public partial struct WeaponSystem : ISystem
         buffer.Clear();
     }
 
-    private void Shot2(ref SystemState state)
+    private void Shot(ref SystemState state)
     {
         if(!_pullTrigger) return;
         if ((SystemAPI.Time.ElapsedTime - _timeLatest) < _cooldown) return;
@@ -217,6 +214,7 @@ public partial struct WeaponSystem : ISystem
         };
         state.Dependency = job.ScheduleParallel(_enQueryWeapon, state.Dependency);
         state.Dependency.Complete();
+        _timeLatest = (float)SystemAPI.Time.ElapsedTime;
         if (_bulletSpawnQueue.Count > 0)
         {
             var bufferSpawnBullet = state.EntityManager.AddBuffer<BufferBulletSpawner>(_entityWeaponAuthoring);
@@ -263,77 +261,4 @@ public partial struct WeaponSystem : ISystem
         }
     }
 
-    private void Shot(ref SystemState state)
-    {
-        return;
-        if(!_pullTrigger) return;
-        if ((SystemAPI.Time.ElapsedTime - _timeLatest) < _cooldown) return;
-        _bulletSpawnQueue.Clear();
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
-        var entitiesDisable = _entityManager.GetBuffer<BufferBulletDisable>(_entityWeaponAuthoring);
-        var bulletEntityPrefab = _bulletEntityPrefab;
-        float spaceAngleAnyBullet = _spaceAnglePerBullet;
-        float time = (float)(SystemAPI.Time.ElapsedTime);
-        BulletInfo bulletInfo = new BulletInfo { startTime = time, damage = _damage, speed = _speed};
-        LocalTransform lt;
-        float3 angleRota;
-        
-        foreach (var weaponAspect in SystemAPI.Query<WeaponAspect>())
-        {
-            float subtractIndex = 0.5f;
-            int halfNumberPreShot = (int)math.ceil(_bulletPerShot / 2f);
-            lt = new LocalTransform()
-            {
-                Position = weaponAspect.PositionWorld,
-                Rotation = weaponAspect.RotationWorld,
-                Scale = 1,
-            };
-            angleRota = MathExt.QuaternionToFloat3(lt.Rotation);
-            if (halfNumberPreShot % 2 != 0)
-            {
-                SpawnBullet_L(lt);
-                --halfNumberPreShot;
-                subtractIndex = 0;
-            }
-            
-            for (int i = 1; i <= halfNumberPreShot; i++)
-            {
-                float3 angleRotaNew = angleRota;
-                float angle = (i - subtractIndex) * spaceAngleAnyBullet;
-                float angle1 = angleRotaNew.y + angle;
-                float angle2 = angleRotaNew.y - angle;
-                angleRotaNew.y = angle1;
-                lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
-                SpawnBullet_L(lt);
-                angleRotaNew.y = angle2;
-                lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
-                SpawnBullet_L(lt);
-            }
-        }
-        
-        ecb.Playback(_entityManager);
-        _timeLatest = time;
-        
-        void SpawnBullet_L(LocalTransform lt)
-        {
-            Entity entity;
-            if (entitiesDisable.Length > 0)
-            {
-                entity = entitiesDisable[0].entity;
-                entitiesDisable.RemoveAt(0);
-                ecb.AddComponent(entity, new SetActiveSP()
-                {
-                    state = StateID.Enable,
-                });
-                ecb.RemoveComponent<Disabled>(entity);
-            }
-            else
-            {
-                entity = ecb.Instantiate(bulletEntityPrefab);
-            }
-            
-            ecb.AddComponent(entity,lt);
-            ecb.AddComponent(entity,bulletInfo);
-        }
-    }
 }

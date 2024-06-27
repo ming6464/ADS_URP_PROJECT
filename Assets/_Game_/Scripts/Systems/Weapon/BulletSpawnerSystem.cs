@@ -5,6 +5,7 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
 namespace _Game_.Scripts.Systems.Weapon
 {
@@ -33,19 +34,17 @@ namespace _Game_.Scripts.Systems.Weapon
                 _entityBulletInstantiate = weaponProperty.entityBullet;
                 _entityWeaponAuthoring = SystemAPI.GetSingletonEntity<WeaponProperty>();
             }
-            
-            var ecb = new EntityCommandBuffer(Allocator.TempJob);
-            var bufferBulletSpawn = _entityManager.GetBuffer<BufferBulletSpawner>(_entityWeaponAuthoring);
-            var bulletSpawnerArr = bufferBulletSpawn.ToNativeArray(Allocator.TempJob);
-            if (bulletSpawnerArr.Length == 0)
-            {
-                bulletSpawnerArr.Dispose();
-                ecb.Dispose();
-                return;
-            }
 
+            SpawnBullet(ref state);
+        }
+
+        private void SpawnBullet(ref SystemState state)
+        {
+            var bufferBulletSpawn = _entityManager.GetBuffer<BufferBulletSpawner>(_entityWeaponAuthoring);
+            if (bufferBulletSpawn.Length == 0) return;
+            var bulletSpawnerArr = bufferBulletSpawn.ToNativeArray(Allocator.TempJob);
+            var ecb = new EntityCommandBuffer(Allocator.TempJob);
             var bufferBulletDisables = _entityManager.GetBuffer<BufferBulletDisable>(_entityWeaponAuthoring);
-            var bulletDisableArr = bufferBulletDisables.ToNativeArray(Allocator.TempJob);
             float time = (float)SystemAPI.Time.ElapsedTime;
 
             for (int index = 0; index < bulletSpawnerArr.Length; index++)
@@ -60,7 +59,7 @@ namespace _Game_.Scripts.Systems.Weapon
 
                 if (halfNumberPreShot % 2 != 0)
                 {
-                    InstantiateBullet(index, lt, damage, speed, _entityBulletInstantiate, ref ecb, bulletDisableArr, time);
+                    InstantiateBullet_L( lt, damage, speed, _entityBulletInstantiate);
                     --halfNumberPreShot;
                     subtractIndex = 0;
                 }
@@ -73,41 +72,38 @@ namespace _Game_.Scripts.Systems.Weapon
                     float angle2 = angleRotaNew.y - angle;
                     angleRotaNew.y = angle1;
                     lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
-                    InstantiateBullet(index, lt, damage, speed, _entityBulletInstantiate, ref ecb, bulletDisableArr, time);
+                    InstantiateBullet_L( lt, damage, speed, _entityBulletInstantiate);
                     angleRotaNew.y = angle2;
                     lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
-                    InstantiateBullet(index, lt, damage, speed, _entityBulletInstantiate, ref ecb, bulletDisableArr, time);
+                    InstantiateBullet_L( lt, damage, speed, _entityBulletInstantiate);
                 }
             }
 
             ecb.Playback(_entityManager);
-
-            // Clear the buffers to avoid conflicts in the next update
-            bufferBulletDisables.Clear();
-            bufferBulletSpawn.Clear();
-
-            bulletDisableArr.Dispose();
             bulletSpawnerArr.Dispose();
+            _entityManager.GetBuffer<BufferBulletSpawner>(_entityWeaponAuthoring).Clear();
             ecb.Dispose();
+            void InstantiateBullet_L(LocalTransform lt, float damage, float speed, Entity entityBullet)
+            {
+                Entity entity;
+                if (bufferBulletDisables.Length > 0)
+                {
+                    entity = bufferBulletDisables[0].entity;
+                    ecb.RemoveComponent<Disabled>(entity);
+                    ecb.AddComponent(entity, new SetActiveSP { state = StateID.Enable });
+                    bufferBulletDisables.RemoveAt(0);
+                }
+                else
+                {
+                    entity = ecb.Instantiate(entityBullet);
+                }
+                ecb.AddComponent(entity, lt);
+                ecb.AddComponent(entity, new BulletInfo { damage = damage, speed = speed, startTime = time });
+            }
+            
         }
 
-        private static void InstantiateBullet(int index, LocalTransform lt, float damage, float speed, Entity entityBullet, ref EntityCommandBuffer ecb, NativeArray<BufferBulletDisable> bulletDisableArr, float time)
-        {
-            Entity entity;
-            if (bulletDisableArr.Length > index)
-            {
-                entity = bulletDisableArr[index].entity;
-                ecb.AddComponent(entity, new SetActiveSP { state = StateID.Enable });
-                ecb.RemoveComponent<Disabled>(entity);
-            }
-            else
-            {
-                entity = ecb.Instantiate(entityBullet);
-            }
-
-            ecb.AddComponent(entity, lt);
-            ecb.AddComponent(entity, new BulletInfo { damage = damage, speed = speed, startTime = time });
-        }
+        
 
         [BurstCompile]
         private struct SpawnBulletJob : IJobParallelFor

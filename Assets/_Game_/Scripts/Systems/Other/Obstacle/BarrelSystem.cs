@@ -35,6 +35,13 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                 _entityWeaponAuthoring = SystemAPI.GetSingletonEntity<WeaponProperty>();
                 _isInit = true;
             }
+
+            PutEventSpawnBullet(ref state);
+        }
+
+        private void PutEventSpawnBullet(ref SystemState state
+        )
+        {
             _ltEnemy.Clear();
             _bulletSpawnQueue.Clear();
             foreach(var lt in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<ZombieInfo>().WithNone<Disabled,SetActiveSP>())
@@ -56,13 +63,12 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
             state.Dependency.Complete();
             if (_bulletSpawnQueue.Count > 0)
             {
-                var bufferSpawnBullet = state.EntityManager.AddBuffer<BufferBulletSpawner>(_entityWeaponAuthoring);
+                var bufferSpawnBullet = state.EntityManager.GetBuffer<BufferBulletSpawner>(_entityWeaponAuthoring);
                 while(_bulletSpawnQueue.TryDequeue(out var queue))
                 {
                     bufferSpawnBullet.Add(queue);
                 }
             }
-            
         }
 
         [BurstCompile]
@@ -132,6 +138,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                             speed = info.speed,
                             spaceAnglePerBullet = info.spaceAnglePerBullet,
                         });
+                        barrelRunTime.value = time;
                         
                         barrelRunTimes[i] = barrelRunTime;
                     }

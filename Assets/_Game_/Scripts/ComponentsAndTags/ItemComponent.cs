@@ -47,7 +47,6 @@ public struct BarrelRunTime : IComponentData
 
 public struct BarrelInfo : IComponentData
 {
-    public Entity entityBullet;
     public float speed;
     public float damage;
     public float cooldown;

@@ -109,11 +109,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 161f3f9ad92648b88eaf9611723e0077, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  bulletPrefab: {fileID: 2192329522781796173, guid: e290f7dbaf29d6e42aa3845c5fe5963e,
-    type: 3}
-  speed: 70
+  pivotFireOffset:
+    x: 0
+    y: 0
+    z: 1.332
+  bulletPerShot: 10
+  spaceAnglePerBullet: 1.2
+  parallelOrbit: 0
+  speed: 80
   damage: 30
-  cooldown: 0.07
+  cooldown: 0.3
   distanceSetChangeRota: 20
   moveToWardMax: 200
   moveToWardMin: 600
