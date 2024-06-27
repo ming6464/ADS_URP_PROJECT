@@ -6,7 +6,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 
-[BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup)),UpdateBefore(typeof(BarrelSystem)),UpdateAfter(typeof(PlayerSpawnSystem))]
+[BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup)),UpdateBefore(typeof(TurretSystem)),UpdateAfter(typeof(PlayerSpawnSystem))]
 public partial struct WeaponSystem : ISystem
 {
     private Entity _weaponEntityInstantiate;

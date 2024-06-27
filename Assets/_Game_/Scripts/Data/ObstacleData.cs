@@ -1,4 +1,5 @@
 ﻿using System;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace _Game_.Scripts.Data
@@ -6,19 +7,23 @@ namespace _Game_.Scripts.Data
     [CreateAssetMenu(menuName = "DataSO/ObstacleSO")]
     public class ObstacleSO : ScriptableObject
     {
-        public Obstacle[] obstacles;
+        public ObstacleItem[] obstacles;
     }
-    
-    
+
     [Serializable]
-    public struct Obstacle 
+    public struct ObstacleItem
     {
         public int id;
-        public ObstacleType type;
-        public GameObject prefabs;
+        public Obstacle obstacle;
     }
 
+    public abstract class Obstacle : ScriptableObject
+    {
+        public ObstacleType type;
+    }
+    
 
+    [Serializable]
     public enum ObstacleType
     {
         Turret

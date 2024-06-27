@@ -20,9 +20,9 @@ MonoBehaviour:
       x: 0.478
       y: 0.849
       z: 0.582
-    damage: 10
+    damage: 15
     speed: 80
-    cooldown: 0.2
+    cooldown: 0.1
     bulletPerShot: 5
     spaceAnglePerBullet: 1
     parallelOrbit: 0
@@ -33,7 +33,7 @@ MonoBehaviour:
       x: -0.03
       y: 1.562
       z: 0.359
-    damage: 500
+    damage: 60
     speed: 70
     cooldown: 0.6
     bulletPerShot: 25

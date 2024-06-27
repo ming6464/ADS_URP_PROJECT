@@ -9,38 +9,81 @@ using Unity.Transforms;
 namespace _Game_.Scripts.Systems.Other.Obstacle
 {
     [BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup)),UpdateAfter(typeof(BulletSpawnerSystem)),UpdateBefore(typeof(BulletSpawnerSystem))]
-    public partial struct BarrelSystem : ISystem
+    public partial struct TurretSystem : ISystem
     {
+        private NativeArray<BufferTurretObstacle> _bufferTurretObstacles;
         private NativeList<LocalTransform> _ltEnemy;
         private NativeQueue<BufferBulletSpawner> _bulletSpawnQueue;
-        private EntityQuery _entityQuery;
+        private EntityQuery _enQueryBarrelInfo;
         private Entity _entityWeaponAuthoring;
+        private EntityManager _entityManager;
         private bool _isInit;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<BarrelInfo>();
+            state.RequireForUpdate<TurretInfo>();
             state.RequireForUpdate<WeaponProperty>();
             _ltEnemy = new NativeList<LocalTransform>(Allocator.Persistent);
-            _entityQuery = SystemAPI.QueryBuilder().WithAll<BarrelInfo>().WithNone<Disabled, SetActiveSP>().Build();
+            _enQueryBarrelInfo = SystemAPI.QueryBuilder().WithAll<BarrelInfo,BarrelRunTime>().WithNone<Disabled, SetActiveSP>().Build();
             _bulletSpawnQueue = new NativeQueue<BufferBulletSpawner>(Allocator.Persistent);
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            _entityManager = state.EntityManager;
             if (!_isInit)
             {
-                _entityWeaponAuthoring = SystemAPI.GetSingletonEntity<WeaponProperty>();
                 _isInit = true;
+                _entityWeaponAuthoring = SystemAPI.GetSingletonEntity<WeaponProperty>();
+                _bufferTurretObstacles = SystemAPI.GetSingletonBuffer<BufferTurretObstacle>()
+                    .ToNativeArray(Allocator.Persistent);
             }
-
+            CheckSetupBarrel(ref state);
             PutEventSpawnBullet(ref state);
         }
 
-        private void PutEventSpawnBullet(ref SystemState state
-        )
+        private void CheckSetupBarrel(ref SystemState state)
+        {
+            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+            foreach (var (barrelSetup, entity) in SystemAPI.Query<RefRO<BarrelCanSetup>>().WithEntityAccess()
+                         .WithNone<Disabled>())
+            {
+                var turret = GetTurret(barrelSetup.ValueRO.id);
+                ecb.AddComponent(entity,new BarrelInfo()
+                {
+                    bulletPerShot = turret.bulletPerShot,
+                    cooldown = turret.cooldown,
+                    damage = turret.damage,
+                    distanceSetChangeRota = turret.distanceSetChangeRota,
+                    moveToWardMax = turret.moveToWardMax,
+                    moveToWardMin = turret.moveToWardMin,
+                    parallelOrbit = turret.parallelOrbit,
+                    pivotFireOffset = turret.pivotFireOffset,
+                    speed = turret.speed,
+                    spaceAnglePerBullet = turret.spaceAnglePerBullet,
+                });
+                ecb.AddComponent<BarrelRunTime>(entity);
+                ecb.RemoveComponent<BarrelCanSetup>(entity);
+            }
+            ecb.Playback(_entityManager);
+            ecb.Dispose();
+        }
+
+        private BufferTurretObstacle GetTurret(int id)
+        {
+            BufferTurretObstacle turret = default;
+
+            foreach (var t in _bufferTurretObstacles)
+            {
+                if (t.id == id) return t;
+            }
+            
+            return turret;
+        }
+
+        private void PutEventSpawnBullet(ref SystemState state)
         {
             _ltEnemy.Clear();
             _bulletSpawnQueue.Clear();
@@ -59,7 +102,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                 ltwComponentTypeHandle = state.GetComponentTypeHandle<LocalToWorld>(),
                 bulletSpawnQueue = _bulletSpawnQueue.AsParallelWriter(),
             };
-            state.Dependency = job.ScheduleParallel(_entityQuery, state.Dependency);
+            state.Dependency = job.ScheduleParallel(_enQueryBarrelInfo, state.Dependency);
             state.Dependency.Complete();
             if (_bulletSpawnQueue.Count > 0)
             {
@@ -78,6 +121,8 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                 _ltEnemy.Dispose();
             if (_bulletSpawnQueue.IsCreated)
                 _bulletSpawnQueue.Dispose();
+            if (_bufferTurretObstacles.IsCreated)
+                _bufferTurretObstacles.Dispose();
         }
         
         partial struct BarrelOB : IJobChunk

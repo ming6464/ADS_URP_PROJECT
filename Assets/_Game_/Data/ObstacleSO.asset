@@ -9,12 +9,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
+  m_Script: {fileID: 11500000, guid: 1ec6c19936f040b2a7b94cfaa3f20405, type: 3}
   m_Name: ObstacleSO
   m_EditorClassIdentifier: Assembly-CSharp:_Game_.Scripts.Data:ObstacleSO
   obstacles:
   - id: 0
-    prefabs: {fileID: 177796887462457866, guid: c1a8f77441069484dbc9c093e49aa3c5,
-      type: 3}
-    speed: 0
-    damage: 0
+    obstacle: {fileID: 11400000, guid: 63e571b248ab2c740a2c4a6725bef6f0, type: 2}

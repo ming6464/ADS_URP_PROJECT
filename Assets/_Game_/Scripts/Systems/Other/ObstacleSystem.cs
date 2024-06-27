@@ -1,4 +1,5 @@
-﻿using Unity.Burst;
+﻿using _Game_.Scripts.Data;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -10,7 +11,7 @@ namespace _Game_.Scripts.Systems.Other
     [BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup))]
     public partial struct ObstacleSystem : ISystem
     {
-        private NativeArray<BufferObstacle> _buffetObstacle;
+        private NativeArray<BufferTurretObstacle> _buffetObstacle;
         private EntityManager _entityManager;
         private bool _isInit;
         
@@ -34,7 +35,7 @@ namespace _Game_.Scripts.Systems.Other
             if (!_isInit)
             {
                 _isInit = true;
-                _buffetObstacle = SystemAPI.GetSingletonBuffer<BufferObstacle>().ToNativeArray(Allocator.Persistent);
+                _buffetObstacle = SystemAPI.GetSingletonBuffer<BufferTurretObstacle>().ToNativeArray(Allocator.Persistent);
 
             }
             EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
@@ -43,23 +44,24 @@ namespace _Game_.Scripts.Systems.Other
             {
                 switch (collection.ValueRO.type)
                 {
-                    case ItemType.Obstacle:
-                        Spawn(ref state,collection.ValueRO, ref ecb);
+                    case ItemType.ObstacleTurret:
+                        SpawnTurret(ref state,ref ecb,collection.ValueRO);
                         ecb.AddComponent(entity,new SetActiveSP()
                         {
                             state = StateID.Disable
                         });
                         break;
                 }
+                
             }
             
             ecb.Playback(_entityManager);
             ecb.Dispose();
         }
 
-        private void Spawn(ref SystemState state,ItemCollection itemCollection, ref EntityCommandBuffer ecb)
+        private void SpawnTurret(ref SystemState state,ref EntityCommandBuffer ecb,ItemCollection itemCollection)
         {
-            BufferObstacle buffetObstacle = default;
+            BufferTurretObstacle buffetObstacle = default;
             bool check = false;
             foreach (var obs in _buffetObstacle)
             {
@@ -83,6 +85,7 @@ namespace _Game_.Scripts.Systems.Other
                 ecb.AddComponent(newObs,new TurretInfo()
                 {
                     id = itemCollection.id,
+                    type = ObstacleType.Turret,
                 });
             }
             points.Clear();

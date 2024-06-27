@@ -73,7 +73,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5982128119541712138}
-  - component: {fileID: 6720823160068438497}
+  - component: {fileID: 8145188081609076897}
   m_Layer: 0
   m_Name: Barrel
   m_TagString: Untagged
@@ -97,7 +97,7 @@ Transform:
   - {fileID: 3770676298321273096}
   m_Father: {fileID: 1977846117856565490}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &6720823160068438497
+--- !u!114 &8145188081609076897
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -109,19 +109,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 161f3f9ad92648b88eaf9611723e0077, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  pivotFireOffset:
-    x: 0
-    y: 0
-    z: 1.332
-  bulletPerShot: 10
-  spaceAnglePerBullet: 1.2
-  parallelOrbit: 0
-  speed: 80
-  damage: 30
-  cooldown: 0.3
-  distanceSetChangeRota: 20
-  moveToWardMax: 200
-  moveToWardMin: 600
+  id: 0
 --- !u!1 &7419813277781920157
 GameObject:
   m_ObjectHideFlags: 0
