@@ -19,29 +19,33 @@ MonoBehaviour:
     hp: 30
     speed: 3
     damage: 5
-    attackRange: 1.2
+    attackRange: 1.5
     delayAttack: 0.5
+    chasingRange: 0
   - id: 1
     prefab: {fileID: 7846563739282400770, guid: baa572274949be94980cc8a985878eff,
       type: 3}
-    hp: 20
-    speed: 5
+    hp: 50
+    speed: 8
     damage: 5
-    attackRange: 1.2
+    attackRange: 1.5
     delayAttack: 0.5
+    chasingRange: 0
   - id: 2
     prefab: {fileID: 7846563739282400770, guid: c347fb1b1bfb83647a9c407dd3cb8bd4,
       type: 3}
-    hp: 5
-    speed: 8
+    hp: 30
+    speed: 10
     damage: 5
-    attackRange: 1.2
+    attackRange: 1.5
     delayAttack: 0.5
+    chasingRange: 0
   - id: 3
     prefab: {fileID: 7846563739282400770, guid: 10045e99e2814174fbd6c2ae06e14d9b,
       type: 3}
     hp: 200
-    speed: 1
+    speed: 2.5
     damage: 5
-    attackRange: 1.2
+    attackRange: 1.5
     delayAttack: 0.5
+    chasingRange: 0

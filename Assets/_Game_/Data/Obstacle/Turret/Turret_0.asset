@@ -22,7 +22,7 @@ MonoBehaviour:
   spaceAnglePerBullet: 1
   parallelOrbit: 0
   speed: 80
-  damage: 30
+  damage: 10
   cooldown: 0.1
   distanceSetChangeRota: 30
   moveToWardMax: 50

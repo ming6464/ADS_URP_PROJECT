@@ -6,7 +6,7 @@ using Unity.Transforms;
 
 namespace _Game.Scripts.Systems.Zombie
 {
-    [UpdateInGroup(typeof(SimulationSystemGroup)),UpdateAfter(typeof(BulletMovementSystem)),UpdateBefore(typeof(ZombieAnimationSystem))]
+    [UpdateInGroup(typeof(SimulationSystemGroup)),UpdateAfter(typeof(BulletMovementSystem)),UpdateBefore(typeof(AnimationSystem))]
     public partial struct ZombieHandleDamageSystem : ISystem
     {
         private EntityTypeHandle _entityTypeHandle;

@@ -92,6 +92,7 @@ public struct CharacterInfo : IComponentData
 {
     public int index;
     public Entity weaponEntity;
+    public float hp;
 }
 
 public readonly partial struct CharacterAspect : IAspect

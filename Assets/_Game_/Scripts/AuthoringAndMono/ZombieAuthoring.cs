@@ -12,7 +12,8 @@ public class ZombieAuthoring : MonoBehaviour
     public bool allowRespawn;
     public bool applyTotalCount;
     public int numberSpawn;
-    public int numberSpawnPerFrame;
+    public float2 numberSpawnPerFrameRange;
+    public float timeSpawn;
     public Transform pointRange1;
     public Transform pointRange2;
     public Transform pointDir1;
@@ -36,7 +37,8 @@ class ZombieBaker : Baker<ZombieAuthoring>
             spawner = new ZombieSpawner
             {
                 numberSpawn = authoring.numberSpawn,
-                numberSpawnPerFrame = authoring.numberSpawnPerFrame,
+                numberSpawnPerFrameRange = authoring.numberSpawnPerFrameRange,
+                timeSpawn = authoring.timeSpawn,
                 spawnInfinity = authoring.spawnInfinity,
                 allowRespawn = authoring.allowRespawn,
                 timeDelay = authoring.timeDelaySpawn,
@@ -63,6 +65,7 @@ class ZombieBaker : Baker<ZombieAuthoring>
                 attackRange = zombie.attackRange,
                 delayAttack = zombie.delayAttack,
                 numberSpawn = spawn.count,
+                chasingRange = zombie.chasingRange,
             });
         }
 

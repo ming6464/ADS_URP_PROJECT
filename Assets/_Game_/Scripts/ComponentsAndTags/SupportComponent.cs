@@ -71,5 +71,13 @@ public struct AddToBuffer : IComponentData
     public Entity entity;
 }
 
+public struct TakeDamage : IComponentData
+{
+    public float value;
+}
+
+public struct NotUnique : IComponentData
+{
+}
 
 //

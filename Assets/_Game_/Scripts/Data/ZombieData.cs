@@ -19,4 +19,5 @@ public struct Zombie
     public float damage;
     public float attackRange;
     public float delayAttack;
+    public float chasingRange;
 }

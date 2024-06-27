@@ -1,9 +1,83 @@
+using Rukhanka;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Jobs;
+using Unity.Physics;
 using Unity.Transforms;
 using UnityEngine;
+//
+
+
+[UpdateInGroup(typeof(SimulationSystemGroup))]
+public partial class AnimationSystem : SystemBase
+{
+    private readonly FastAnimatorParameter _dyingAnimatorParameter = new("Die");
+    
+    protected override void OnUpdate()
+    {
+        Dependency.Complete();
+        var zombieAnimatorJob = new ProcessAnimZombie()
+        {
+            dyingAnimatorParameter = _dyingAnimatorParameter,
+            time = (float)SystemAPI.Time.ElapsedTime,
+        };
+
+        var characterAnimJob = new ProcessAnimCharacter();
+        Dependency = zombieAnimatorJob.ScheduleParallel(Dependency);
+        Dependency = JobHandle.CombineDependencies(zombieAnimatorJob.ScheduleParallel(Dependency),characterAnimJob.ScheduleParallel(Dependency));
+    }
+    
+    [BurstCompile]
+    partial struct ProcessAnimCharacter : IJobEntity
+    {
+        void Execute(in CharacterInfo characterInfo, ref SetActiveSP disableSp, AnimatorParametersAspect parametersAspect)
+        {
+            return;
+            switch (disableSp.state)
+            {
+                default:
+                    disableSp.state = StateID.Disable;
+                    break;
+            }       
+        }
+    }
+    
+    [BurstCompile]
+    partial struct ProcessAnimZombie : IJobEntity
+    {
+        [ReadOnly] public FastAnimatorParameter dyingAnimatorParameter;
+        [ReadOnly] public float time;
+        void Execute( in ZombieInfo zombieInfo, ref SetActiveSP disableSp, AnimatorParametersAspect parametersAspect,ref PhysicsCollider physicsCollider)
+        {
+            var colliderFilter = physicsCollider.Value.Value.GetCollisionFilter();
+            switch (disableSp.state)
+            {
+                case StateID.Enable:
+                    parametersAspect.SetBoolParameter(dyingAnimatorParameter,false);
+                    colliderFilter.BelongsTo = 1u << 7;
+                    physicsCollider.Value.Value.SetCollisionFilter(colliderFilter);
+                    break;
+                case StateID.Wait:
+                    parametersAspect.SetBoolParameter(dyingAnimatorParameter,true);
+                    disableSp.state = StateID.WaitAnimation;
+                    colliderFilter.BelongsTo = 1u << 9;
+                    physicsCollider.Value.Value.SetCollisionFilter(colliderFilter);
+                    break;
+                case StateID.WaitAnimation:
+                    if ((time - disableSp.startTime) > 4)
+                    {
+                        disableSp.state = StateID.Disable;
+                    }
+                    break;
+            }
+        
+        }
+    }
+    
+}
+
 
 
 //
@@ -101,6 +175,7 @@ public partial struct HandleSetActiveSystem : ISystem
 
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
+            return;
             var setActiveSps = chunk.GetNativeArray(setActiveSpTypeHandle);
             var entities = chunk.GetNativeArray(entityTypeHandle);
 
@@ -373,7 +448,7 @@ public partial struct HandlePoolBullet : ISystem
     }
 }
 //
-[UpdateInGroup(typeof(PresentationSystemGroup))]
+[UpdateInGroup(typeof(PresentationSystemGroup),OrderLast = true)]
 public partial class UpdateHybrid : SystemBase
 {
     // Camera {

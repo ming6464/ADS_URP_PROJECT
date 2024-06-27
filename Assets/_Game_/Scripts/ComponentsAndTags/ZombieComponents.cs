@@ -15,7 +15,8 @@ public struct ZombieSpawner
     public bool spawnInfinity;
     public bool allowRespawn;
     public int numberSpawn;
-    public int numberSpawnPerFrame;
+    public float2 numberSpawnPerFrameRange;
+    public float timeSpawn;
     public float3 posMin;
     public float3 posMax;
 }
@@ -28,7 +29,13 @@ public struct ZombieInfo : IComponentData
     public float damage;
     public float attackRange;
     public float delayAttack;
+    public float chasingRange;
     public float3 directNormal;
+}
+
+public struct ZombieRuntime : IComponentData
+{
+    public float latestTimeAttack;
 }
 
 public struct BufferZombieStore : IBufferElementData
@@ -40,6 +47,7 @@ public struct BufferZombieStore : IBufferElementData
     public float damage;
     public float attackRange;
     public float delayAttack;
+    public float chasingRange;
     //
     public int numberSpawn;
 }
@@ -51,14 +59,6 @@ public struct BufferZombieDie : IBufferElementData
 }
 
 
-public struct TakeDamage : IComponentData
-{
-    public float value;
-}
-
-public struct NotUnique : IComponentData
-{
-}
 
 public readonly partial struct ZombieAspect : IAspect
 {

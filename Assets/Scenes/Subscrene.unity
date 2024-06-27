@@ -1392,8 +1392,11 @@ MonoBehaviour:
   spawnInfinity: 0
   allowRespawn: 1
   applyTotalCount: 1
-  numberSpawn: 2000
-  numberSpawnPerFrame: 20
+  numberSpawn: 1200
+  numberSpawnPerFrameRange:
+    x: 3
+    y: 30
+  timeSpawn: 80
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}
   pointDir1: {fileID: 1398424327}

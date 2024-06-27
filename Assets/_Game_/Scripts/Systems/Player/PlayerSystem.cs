@@ -82,7 +82,7 @@ public partial struct PlayerSystem : ISystem
         Move(ref state);
         Rota(ref state);
         state.Dependency.Complete();
-        CheckCollider(ref state,ref ecb);
+        // CheckCollider(ref state,ref ecb);
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
@@ -205,6 +205,8 @@ public partial struct PlayerSystem : ISystem
                 });
                 
                 ecb.RemoveComponent<PhysicsCollider>(entityItem);
+                
+                ecb.RemoveComponent<ItemInfo>(entityItem);
                 
                 ecb.AddComponent(entityItem,new SetActiveSP()
                 {

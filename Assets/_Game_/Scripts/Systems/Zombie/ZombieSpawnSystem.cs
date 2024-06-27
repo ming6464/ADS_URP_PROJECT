@@ -19,7 +19,9 @@ public partial struct ZombieSpawnSystem : ISystem
     private bool _isAllowRespawn;
     private int _numberSpawn;
     private int _numberSpawnPerFrame;
+    private float2 _spawnRange;
     private float _timeDelay;
+    private float _tímeSpawn;
     private LocalTransform _localTransform;
     private float3 _pointRandomMin;
     private float3 _pointRandomMax;
@@ -68,8 +70,9 @@ public partial struct ZombieSpawnSystem : ISystem
             _latestSpawnTime = -_zombieProperties.spawner.timeDelay;
             _isSpawnInfinity = _zombieProperties.spawner.spawnInfinity;
             _isAllowRespawn = _zombieProperties.spawner.allowRespawn;
-            _numberSpawnPerFrame = _zombieProperties.spawner.numberSpawnPerFrame;
+            _spawnRange = _zombieProperties.spawner.numberSpawnPerFrameRange;
             _timeDelay = _zombieProperties.spawner.timeDelay;
+            _tímeSpawn = _zombieProperties.spawner.timeSpawn;
             _zombieStores = SystemAPI.GetBuffer<BufferZombieStore>(_entityZombieProperty).ToNativeArray(Allocator.Persistent);
             _isInit = true;
             _applyTotalCount = _zombieProperties.applyTotalCount;
@@ -88,6 +91,10 @@ public partial struct ZombieSpawnSystem : ISystem
             _spawnDataArray = new NativeArray<SpawnData>(_zombieStores.Length,Allocator.Persistent);
 
         }
+
+        _numberSpawnPerFrame =
+            (int) math.lerp(_spawnRange.x, _spawnRange.y, math.clamp(SystemAPI.Time.ElapsedTime / _tímeSpawn,0,1));
+        
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         bool hasEntityNew = false;
         SpawnZombie(ref state,ref ecb,ref hasEntityNew);
@@ -152,6 +159,10 @@ public partial struct ZombieSpawnSystem : ISystem
         }
         if(!_isSpawnInfinity && numberZombieSet >= _numberSpawn) return;
         int numberZombieCanSpawn = _isSpawnInfinity ? _numberSpawnPerFrame : (math.min(_numberSpawn - numberZombieSet,_numberSpawnPerFrame));
+        var zomRunTime = new ZombieRuntime()
+        {
+            latestTimeAttack = (float)SystemAPI.Time.ElapsedTime,
+        };
         int i = 0;
         while (i < numberZombieCanSpawn)
         {
@@ -203,7 +214,9 @@ public partial struct ZombieSpawnSystem : ISystem
 
             var zombieInfo = GetZombieInfo(idZombieRandom);
             zombieInfo.directNormal = _zombieProperties.directNormal;
+            ecb.AddComponent(entityNew, zomRunTime);
             ecb.AddComponent(entityNew,zombieInfo);
+            
             i++;
         }
         _latestSpawnTime = (float)SystemAPI.Time.ElapsedTime;
