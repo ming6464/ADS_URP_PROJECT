@@ -3,6 +3,7 @@ using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Transforms;
+using UnityEngine;
 
 namespace _Game.Scripts.Systems.Zombie
 {
@@ -71,6 +72,7 @@ namespace _Game.Scripts.Systems.Zombie
                     state = StateID.Wait,
                     startTime = time,
                 };
+                Debug.Log("m _ die 2");
                 var addToBuffer = new AddToBuffer();
                 
                 for (int i = 0; i < chunk.Count; i++)

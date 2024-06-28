@@ -82,7 +82,7 @@ public partial struct PlayerSystem : ISystem
         Move(ref state);
         Rota(ref state);
         state.Dependency.Complete();
-        // CheckCollider(ref state,ref ecb);
+        CheckCollider(ref state,ref ecb);
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
@@ -162,9 +162,8 @@ public partial struct PlayerSystem : ISystem
         _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
         _playerInfo = SystemAPI.GetComponentRO<PlayerInfo>(_playerEntity).ValueRO;
 
-        _maxXGridCharacter = _playerInfo.maxXGridCharacter;
-        _maxYGridCharacter = _playerInfo.maxYGridCharacter;
-        
+        _maxXGridCharacter = math.max(1,_playerInfo.maxXGridCharacter);
+        _maxYGridCharacter = math.max(1,_playerInfo.maxYGridCharacter);
         
         _ltwPlayer = SystemAPI.GetComponentRO<LocalToWorld>(_playerEntity).ValueRO;
         var halfX = (_maxXGridCharacter - 1) * _spaceGrid.x / 2f + _characterRadius;
@@ -174,13 +173,13 @@ public partial struct PlayerSystem : ISystem
         if (_physicsWorld.BoxCastAll(_ltwPlayer.Position, quaternion.identity, halfSizeBox, float3.zero, 0,
                 ref _arrHitItem, _filterItem))
         {
-
             NativeArray<Entity> itemDisable =
                 SystemAPI.QueryBuilder().WithAll<ItemCollection, Disabled>().Build().ToEntityArray(Allocator.Temp);
             int maxIndexItemDisable = itemDisable.Length - 1;
             for (int i = 0; i < _arrHitItem.Length; i++)
             {
                 Entity entityItem = _arrHitItem[i].Entity;
+                if(!_entityManager.HasComponent<ItemInfo>(entityItem)) continue;
                 var itemInfo = _entityManager.GetComponentData<ItemInfo>(entityItem);
                 Entity entityItemCollection;
                 if (i <= maxIndexItemDisable)
@@ -205,9 +204,7 @@ public partial struct PlayerSystem : ISystem
                 });
                 
                 ecb.RemoveComponent<PhysicsCollider>(entityItem);
-                
                 ecb.RemoveComponent<ItemInfo>(entityItem);
-                
                 ecb.AddComponent(entityItem,new SetActiveSP()
                 {
                     state = StateID.DestroyAll,
@@ -219,7 +216,6 @@ public partial struct PlayerSystem : ISystem
 
         _arrHitItem.Clear();
     }
-    
 
     private partial struct CharacterRotate : IJobChunk
     {

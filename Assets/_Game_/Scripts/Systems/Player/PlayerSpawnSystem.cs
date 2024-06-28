@@ -17,11 +17,15 @@ public partial struct PlayerSpawnSystem : ISystem
     private float2 _spaceGrid;
     private PlayerProperty _playerProperty;
     private int _passCountOfCol;
+    private int _passCountCharacter;
+    private EntityQuery _enQueryCharacterAlive;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<PlayerProperty>();
+        _enQueryCharacterAlive =
+            SystemAPI.QueryBuilder().WithAll<CharacterInfo,LocalTransform>().WithNone<Disabled, SetActiveSP>().Build();
     }
 
     public void OnUpdate(ref SystemState state)
@@ -68,12 +72,11 @@ public partial struct PlayerSpawnSystem : ISystem
             _spawnPlayerState = 2;
             _spaceGrid = _playerProperty.spaceGrid;
         }
-        
         UpdateCharacter(ref state, ref ecb);
+        ArrangeCharacter(ref state, ref ecb);
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
     }
-
     private void UpdateCharacter(ref SystemState state, ref EntityCommandBuffer ecb)
     {
         int spawnChange = 0;
@@ -101,12 +104,10 @@ public partial struct PlayerSpawnSystem : ISystem
         
         Spawn(ref state, ref ecb, spawnChange);
     }
-
     private void Spawn(ref SystemState state, ref EntityCommandBuffer ecb, int count)
     {
         if(count == 0) return;
-        var lt = DotsEX.LocalTransformDefault();
-        NativeArray<Entity> characterAlive = SystemAPI.QueryBuilder().WithAll<CharacterInfo>().WithNone<Disabled>().Build().ToEntityArray(Allocator.Temp);
+        NativeArray<Entity> characterAlive = _enQueryCharacterAlive.ToEntityArray(Allocator.Temp);
         int characterAliveCount = characterAlive.Length;
         var totalNumber = count + characterAliveCount;
         if (totalNumber < 0)
@@ -118,112 +119,97 @@ public partial struct PlayerSpawnSystem : ISystem
             }
             totalNumber = 0;
         }
-
-        int countOfCol = math.max(2,(int)math.ceil(math.sqrt(totalNumber)));
-        bool changeSizeCol = false;
-
-        if (countOfCol != _passCountOfCol)
-        {
-            changeSizeCol = true;
-            _passCountOfCol = countOfCol;
-        }
-
+        float time = (float)SystemAPI.Time.ElapsedTime;
         var bufferDisable = _entityManager.GetBuffer<BufferCharacterDie>(_entityPlayerInfo);
-        
         if (count > 0)
         {
+            var lt = DotsEX.LocalTransformDefault();
             var characterBuffer = _entityManager.GetBuffer<BufferCharacterNew>(_entityPlayerInfo);
-            int i = changeSizeCol ? 0 : characterAliveCount;
-            for (;i < totalNumber; i++)
+            for (int i = characterAliveCount;i < totalNumber; i++)
             {
-                lt.Position = GetPositionLocal_L(i, countOfCol, _spaceGrid);
                 Entity entitySet;
-                
-                if (i < characterAliveCount)
+                if (bufferDisable.Length > 1)
                 {
-                    entitySet = characterAlive[i];
+                    entitySet = bufferDisable[0].entity;
+                    bufferDisable.RemoveAt(0);
+                    ecb.RemoveComponent<Disabled>(entitySet);
+                    ecb.AddComponent(entitySet,new SetActiveSP()
+                    {
+                        state = StateID.Enable,
+                    });
                 }
                 else
                 {
-                    if (bufferDisable.Length > 1)
+                    entitySet = _entityManager.Instantiate(_characterEntityInstantiate);
+                    ecb.AddComponent<LocalToWorld>(entitySet);
+                    ecb.AddComponent(entitySet, new Parent()
                     {
-                        entitySet = bufferDisable[0].entity;
-                        bufferDisable.RemoveAt(0);
-                        ecb.RemoveComponent<Disabled>(entitySet);
-                        ecb.AddComponent(entitySet,new SetActiveSP()
-                        {
-                            state = StateID.Enable,
-                        });
-                    }
-                    else
-                    {
-                        entitySet = _entityManager.Instantiate(_characterEntityInstantiate);
-                        ecb.AddComponent<LocalToWorld>(entitySet);
-                        ecb.AddComponent(entitySet, new Parent()
-                        {
-                            Value = _parentCharacterEntity,
-                        });
-                    }
-                    characterBuffer.Add(new BufferCharacterNew()
-                    {
-                        entity = entitySet,
-                    });
-                    ecb.AddComponent(entitySet, new CharacterInfo()
-                    {
-                        index = i
+                        Value = _parentCharacterEntity,
                     });
                 }
-                ecb.AddComponent(entitySet, lt);
+                characterBuffer.Add(new BufferCharacterNew()
+                {
+                    entity = entitySet,
+                });
+                ecb.AddComponent(entitySet, new CharacterInfo()
+                {
+                    index = i,
+                    hp = 15,
+                });
+                ecb.AddComponent(entitySet,lt);
             }
         }
         else
         {
-            int maxIndex = totalNumber - 1;
-            int condition = totalNumber;
-            if (changeSizeCol)
+            for (int i = characterAliveCount - 1; i >= totalNumber; i--)
             {
-                condition = 0;
+                ecb.AddComponent(characterAlive[i],new TakeDamage()
+                {
+                    value = 9999,
+                });
             }
-            for (int i = characterAliveCount - 1; i >= condition; i--)
-            {
-                if (i > maxIndex)
-                {
-                    var characterInfo = _entityManager.GetComponentData<CharacterInfo>(characterAlive[i]);
-                    bufferDisable.Add(new BufferCharacterDie()
-                    {
-                        entity = characterAlive[i],
-                    });
-                    ecb.AddComponent(characterAlive[i], new SetActiveSP()
-                    {
-                        state = StateID.Disable
-                    });
-                    
+        }
+        characterAlive.Dispose();
+        
+    }
 
-                    if (!characterInfo.weaponEntity.Equals(default))
-                    {
-                        ecb.RemoveComponent<Parent>(characterInfo.weaponEntity);
-                        ecb.AddComponent(characterInfo.weaponEntity,new SetActiveSP()
-                        {
-                            state = StateID.Disable,
-                        });
-                    }
-                }
-                else
+    private void ArrangeCharacter(ref SystemState state,ref EntityCommandBuffer ecb)
+    {
+        NativeArray<Entity> characterAlive = _enQueryCharacterAlive.ToEntityArray(Allocator.Temp);
+        var characterInfos = _enQueryCharacterAlive.ToComponentDataArray<CharacterInfo>(Allocator.Temp);
+        int length = characterAlive.Length;
+        
+        if(length == _passCountCharacter) return;
+        int countOfCol = math.max(2,(int)math.ceil(math.sqrt(length)));
+        for (int i = 0; i < length - 1; i++)
+        {
+            for (int j = i + 1; j < length; j++)
+            {
+                if (characterInfos[j].index < characterInfos[i].index)
                 {
-                    if(!changeSizeCol) break;
-                    lt.Position = GetPositionLocal_L(i, countOfCol, _spaceGrid);
-                    ecb.AddComponent(characterAlive[i], lt);
+                    (characterAlive[i], characterAlive[j]) = (characterAlive[j], characterAlive[i]);
+                    (characterInfos[i], characterInfos[j]) = (characterInfos[j], characterInfos[i]);
                 }
             }
         }
 
-        int maxX = totalNumber;
+        _passCountCharacter = length;
+        for (int i = 0; i < length; i++)
+        {
+            var characterInfo = characterInfos[i];
+            characterInfo.index = i;
+            ecb.SetComponent(characterAlive[i],characterInfo);
+            ecb.AddComponent(characterAlive[i],new NextPoint()
+            {
+                value = GetPositionLocal_L(i, countOfCol, _spaceGrid),
+            });
+        }
+        int maxX = length;
         int maxY = 1;
-
         if (maxX > countOfCol)
         {
             maxX = countOfCol;
-            maxY = (int)math.ceil(totalNumber * 1.0f / maxX);
+            maxY = (int)math.ceil(length * 1.0f / maxX);
         }
 
         float maxWidthCharacters = _spaceGrid.x * (maxX - 1);
@@ -239,8 +225,8 @@ public partial struct PlayerSpawnSystem : ISystem
         playInfo.ValueRW.maxXGridCharacter = maxX;
         playInfo.ValueRW.maxYGridCharacter = maxY;
         characterAlive.Dispose();
-
-        // local function
+        
+        
         float3 GetPositionLocal_L(int index, int maxCol, float2 space)
         {
             float3 grid = GetGridPos_L(index, maxCol);
@@ -249,7 +235,7 @@ public partial struct PlayerSpawnSystem : ISystem
 
             return grid;
         }
-
+        
         float3 GetGridPos_L(int index, int maxCol)
         {
             var grid = new float3(0, 0, 0);
@@ -267,7 +253,7 @@ public partial struct PlayerSpawnSystem : ISystem
                 grid.x = index % maxCol;
                 grid.z = index / maxCol;
             }
-
+            
             return grid;
         }
     }

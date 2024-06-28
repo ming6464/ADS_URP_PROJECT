@@ -5,6 +5,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
 using Random = Unity.Mathematics.Random;
 using RaycastHit = Unity.Physics.RaycastHit;
 
@@ -108,6 +109,7 @@ public partial struct BulletMovementSystem : ISystem
             }
             foreach (var map in _zombieTakeDamageMap)
             {
+                Debug.Log("m _ take damage 1");
                 ecb.AddComponent(map.Key,new TakeDamage()
                 {
                     value = map.Value,

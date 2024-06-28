@@ -11,6 +11,8 @@ public class PlayerAuthoring : MonoBehaviour
     public float speed;
     public float radius;
     //
+    public float characterMoveToWardChangePos;
+    //
     public bool aimNearestEnemy;
     public float distanceSetChangeRota;
     public float moveToWardMax;
@@ -40,7 +42,8 @@ public class PlayerAuthoring : MonoBehaviour
                 idWeaponDefault = authoring.idWeaponDefault,
                 distanceSetChangeRota = authoring.distanceSetChangeRota,
                 moveToWardMin = authoring.moveToWardMin,
-                moveToWardMax = authoring.moveToWardMax
+                moveToWardMax = authoring.moveToWardMax,
+                characterMoveToWardChangePos = authoring.characterMoveToWardChangePos
             });
         
             AddComponent(entity, new PlayerInput

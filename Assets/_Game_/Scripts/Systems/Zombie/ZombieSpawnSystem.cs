@@ -35,6 +35,7 @@ public partial struct ZombieSpawnSystem : ISystem
     private bool _applyTotalCount;
     private EntityManager _entityManager;
     private EntityQuery _enQueryZombieNotUnique;
+    private EntityQuery _enQueryZombieNew;
     
     
     [BurstCompile]
@@ -44,8 +45,9 @@ public partial struct ZombieSpawnSystem : ISystem
         state.RequireForUpdate<ZombieProperty>();
         _totalSpawnCount = 0;
         _entityTypeHandle = state.GetEntityTypeHandle();
-        _enQueryZombieNotUnique = SystemAPI.QueryBuilder().WithAll<ZombieInfo, NotUnique>().WithNone<Disabled>()
-            .WithNone<SetActiveSP>().Build();
+        _enQueryZombieNotUnique = SystemAPI.QueryBuilder().WithAll<ZombieInfo, NotUnique>().WithNone<Disabled,SetActiveSP>().Build();
+        _enQueryZombieNew = SystemAPI.QueryBuilder().WithAll<ZombieInfo, New>().WithNone<Disabled, SetActiveSP>()
+            .Build();
     }
 
     public void OnDestroy(ref SystemState state)
@@ -91,19 +93,20 @@ public partial struct ZombieSpawnSystem : ISystem
             _spawnDataArray = new NativeArray<SpawnData>(_zombieStores.Length,Allocator.Persistent);
 
         }
-
+        
         _numberSpawnPerFrame =
             (int) math.lerp(_spawnRange.x, _spawnRange.y, math.clamp(SystemAPI.Time.ElapsedTime / _tímeSpawn,0,1));
         
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         bool hasEntityNew = false;
+        HandleNewZombie(ref state, ref ecb);
         SpawnZombie(ref state,ref ecb,ref hasEntityNew);
         ecb.Playback(_entityManager);
         ecb.Dispose();
         if (hasEntityNew)
         {
-            _entityTypeHandle.Update(ref state);
             ecb = new EntityCommandBuffer(Allocator.TempJob);
+            _entityTypeHandle.Update(ref state);
             var uniquePhysic = new UniquePhysicColliderJOB()
             {
                 ecb = ecb.AsParallelWriter(),
@@ -147,6 +150,7 @@ public partial struct ZombieSpawnSystem : ISystem
     private void SpawnZombie(ref SystemState state,ref EntityCommandBuffer ecb,ref bool hasNewEntity)
     {
         if((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < _timeDelay) return;
+        _entityTypeHandle.Update(ref state);
         int numberZombieSet = _totalSpawnCount;
         DynamicBuffer<BufferZombieDie> bufferZombieDie = _entityManager.GetBuffer<BufferZombieDie>(_entityZombieProperty);
 
@@ -192,6 +196,7 @@ public partial struct ZombieSpawnSystem : ISystem
                     entityNew = bufferZombieDie[j].entity;
                     checkGetFromPool = true;
                     bufferZombieDie.RemoveAt(j);
+                    break;
                 }
             }
             
@@ -216,31 +221,63 @@ public partial struct ZombieSpawnSystem : ISystem
             zombieInfo.directNormal = _zombieProperties.directNormal;
             ecb.AddComponent(entityNew, zomRunTime);
             ecb.AddComponent(entityNew,zombieInfo);
-            
+            ecb.AddComponent<New>(entityNew);
             i++;
         }
         _latestSpawnTime = (float)SystemAPI.Time.ElapsedTime;
         _totalSpawnCount += numberZombieCanSpawn;
         _numberZombieAlive += numberZombieCanSpawn;
     }
+    
+    private void HandleNewZombie(ref SystemState state, ref EntityCommandBuffer ecb)
+    {
+        _entityTypeHandle.Update(ref state);
+        var job = new HandleNewZombieJOB()
+        {
+            entityTypeHandle = _entityTypeHandle,
+            ecb = ecb.AsParallelWriter()
+        };
+        state.Dependency = job.ScheduleParallel(_enQueryZombieNew, state.Dependency);
+        state.Dependency.Complete();
+    }
+    
+    [BurstCompile]
+    partial struct HandleNewZombieJOB : IJobChunk
+    {
+        public EntityCommandBuffer.ParallelWriter ecb;
+        public EntityTypeHandle entityTypeHandle;
+        
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+        {
+            var entities = chunk.GetNativeArray(entityTypeHandle);
+            for (int i = 0; i < chunk.Count; i++)
+            {
+                ecb.RemoveComponent<New>(unfilteredChunkIndex,entities[i]);
+            }
+        }
+    }
+    
+    
+    
+    [BurstCompile]
+    partial struct UniquePhysicColliderJOB : IJobChunk
+    {
+        [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
+        [ReadOnly] public EntityTypeHandle entityTypeHandle;
+        public ComponentTypeHandle<PhysicsCollider> physicColliderTypeHandle;
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+        {
+            var physicColliders = chunk.GetNativeArray(physicColliderTypeHandle);
+            for (int i = 0; i < chunk.Count; i++)
+            {
+                var collider = physicColliders[i];
+                collider.Value = collider.Value.Value.Clone();
+                physicColliders[i] = collider;
+            
+            }
+            ecb.RemoveComponent<NotUnique>(unfilteredChunkIndex,chunk.GetNativeArray(entityTypeHandle));
+        }
+    }
+    
 }
 
-[BurstCompile]
-public partial struct UniquePhysicColliderJOB : IJobChunk
-{
-    [WriteOnly] public EntityCommandBuffer.ParallelWriter ecb;
-    [ReadOnly] public EntityTypeHandle entityTypeHandle;
-    public ComponentTypeHandle<PhysicsCollider> physicColliderTypeHandle;
-    public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
-    {
-        var physicColliders = chunk.GetNativeArray(physicColliderTypeHandle);
-        for (int i = 0; i < chunk.Count; i++)
-        {
-            var collider = physicColliders[i];
-            collider.Value = collider.Value.Value.Clone();
-            physicColliders[i] = collider;
-            
-        }
-        ecb.RemoveComponent<NotUnique>(unfilteredChunkIndex,chunk.GetNativeArray(entityTypeHandle));
-    }
-}

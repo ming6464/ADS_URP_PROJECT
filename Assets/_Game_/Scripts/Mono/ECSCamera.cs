@@ -1,6 +1,4 @@
-﻿using System;
-using Unity.Entities;
-using Unity.Transforms;
+﻿using Unity.Entities;
 using UnityEngine;
 
 public class ECSCamera : MonoBehaviour

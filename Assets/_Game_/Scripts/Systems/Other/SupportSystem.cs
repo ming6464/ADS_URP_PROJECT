@@ -3,7 +3,6 @@ using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Jobs;
 using Unity.Physics;
 using Unity.Transforms;
 using UnityEngine;
@@ -17,7 +16,6 @@ public partial class AnimationSystem : SystemBase
     
     protected override void OnUpdate()
     {
-        Dependency.Complete();
         var zombieAnimatorJob = new ProcessAnimZombie()
         {
             dyingAnimatorParameter = _dyingAnimatorParameter,
@@ -25,19 +23,20 @@ public partial class AnimationSystem : SystemBase
         };
 
         var characterAnimJob = new ProcessAnimCharacter();
+        Dependency = characterAnimJob.ScheduleParallel(Dependency);
+        Dependency.Complete();
         Dependency = zombieAnimatorJob.ScheduleParallel(Dependency);
-        Dependency = JobHandle.CombineDependencies(zombieAnimatorJob.ScheduleParallel(Dependency),characterAnimJob.ScheduleParallel(Dependency));
+        Dependency.Complete();
     }
     
     [BurstCompile]
     partial struct ProcessAnimCharacter : IJobEntity
     {
-        void Execute(in CharacterInfo characterInfo, ref SetActiveSP disableSp, AnimatorParametersAspect parametersAspect)
+        void Execute(in CharacterInfo characterInfo, ref SetActiveSP disableSp)
         {
-            return;
             switch (disableSp.state)
             {
-                default:
+                case StateID.Wait:
                     disableSp.state = StateID.Disable;
                     break;
             }       
@@ -175,7 +174,6 @@ public partial struct HandleSetActiveSystem : ISystem
 
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
-            return;
             var setActiveSps = chunk.GetNativeArray(setActiveSpTypeHandle);
             var entities = chunk.GetNativeArray(entityTypeHandle);
 

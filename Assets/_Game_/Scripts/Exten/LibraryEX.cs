@@ -391,6 +391,15 @@ public static class MathExt
     }
     
     #endregion Interpolate
+
+
+    public static bool ComparisionEqual(this float3 f1, float3 f2)
+    {
+
+        var f = f1 - f2;
+
+        return !(f.x != 0 || f.y != 0 || f.z != 0);
+    }
     
 }
 

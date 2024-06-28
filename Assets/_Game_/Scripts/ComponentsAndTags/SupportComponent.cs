@@ -80,4 +80,9 @@ public struct NotUnique : IComponentData
 {
 }
 
+public struct New : IComponentData
+{
+    
+}
+
 //

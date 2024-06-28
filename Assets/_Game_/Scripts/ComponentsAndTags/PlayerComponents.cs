@@ -15,7 +15,8 @@ public struct PlayerProperty : IComponentData
     public float distanceSetChangeRota;
     public float moveToWardMax;
     public float moveToWardMin;
-    
+    public float characterMoveToWardChangePos;
+
 }
 
 public struct PlayerInfo : IComponentData
@@ -25,15 +26,7 @@ public struct PlayerInfo : IComponentData
     public int maxYGridCharacter;
 }
 
-public struct BufferCharacterNew : IBufferElementData
-{
-    public Entity entity;
-}
 
-public struct BufferCharacterDie : IBufferElementData
-{
-    public Entity entity;
-}
 
 public readonly partial struct PlayerAspect : IAspect
 {
@@ -82,6 +75,15 @@ public struct PlayerInput : IComponentData
 
 // Character
 
+public struct BufferCharacterNew : IBufferElementData
+{
+    public Entity entity;
+}
+
+public struct BufferCharacterDie : IBufferElementData
+{
+    public Entity entity;
+}
 
 public struct ParentCharacter : IComponentData
 {
@@ -93,6 +95,11 @@ public struct CharacterInfo : IComponentData
     public int index;
     public Entity weaponEntity;
     public float hp;
+}
+
+public struct NextPoint : IComponentData
+{
+    public float3 value;
 }
 
 public readonly partial struct CharacterAspect : IAspect

@@ -5,6 +5,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
 [BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup)),UpdateBefore(typeof(TurretSystem)),UpdateAfter(typeof(PlayerSpawnSystem))]
 public partial struct WeaponSystem : ISystem

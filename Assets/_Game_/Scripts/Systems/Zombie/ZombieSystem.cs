@@ -4,6 +4,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup)),UpdateBefore(typeof(AnimationSystem))]
 [BurstCompile]
@@ -15,6 +16,7 @@ public partial struct ZombieSystem : ISystem
     private ZombieProperty _zombieProperty;
     private EntityTypeHandle _entityTypeHandle;
     private EntityQuery _enQueryZombie;
+    private EntityQuery _enQueryZombieNew;
     private NativeQueue<TakeDamageItem> _takeDamageQueue;
     private NativeList<CharacterSetTakeDamage> _characterSetTakeDamages;
     [BurstCompile]
@@ -24,7 +26,10 @@ public partial struct ZombieSystem : ISystem
         state.RequireForUpdate<ActiveZoneProperty>();
         state.RequireForUpdate<ZombieInfo>();
         _enQueryZombie =
-            SystemAPI.QueryBuilder().WithAll<ZombieInfo,LocalTransform,ZombieRuntime>().WithNone<Disabled, SetActiveSP>().Build();
+            SystemAPI.QueryBuilder().WithAll<ZombieInfo,LocalTransform,ZombieRuntime>().WithNone<Disabled, SetActiveSP, New>().Build();
+
+        _enQueryZombieNew = SystemAPI.QueryBuilder().WithAll<ZombieInfo,LocalTransform,New>().WithNone<Disabled, SetActiveSP>().Build();
+        
         _takeDamageQueue = new NativeQueue<TakeDamageItem>(Allocator.Persistent);
         _characterSetTakeDamages = new NativeList<CharacterSetTakeDamage>(Allocator.Persistent);
     }
@@ -46,52 +51,26 @@ public partial struct ZombieSystem : ISystem
             var zone = SystemAPI.GetSingleton<ActiveZoneProperty>();
             _pointZoneMin = zone.pointRangeMin;
             _pointZoneMax = zone.pointRangeMax;
-            _enQueryZombie = SystemAPI.QueryBuilder().WithAll<ZombieInfo, LocalTransform>().Build();
             _zombieProperty = SystemAPI
                 .GetComponentRO<ZombieProperty>(SystemAPI.GetSingletonEntity<ZombieProperty>()).ValueRO;
         }
         state.Dependency.Complete();
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
+        _entityTypeHandle.Update(ref state);
         Move(ref state);
-        CheckAttackPlayer(ref state);
+        CheckAttackPlayer(ref state,ref ecb);
         CheckZombieToDeadZone(ref state, ref ecb);
         state.Dependency.Complete();
-
-        NativeHashMap<int, float> characterTakeDamageMap =
-            new NativeHashMap<int, float>(_takeDamageQueue.Count, Allocator.Temp);
-        while(_takeDamageQueue.TryDequeue(out var queue))
-        {
-            if (characterTakeDamageMap.ContainsKey(queue.index))
-            {
-                characterTakeDamageMap[queue.index] += queue.damage;
-            }
-            else
-            {
-                characterTakeDamageMap.Add(queue.index,queue.damage);
-            }
-        }
-        
-        foreach (var map in characterTakeDamageMap)
-        {
-            if(map.Value == 0) continue;
-            Entity entity = _characterSetTakeDamages[map.Key].entity;
-            ecb.AddComponent(entity,new TakeDamage()
-            {
-                value = map.Value,
-            });
-        }
-        
-        characterTakeDamageMap.Dispose();
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
     }
-
-    private void CheckAttackPlayer(ref SystemState state)
+    
+    private void CheckAttackPlayer(ref SystemState state,ref EntityCommandBuffer ecb)
     {
         _takeDamageQueue.Clear();
         _characterSetTakeDamages.Clear();
 
-        foreach (var (ltw, entity) in SystemAPI.Query<RefRO<LocalToWorld>>().WithEntityAccess().WithNone<Disabled,SetActiveSP>())
+        foreach (var (ltw, entity) in SystemAPI.Query<RefRO<LocalToWorld>>().WithEntityAccess().WithAll<CharacterInfo>().WithNone<Disabled,SetActiveSP,New>())
         {
             _characterSetTakeDamages.Add(new CharacterSetTakeDamage()
             {
@@ -111,6 +90,31 @@ public partial struct ZombieSystem : ISystem
         };
         state.Dependency = job.ScheduleParallel(_enQueryZombie, state.Dependency);
         state.Dependency.Complete();
+        
+        NativeHashMap<int, float> characterTakeDamageMap =
+            new NativeHashMap<int, float>(_takeDamageQueue.Count, Allocator.Temp);
+        while(_takeDamageQueue.TryDequeue(out var queue))
+        {
+            if (characterTakeDamageMap.ContainsKey(queue.index))
+            {
+                characterTakeDamageMap[queue.index] += queue.damage;
+            }
+            else
+            {
+                characterTakeDamageMap.Add(queue.index,queue.damage);
+            }
+        }
+        foreach (var map in characterTakeDamageMap)
+        {
+            if(map.Value == 0) continue;
+            Entity entity = _characterSetTakeDamages[map.Key].entity;
+            ecb.AddComponent(entity,new TakeDamage()
+            {
+                value = map.Value,
+            });
+        }
+        characterTakeDamageMap.Dispose();
+        
     }
 
     private void Move(ref SystemState state)
@@ -128,8 +132,6 @@ public partial struct ZombieSystem : ISystem
 
     private void CheckZombieToDeadZone(ref SystemState state, ref EntityCommandBuffer ecb)
     {
-        _entityTypeHandle.Update(ref state);
-
         var chunkJob = new CheckDeadZoneJOB
         {
             ecb = ecb.AsParallelWriter(),
@@ -195,6 +197,7 @@ public partial struct ZombieSystem : ISystem
                 {
                     state = StateID.Disable,
                 });
+                
                 
                 ecb.AddComponent(unfilteredChunkIndex, entities[i], new AddToBuffer()
                 {
