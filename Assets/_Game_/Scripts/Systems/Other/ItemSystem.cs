@@ -3,21 +3,24 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
 
 namespace _Game_.Scripts.Systems.Other
 {
     [BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup))]
-    public partial struct ObstacleSystem : ISystem
+    public partial struct ItemSystem : ISystem
     {
         private NativeArray<BufferTurretObstacle> _buffetObstacle;
+        private Entity _entityPlayerAuthoring;
         private EntityManager _entityManager;
         private bool _isInit;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<ItemCollection>();
+            state.RequireForUpdate<PlayerInfo>();
         }
         
         [BurstCompile]
@@ -35,9 +38,54 @@ namespace _Game_.Scripts.Systems.Other
                 _entityManager = state.EntityManager;
                 _isInit = true;
                 _buffetObstacle = SystemAPI.GetSingletonBuffer<BufferTurretObstacle>().ToNativeArray(Allocator.Persistent);
+                _entityPlayerAuthoring = SystemAPI.GetSingletonEntity<PlayerInfo>();
 
             }
             EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+
+            CheckObstacleItem(ref state, ref ecb);
+            CheckItemShooting(ref state, ref ecb);
+            ecb.Playback(_entityManager);
+            ecb.Dispose();
+        }
+
+        private void CheckItemShooting(ref SystemState state, ref EntityCommandBuffer ecb) 
+        {
+            var query = SystemAPI.QueryBuilder().WithAll<TakeDamage>().Build();
+            var query2 = SystemAPI.QueryBuilder().WithAll<TakeDamage,ItemInfo>().Build();
+
+            var a = query.ToEntityArray(Allocator.Temp);
+            var b = query2.ToEntityArray(Allocator.Temp);
+            
+            a.Dispose();
+            b.Dispose();
+            
+            
+            foreach (var (itemInfo, takeDamage, entity) in SystemAPI.Query<RefRW<ItemInfo>, RefRO<TakeDamage>>()
+                         .WithEntityAccess())
+            {
+                itemInfo.ValueRW.hp -= takeDamage.ValueRO.value;
+                ecb.RemoveComponent<TakeDamage>(entity);
+                if (itemInfo.ValueRO.hp <= 0)
+                {
+                    var entityNEw = _entityManager.CreateEntity();
+                    ecb.AddComponent(entityNEw,new ItemCollection()
+                    {
+                        count = itemInfo.ValueRO.count,
+                        entityItem = entityNEw,
+                        id = itemInfo.ValueRO.id,
+                        type = itemInfo.ValueRO.type,
+                    });
+                    ecb.AddComponent(entity,new SetActiveSP()
+                    {
+                        state = StateID.DestroyAll
+                    });
+                }
+            }
+        }
+
+        private void CheckObstacleItem(ref SystemState state, ref EntityCommandBuffer ecb)
+        {
             foreach (var (collection,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess()
                          .WithNone<Disabled, SetActiveSP>())
             {
@@ -53,9 +101,6 @@ namespace _Game_.Scripts.Systems.Other
                 }
                 
             }
-            
-            ecb.Playback(_entityManager);
-            ecb.Dispose();
         }
 
         private void SpawnTurret(ref SystemState state,ref EntityCommandBuffer ecb,ItemCollection itemCollection)
@@ -89,6 +134,5 @@ namespace _Game_.Scripts.Systems.Other
             }
             points.Clear();
         }
-        
     }
 }

@@ -89,6 +89,7 @@ public partial struct PlayerSpawnSystem : ISystem
         foreach (var (collection,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess()
                      .WithNone<Disabled, SetActiveSP>())
         {
+            Debug.Log("m _ item 3");
             switch (collection.ValueRO.type)
             {
                 case ItemType.Character:

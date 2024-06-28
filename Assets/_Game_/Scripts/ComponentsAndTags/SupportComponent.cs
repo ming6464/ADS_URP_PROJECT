@@ -22,6 +22,7 @@ public struct LayerStoreComponent : IComponentData
     public uint zombieLayer;
     public uint bulletLayer;
     public uint itemLayer;
+    public uint itemCanShootLayer;
 }
 
 public struct EffectComponent : IComponentData

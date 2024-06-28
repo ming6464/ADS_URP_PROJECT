@@ -3,7 +3,6 @@ using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Transforms;
-using UnityEngine;
 
 namespace _Game_.Scripts.Systems.Player
 {
@@ -60,7 +59,6 @@ namespace _Game_.Scripts.Systems.Player
             _entityTypeHandle.Update(ref state);
 
             var listNextPointEntity = _enQueryMove.ToEntityArray(Allocator.Temp);
-            Debug.Log("m_ " + listNextPointEntity.Length);
             listNextPointEntity.Dispose();
             
             var job = new CharacterMoveNextPointJOB()

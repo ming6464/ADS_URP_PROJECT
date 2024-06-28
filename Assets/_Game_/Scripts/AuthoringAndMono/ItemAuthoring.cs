@@ -5,8 +5,11 @@ public class ItemAuthoring : MonoBehaviour
 {
     public int count;
     public ItemType type;
+    public TypeUsing typeUsing;
+    public float hp;
     public int id;
     public TextMesh textObj;
+    public TextMesh textHp;
     public Transform[] spawnPoints;
     
     private void OnValidate()
@@ -26,6 +29,11 @@ public class ItemAuthoring : MonoBehaviour
                     break;
             }
         }
+
+        if (textHp)
+        {
+            textHp.text = hp.ToString();
+        }
     }
 
     private class ItemAuthoringBaker : Baker<ItemAuthoring>
@@ -38,6 +46,7 @@ public class ItemAuthoring : MonoBehaviour
                 id = authoring.id,
                 type = authoring.type,
                 count = authoring.count,
+                hp = authoring.hp,
             });
             if (authoring.spawnPoints.Length > 0)
             {
@@ -51,6 +60,18 @@ public class ItemAuthoring : MonoBehaviour
                     });
                 }
             }
+
+            if (authoring.typeUsing.Equals(TypeUsing.canShooting))
+            {
+                AddComponent<ItemCanShoot>(entity);
+                
+            }
         }
     }
+}
+
+public enum TypeUsing
+{
+    none,
+    canShooting
 }

@@ -20,8 +20,8 @@ public partial struct BulletMovementSystem : ISystem
     private EntityTypeHandle _entityTypeHandle;
     private CollisionFilter _collisionFilter;
     private PhysicsWorldSingleton _physicsWorld;
-    private NativeQueue<ZombieTakeDamage> _zombieDamageMapQueue;
-    private NativeHashMap<Entity, float> _zombieTakeDamageMap;
+    private NativeQueue<ItemTakeDamage> _takeDamageQueue;
+    private NativeHashMap<Entity, float> _takeDamageMap;
     private EntityQuery _enQueryBulletInfoAlive;
     
     [BurstCompile]
@@ -33,18 +33,18 @@ public partial struct BulletMovementSystem : ISystem
         state.RequireForUpdate<PhysicsWorldSingleton>();
         state.RequireForUpdate<WeaponInfo>();
         _entityTypeHandle = state.GetEntityTypeHandle();
-        _zombieDamageMapQueue = new NativeQueue<ZombieTakeDamage>( Allocator.Persistent);
-        _zombieTakeDamageMap =
+        _takeDamageQueue = new NativeQueue<ItemTakeDamage>( Allocator.Persistent);
+        _takeDamageMap =
             new NativeHashMap<Entity, float>(100, Allocator.Persistent);
         _enQueryBulletInfoAlive = SystemAPI.QueryBuilder().WithAll<BulletInfo>().WithNone<Disabled, SetActiveSP>().Build();
     }
 
     public void OnDestroy(ref SystemState state)
     {
-        if (_zombieDamageMapQueue.IsCreated)
-            _zombieDamageMapQueue.Dispose();
-        if (_zombieTakeDamageMap.IsCreated)
-            _zombieTakeDamageMap.Dispose();
+        if (_takeDamageQueue.IsCreated)
+            _takeDamageQueue.Dispose();
+        if (_takeDamageMap.IsCreated)
+            _takeDamageMap.Dispose();
     }
 
     public void OnUpdate(ref SystemState state)
@@ -59,7 +59,7 @@ public partial struct BulletMovementSystem : ISystem
             _collisionFilter = new CollisionFilter()
             {
                 BelongsTo = layerStore.bulletLayer,
-                CollidesWith = layerStore.zombieLayer,
+                CollidesWith = layerStore.zombieLayer | layerStore.itemCanShootLayer,
             };
         }
         
@@ -85,39 +85,42 @@ public partial struct BulletMovementSystem : ISystem
             currentTime = curTime,
             bulletInfoTypeHandle = state.GetComponentTypeHandle<BulletInfo>(),
             expired = _expired,
-            zombieDamageMapQueue = _zombieDamageMapQueue.AsParallelWriter(),
+            zombieDamageMapQueue = _takeDamageQueue.AsParallelWriter(),
         };
         state.Dependency = jobChunk.Schedule(_enQueryBulletInfoAlive, state.Dependency);
         state.Dependency.Complete();
-        if (_zombieDamageMapQueue.Count > 0)
+        
+        if (_takeDamageQueue.Count > 0)
         {
-            while(_zombieDamageMapQueue.TryDequeue(out var item))
+            while(_takeDamageQueue.TryDequeue(out var item))
             {
                 if (item.damage == 0)
                 {
                     
                     continue;
                 }
-                if (_zombieTakeDamageMap.ContainsKey(item.entity))
+                if (_takeDamageMap.ContainsKey(item.entity))
                 {
-                    _zombieTakeDamageMap[item.entity] += item.damage;
+                    _takeDamageMap[item.entity] += item.damage;
                 }
                 else
                 {
-                    _zombieTakeDamageMap.Add(item.entity,item.damage);
+                    _takeDamageMap.Add(item.entity,item.damage);
                 }
             }
-            foreach (var map in _zombieTakeDamageMap)
+            
+            
+            
+            foreach (var map in _takeDamageMap)
             {
-                Debug.Log("m _ take damage 1");
                 ecb.AddComponent(map.Key,new TakeDamage()
                 {
                     value = map.Value,
                 });
             }
         }
-        _zombieDamageMapQueue.Clear();
-        _zombieTakeDamageMap.Clear();
+        _takeDamageQueue.Clear();
+        _takeDamageMap.Clear();
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
@@ -138,7 +141,7 @@ public partial struct BulletMovementSystem : ISystem
         [ReadOnly] public float currentTime;
         [ReadOnly] public float expired;
         public ComponentTypeHandle<LocalTransform> localTransformType;
-        [WriteOnly]public NativeQueue<ZombieTakeDamage>.ParallelWriter  zombieDamageMapQueue;
+        [WriteOnly]public NativeQueue<ItemTakeDamage>.ParallelWriter  zombieDamageMapQueue;
 
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
             in v128 chunkEnabledMask)
@@ -185,7 +188,7 @@ public partial struct BulletMovementSystem : ISystem
                 
                 if (physicsWorld.CastRay(raycastInput, out RaycastHit hit))
                 {
-                    zombieDamageMapQueue.Enqueue(new ZombieTakeDamage()
+                    zombieDamageMapQueue.Enqueue(new ItemTakeDamage()
                     {
                         damage = bulletInfo.damage,
                         entity = hit.Entity,
@@ -211,7 +214,7 @@ public partial struct BulletMovementSystem : ISystem
     
     // structs {
 
-    private struct ZombieTakeDamage
+    private struct ItemTakeDamage
     {
         public Entity entity;
         public float damage;

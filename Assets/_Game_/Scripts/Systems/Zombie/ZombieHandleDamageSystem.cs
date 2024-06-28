@@ -72,7 +72,6 @@ namespace _Game.Scripts.Systems.Zombie
                     state = StateID.Wait,
                     startTime = time,
                 };
-                Debug.Log("m _ die 2");
                 var addToBuffer = new AddToBuffer();
                 
                 for (int i = 0; i < chunk.Count; i++)

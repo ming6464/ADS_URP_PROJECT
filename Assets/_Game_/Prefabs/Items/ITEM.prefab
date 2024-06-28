@@ -153,8 +153,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   count: 3
   type: 0
+  typeUsing: 0
+  hp: 0
   id: 0
   textObj: {fileID: 2035862929969342748}
+  textHp: {fileID: 0}
   spawnPoints: []
 --- !u!1 &7910497903320759565
 GameObject:

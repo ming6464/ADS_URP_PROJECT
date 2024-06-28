@@ -225,10 +225,7 @@ public partial struct HandleSetActiveSystem : ISystem
                     DestroyAllChildren(buffer[j].Value, index);
                 }
             }
-            else
-            {
-                ecb.DestroyEntity(index,entity);
-            }
+            ecb.DestroyEntity(index,entity);
         }
     }
     

@@ -14,6 +14,7 @@ public struct ItemInfo : IComponentData
     public int id;
     public ItemType type;
     public int count;
+    public float hp;
 }
 
 public struct ItemCollection : IComponentData
@@ -29,6 +30,10 @@ public struct BufferSpawnPoint : IBufferElementData
     public float3 value;
 }
 
+public struct ItemCanShoot : IComponentData
+{
+    
+}
 
 //obstacle
 public struct BufferTurretObstacle : IBufferElementData

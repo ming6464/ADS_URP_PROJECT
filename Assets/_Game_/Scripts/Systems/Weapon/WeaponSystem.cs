@@ -108,6 +108,7 @@ public partial struct WeaponSystem : ISystem
             foreach (var (collection,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess()
                          .WithNone<Disabled, SetActiveSP>())
             {
+                Debug.Log("m _ item 1");
                 switch (collection.ValueRO.type)
                 {
                     case ItemType.Weapon:

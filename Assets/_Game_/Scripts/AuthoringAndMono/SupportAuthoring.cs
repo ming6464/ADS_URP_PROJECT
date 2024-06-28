@@ -13,6 +13,7 @@ namespace _Game_.Scripts.AuthoringAndMono
         public LayerMask zombieLayer;
         public LayerMask bulletLayer;
         public LayerMask itemLayer;
+        public LayerMask itemCanShootLayer;
 
         [Header("Camera")] 
         public float3 offsetFirstPerson; 
@@ -41,6 +42,7 @@ namespace _Game_.Scripts.AuthoringAndMono
                     zombieLayer = (uint)authoring.zombieLayer.value,
                     bulletLayer = (uint)authoring.bulletLayer.value,
                     itemLayer = (uint)authoring.itemLayer.value,
+                    itemCanShootLayer = (uint)authoring.itemCanShootLayer.value,
                 });
             }
         }

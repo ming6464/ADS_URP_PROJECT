@@ -1,3 +1,4 @@
+using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
@@ -33,6 +34,7 @@ public partial struct PlayerSystem : ISystem
     private CollisionFilter _filterItem;
     private LayerStoreComponent _layerStore;
     
+    [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<LayerStoreComponent>();
@@ -46,12 +48,14 @@ public partial struct PlayerSystem : ISystem
     }
 
 
+    [BurstCompile]
     public void OnDestroy(ref SystemState state)
     {
         if (_arrHitItem.IsCreated)
             _arrHitItem.Dispose();
     }
 
+    [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
         if (!_init)
@@ -81,8 +85,8 @@ public partial struct PlayerSystem : ISystem
 
         Move(ref state);
         Rota(ref state);
-        state.Dependency.Complete();
         CheckCollider(ref state,ref ecb);
+        state.Dependency.Complete();
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
@@ -107,7 +111,7 @@ public partial struct PlayerSystem : ISystem
             float3 playerPosWorld = _playerAspect.PositionWorld;
             float3 positionNearest = float3.zero;
             bool check = false;
-            foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAll<ZombieInfo>()
+            foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAny<ZombieInfo,ItemCanShoot>()
                          .WithNone<Disabled, SetActiveSP>())
             {
                 check = true;
@@ -173,45 +177,31 @@ public partial struct PlayerSystem : ISystem
         if (_physicsWorld.BoxCastAll(_ltwPlayer.Position, quaternion.identity, halfSizeBox, float3.zero, 0,
                 ref _arrHitItem, _filterItem))
         {
-            NativeArray<Entity> itemDisable =
-                SystemAPI.QueryBuilder().WithAll<ItemCollection, Disabled>().Build().ToEntityArray(Allocator.Temp);
-            int maxIndexItemDisable = itemDisable.Length - 1;
             for (int i = 0; i < _arrHitItem.Length; i++)
             {
                 Entity entityItem = _arrHitItem[i].Entity;
-                if(!_entityManager.HasComponent<ItemInfo>(entityItem)) continue;
                 var itemInfo = _entityManager.GetComponentData<ItemInfo>(entityItem);
-                Entity entityItemCollection;
-                if (i <= maxIndexItemDisable)
+
+                var entityCollectionNew = _entityManager.CreateEntity();
+
+                if (_entityManager.HasBuffer<BufferSpawnPoint>(entityItem))
                 {
-                    entityItemCollection = itemDisable[i];
-                    ecb.RemoveComponent<Disabled>(entityItemCollection);
-                    ecb.AddComponent(entityItemCollection,new SetActiveSP()
-                    {
-                        state = StateID.Enable,
-                    });
+                    var buffer = ecb.AddBuffer<BufferSpawnPoint>(entityCollectionNew);
+                    buffer.CopyFrom(_entityManager.GetBuffer<BufferSpawnPoint>(entityItem));
                 }
-                else
-                {
-                    entityItemCollection = _entityManager.CreateEntity();
-                }
-                ecb.AddComponent(entityItemCollection,new ItemCollection()
+                
+                ecb.AddComponent(entityCollectionNew,new ItemCollection()
                 {
                     type = itemInfo.type,
                     count = itemInfo.count,
                     id = itemInfo.id,
-                    entityItem = _arrHitItem[i].Entity,
+                    entityItem = entityCollectionNew,
                 });
-                
-                ecb.RemoveComponent<PhysicsCollider>(entityItem);
-                ecb.RemoveComponent<ItemInfo>(entityItem);
                 ecb.AddComponent(entityItem,new SetActiveSP()
                 {
                     state = StateID.DestroyAll,
                 });
             }
-
-            itemDisable.Dispose();
         }
 
         _arrHitItem.Clear();
