@@ -5,6 +5,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
 namespace _Game_.Scripts.Systems.Other.Obstacle
 {
@@ -12,7 +13,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
     public partial struct TurretSystem : ISystem
     {
         private NativeArray<BufferTurretObstacle> _bufferTurretObstacles;
-        private NativeList<LocalTransform> _ltEnemy;
+        private NativeList<float3> _enemyPositions;
         private NativeQueue<BufferBulletSpawner> _bulletSpawnQueue;
         private EntityQuery _enQueryBarrelInfo;
         private Entity _entityWeaponAuthoring;
@@ -24,7 +25,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
         {
             state.RequireForUpdate<TurretInfo>();
             state.RequireForUpdate<WeaponProperty>();
-            _ltEnemy = new NativeList<LocalTransform>(Allocator.Persistent);
+            _enemyPositions = new NativeList<float3>(Allocator.Persistent);
             _enQueryBarrelInfo = SystemAPI.QueryBuilder().WithAll<BarrelInfo,BarrelRunTime>().WithNone<Disabled, SetActiveSP>().Build();
             _bulletSpawnQueue = new NativeQueue<BufferBulletSpawner>(Allocator.Persistent);
         }
@@ -56,7 +57,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                     bulletPerShot = turret.bulletPerShot,
                     cooldown = turret.cooldown,
                     damage = turret.damage,
-                    distanceSetChangeRota = turret.distanceSetChangeRota,
+                    distanceAim = turret.distanceAim,
                     moveToWardMax = turret.moveToWardMax,
                     moveToWardMin = turret.moveToWardMin,
                     parallelOrbit = turret.parallelOrbit,
@@ -85,16 +86,19 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
 
         private void PutEventSpawnBullet(ref SystemState state)
         {
-            _ltEnemy.Clear();
+            _enemyPositions.Clear();
             _bulletSpawnQueue.Clear();
-            foreach(var lt in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<ZombieInfo>().WithNone<Disabled,SetActiveSP>())
+            foreach(var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAll<ZombieInfo>().WithNone<Disabled,SetActiveSP>())
             {
-                _ltEnemy.Add(lt.ValueRO);
+                _enemyPositions.Add(ltw.ValueRO.Position);
             }
-            var job = new BarrelOB()
+            
+            Debug.Log("m_ length zombie : " + _enemyPositions.Length);
+            
+            var job = new BarreJOB()
             {
                 ltComponentType = state.GetComponentTypeHandle<LocalTransform>(),
-                ltEnemy = _ltEnemy,
+                enemyPositions = _enemyPositions,
                 barrelInfoComponentType = state.GetComponentTypeHandle<BarrelInfo>(),
                 deltaTime = SystemAPI.Time.DeltaTime,
                 barrelRunTimeComponentType = state.GetComponentTypeHandle<BarrelRunTime>(),
@@ -117,21 +121,21 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
         [BurstCompile]
         public void OnDestroy(ref SystemState state)
         {
-            if (_ltEnemy.IsCreated)
-                _ltEnemy.Dispose();
+            if (_enemyPositions.IsCreated)
+                _enemyPositions.Dispose();
             if (_bulletSpawnQueue.IsCreated)
                 _bulletSpawnQueue.Dispose();
             if (_bufferTurretObstacles.IsCreated)
                 _bufferTurretObstacles.Dispose();
         }
         
-        partial struct BarrelOB : IJobChunk
+        partial struct BarreJOB : IJobChunk
         {
             public ComponentTypeHandle<LocalTransform> ltComponentType;
             public ComponentTypeHandle<BarrelRunTime> barrelRunTimeComponentType;
             public NativeQueue<BufferBulletSpawner>.ParallelWriter bulletSpawnQueue;
-            public ComponentTypeHandle<LocalToWorld> ltwComponentTypeHandle;
-            [ReadOnly] public NativeList<LocalTransform> ltEnemy;
+            [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwComponentTypeHandle;
+            [ReadOnly] public NativeList<float3> enemyPositions;
             [ReadOnly] public ComponentTypeHandle<BarrelInfo> barrelInfoComponentType;
             [ReadOnly] public float deltaTime;
             [ReadOnly] public float time;
@@ -152,19 +156,8 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                     var ltw = ltws[i];
                     var info = barrelInfos[i];
                     var moveToWard = info.moveToWardMax;
-                    var ltEnemy = GetLocalTransformNearestEnemy(ltw.Position);
-                    var direct = lt.Forward();
-                    if (ltEnemy.Scale > 0)
-                    {
-                        var distance = math.distance(ltw.Position, ltEnemy.Position);
-                        direct = ltEnemy.Position - ltw.Position;
-                        var ratio = 0f;
-                        if (distance < info.distanceSetChangeRota)
-                        {
-                            ratio = 1 - (distance * 1.0f / info.distanceSetChangeRota);
-                        }
-                        moveToWard = math.lerp(info.moveToWardMin, info.moveToWardMax,ratio);
-                    }
+                    var direct = math.forward();
+                    GetLocalTransformNearestEnemy(ltw.Position,info,ref direct,ref moveToWard);
                     lt.Rotation = MathExt.MoveTowards(ltw.Rotation, quaternion.LookRotationSafe(direct, math.up()),
                         moveToWard * deltaTime);
                     lts[i] = lt;
@@ -184,7 +177,6 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                             spaceAnglePerBullet = info.spaceAnglePerBullet,
                         });
                         barrelRunTime.value = time;
-                        
                         barrelRunTimes[i] = barrelRunTime;
                     }
                     
@@ -192,25 +184,36 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                 
             }
 
-            private LocalTransform GetLocalTransformNearestEnemy(float3 pos)
+            private void GetLocalTransformNearestEnemy(float3 pos,BarrelInfo info,ref float3 direct, ref float moveToWard)
             {
-                float distanceNearest = 999;
-
-                LocalTransform lt = new LocalTransform()
+                float distanceNearest = info.distanceAim;
+                float3 positionNearest = float3.zero;
+                bool check = false;
+                foreach (var enemyPos in enemyPositions)
                 {
-                    Scale = -1,
-                };
-                
-                foreach (var enemyLt in ltEnemy)
-                {
-                    if (math.distance(pos, enemyLt.Position) < distanceNearest)
+                    var distance = math.distance(pos, enemyPos);
+                    
+                    if (distance < distanceNearest)
                     {
-                        distanceNearest = math.distance(pos, enemyLt.Position);
-                        lt = enemyLt;
+                        if (MathExt.CalculateAngle(enemyPos - pos, math.forward()) < 120)
+                        {
+                            distanceNearest = distance;
+                            positionNearest = enemyPos;
+                            check = true;
+                        }
                     }
                 }
-
-                return lt;
+                if (check)
+                {
+                    direct = positionNearest - pos;
+                    var ratio = 1 - math.clamp(distanceNearest * 1.0f / info.distanceAim, 0, 1);
+                    moveToWard = math.lerp(info.moveToWardMin, info.moveToWardMax,ratio);
+                }
+                else
+                {
+                    moveToWard = info.moveToWardMax;
+                    direct = math.forward();
+                }
             }
         }
 

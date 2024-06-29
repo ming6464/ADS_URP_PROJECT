@@ -31,7 +31,6 @@ public partial struct BulletMovementSystem : ISystem
         state.RequireForUpdate<EffectProperty>();
         state.RequireForUpdate<WeaponProperty>();
         state.RequireForUpdate<PhysicsWorldSingleton>();
-        state.RequireForUpdate<WeaponInfo>();
         _entityTypeHandle = state.GetEntityTypeHandle();
         _takeDamageQueue = new NativeQueue<ItemTakeDamage>( Allocator.Persistent);
         _takeDamageMap =

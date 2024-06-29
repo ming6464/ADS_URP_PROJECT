@@ -27,7 +27,7 @@ namespace _Game_.Scripts.AuthoringAndMono
                                 bulletPerShot = turret.bulletPerShot,
                                 cooldown = turret.cooldown,
                                 damage = turret.damage,
-                                distanceSetChangeRota = turret.distanceSetChangeRota,
+                                distanceAim = turret.distanceAim,
                                 moveToWardMax = turret.moveToWardMax,
                                 moveToWardMin = turret.moveToWardMin,
                                 parallelOrbit = turret.parallelOrbit,

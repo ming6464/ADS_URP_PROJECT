@@ -14,7 +14,7 @@ namespace _Game_.Scripts.Data
         public float speed;
         public float damage;
         public float cooldown;
-        public float distanceSetChangeRota;
+        public float distanceAim;
         public float moveToWardMax;
         public float moveToWardMin;
     }

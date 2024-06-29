@@ -47,7 +47,7 @@ public struct BufferTurretObstacle : IBufferElementData
     public float speed;
     public float damage;
     public float cooldown;
-    public float distanceSetChangeRota;
+    public float distanceAim;
     public float moveToWardMax;
     public float moveToWardMin;
 }
@@ -68,7 +68,7 @@ public struct BarrelInfo : IComponentData
     public float speed;
     public float damage;
     public float cooldown;
-    public float distanceSetChangeRota;
+    public float distanceAim;
     public float moveToWardMax;
     public float moveToWardMin;
     public float3 pivotFireOffset;

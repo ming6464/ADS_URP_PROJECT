@@ -51,16 +51,6 @@ namespace _Game_.Scripts.Systems.Other
 
         private void CheckItemShooting(ref SystemState state, ref EntityCommandBuffer ecb) 
         {
-            var query = SystemAPI.QueryBuilder().WithAll<TakeDamage>().Build();
-            var query2 = SystemAPI.QueryBuilder().WithAll<TakeDamage,ItemInfo>().Build();
-
-            var a = query.ToEntityArray(Allocator.Temp);
-            var b = query2.ToEntityArray(Allocator.Temp);
-            
-            a.Dispose();
-            b.Dispose();
-            
-            
             foreach (var (itemInfo, takeDamage, entity) in SystemAPI.Query<RefRW<ItemInfo>, RefRO<TakeDamage>>()
                          .WithEntityAccess())
             {

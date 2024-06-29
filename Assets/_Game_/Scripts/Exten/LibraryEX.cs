@@ -392,13 +392,129 @@ public static class MathExt
     
     #endregion Interpolate
 
+    /// <summary>
+    /// Tính toán góc giữa hai vector và xác định góc âm nếu vector A theo chiều kim đồng hồ so với vector B.
+    /// </summary>
+    /// <param name="vecA">Vector đầu tiên.</param>
+    /// <param name="vecB">Vector thứ hai.</param>
+    /// <returns>Góc giữa hai vector tính bằng độ, có thể là âm hoặc dương.</returns>
+    public static float CalculateSignedAngle(float3 vecA, float3 vecB)
+    {
+        // Chuẩn hóa các vector
+        vecA = math.normalize(vecA);
+        vecB = math.normalize(vecB);
+        
+        // Tính dot product
+        float dotProduct = math.dot(vecA, vecB);
+        
+        // Đảm bảo giá trị của dot product nằm trong khoảng [-1, 1]
+        dotProduct = math.clamp(dotProduct, -1.0f, 1.0f);
+        
+        // Tính góc bằng hàm acos và chuyển từ radian sang độ
+        float angleRadians = math.acos(dotProduct);
+        float angleDegrees = math.degrees(angleRadians);
+        
+        // Tính cross product để xác định hướng
+        float3 crossProduct = math.cross(vecA, vecB);
+        
+        // Xác định dấu của góc
+        if (crossProduct.z < 0) // Dựa trên trục Z cho 2D vectors trong mặt phẳng XY
+        {
+            angleDegrees = -angleDegrees;
+        }
+        
+        return angleDegrees;
+    }
 
+    public static float CalculateAngle(float3 vecA, float3 vecB)
+    {
+        // Chuẩn hóa các vector
+        vecA = math.normalize(vecA);
+        vecB = math.normalize(vecB);
+        
+        // Tính dot product
+        float dotProduct = math.dot(vecA, vecB);
+        
+        // Đảm bảo giá trị của dot product nằm trong khoảng [-1, 1]
+        dotProduct = math.clamp(dotProduct, -1.0f, 1.0f);
+        
+        // Tính góc bằng hàm acos và chuyển từ radian sang độ
+        float angleRadians = math.acos(dotProduct);
+        float angleDegrees = math.degrees(angleRadians);
+        
+        return angleDegrees;
+    }
+    
+    /// <summary>
+    /// So sánh hai vector float3 để kiểm tra xem chúng có bằng nhau hay không.
+    /// </summary>
+    /// <param name="f1">Vector float3 thứ nhất.</param>
+    /// <param name="f2">Vector float3 thứ hai.</param>
+    /// <returns>Trả về true nếu hai vector bằng nhau, ngược lại trả về false.</returns>
     public static bool ComparisionEqual(this float3 f1, float3 f2)
     {
-
         var f = f1 - f2;
-
         return !(f.x != 0 || f.y != 0 || f.z != 0);
+    }
+    
+    
+    /// <summary>
+    /// Tính toán góc giữa hai vector float2.
+    /// </summary>
+    /// <param name="vecA">Vector đầu tiên.</param>
+    /// <param name="vecB">Vector thứ hai.</param>
+    /// <returns>Góc giữa hai vector tính bằng độ.</returns>
+    public static float CalculateAngle(float2 vecA, float2 vecB)
+    {
+        // Chuẩn hóa các vector
+        vecA = math.normalize(vecA);
+        vecB = math.normalize(vecB);
+        
+        // Tính dot product
+        float dotProduct = math.dot(vecA, vecB);
+        
+        // Đảm bảo giá trị của dot product nằm trong khoảng [-1, 1]
+        dotProduct = math.clamp(dotProduct, -1.0f, 1.0f);
+        
+        // Tính góc bằng hàm acos và chuyển từ radian sang độ
+        float angleRadians = math.acos(dotProduct);
+        float angleDegrees = math.degrees(angleRadians);
+        
+        return angleDegrees;
+    }
+
+    /// <summary>
+    /// Tính toán góc có dấu giữa hai vector float2 và xác định góc âm nếu vector A theo chiều kim đồng hồ so với vector B.
+    /// </summary>
+    /// <param name="vecA">Vector đầu tiên.</param>
+    /// <param name="vecB">Vector thứ hai.</param>
+    /// <returns>Góc có dấu giữa hai vector tính bằng độ, có thể là âm hoặc dương.</returns>
+    public static float CalculateSignedAngle(float2 vecA, float2 vecB)
+    {
+        // Chuẩn hóa các vector
+        vecA = math.normalize(vecA);
+        vecB = math.normalize(vecB);
+        
+        // Tính dot product
+        float dotProduct = math.dot(vecA, vecB);
+        
+        // Đảm bảo giá trị của dot product nằm trong khoảng [-1, 1]
+        dotProduct = math.clamp(dotProduct, -1.0f, 1.0f);
+        
+        // Tính góc bằng hàm acos và chuyển từ radian sang độ
+        float angleRadians = math.acos(dotProduct);
+        float angleDegrees = math.degrees(angleRadians);
+        
+        // Tính cross product để xác định hướng
+        float crossProduct = vecA.x * vecB.y - vecA.y * vecB.x;
+        
+        // Xác định dấu của góc
+        if (crossProduct < 0)
+        {
+            angleDegrees = -angleDegrees;
+        }
+        
+        return angleDegrees;
     }
     
 }

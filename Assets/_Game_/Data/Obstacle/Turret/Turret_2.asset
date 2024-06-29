@@ -20,10 +20,10 @@ MonoBehaviour:
     z: 1.584
   bulletPerShot: 5
   spaceAnglePerBullet: 1
-  parallelOrbit: 0
+  parallelOrbit: 1
   speed: 80
   damage: 10
   cooldown: 0.1
-  distanceSetChangeRota: 30
+  distanceAim: 100
   moveToWardMax: 10
   moveToWardMin: 200

@@ -20,8 +20,8 @@ public class ItemAuthoring : MonoBehaviour
             switch (type)
             {
                 case ItemType.Character:
-                    str = "+";
-                    if (count < 0) str = "-";
+                    str = "";
+                    if (count > 0) str = "+";
                     textObj.text = str + " " + count;
                     break;
                 default:

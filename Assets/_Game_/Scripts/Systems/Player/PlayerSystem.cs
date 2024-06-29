@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -5,7 +6,6 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
-using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 public partial struct PlayerSystem : ISystem
@@ -16,13 +16,7 @@ public partial struct PlayerSystem : ISystem
     private PlayerInfo _playerInfo;
     private Entity _playerEntity;
     private bool _init;
-    private bool _aimNearestEnemy;
     private PlayerAspect _playerAspect;
-    private float _moveToWardMin;
-    private float _moveToWardMax;
-    private float _distanceSetChangeRota;
-
-    private EntityQuery _entityQueryPlayer;
     //
     private int _maxXGridCharacter;
     private int _maxYGridCharacter;
@@ -44,7 +38,6 @@ public partial struct PlayerSystem : ISystem
         state.RequireForUpdate<PlayerInfo>();
         state.RequireForUpdate<CharacterInfo>();
         _arrHitItem = new NativeList<ColliderCastHit>(Allocator.Persistent);
-        _entityQueryPlayer = SystemAPI.QueryBuilder().WithAll<CharacterInfo>().Build();
     }
 
 
@@ -62,12 +55,6 @@ public partial struct PlayerSystem : ISystem
         {
             _playerProperty = SystemAPI.GetSingleton<PlayerProperty>();
             _playerEntity = SystemAPI.GetSingletonEntity<PlayerInfo>();
-            _aimNearestEnemy = _playerProperty.aimNearestEnemy;
-            
-            _moveToWardMin = _playerProperty.moveToWardMin;
-            _moveToWardMax = _playerProperty.moveToWardMax;
-            _distanceSetChangeRota = _playerProperty.distanceSetChangeRota;
-            
             _characterRadius = _playerProperty.characterRadius;
             _layerStore = SystemAPI.GetSingleton<LayerStoreComponent>();
             _filterItem = new CollisionFilter()
@@ -84,7 +71,6 @@ public partial struct PlayerSystem : ISystem
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
 
         Move(ref state);
-        Rota(ref state);
         CheckCollider(ref state,ref ecb);
         state.Dependency.Complete();
         ecb.Playback(_entityManager);
@@ -99,68 +85,6 @@ public partial struct PlayerSystem : ISystem
         _playerAspect.Position += new float3(direct.x, 0, direct.y) * _playerProperty.speed * SystemAPI.Time.DeltaTime;
     }
 
-
-    private void Rota(ref SystemState state)
-    {
-        
-        float3 dirRota;
-        float moveToWard = _moveToWardMax;
-        if (_aimNearestEnemy)
-        {
-            float spaceNearest = 99999f;
-            float3 playerPosWorld = _playerAspect.PositionWorld;
-            float3 positionNearest = float3.zero;
-            bool check = false;
-            foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAny<ZombieInfo,ItemCanShoot>()
-                         .WithNone<Disabled, SetActiveSP>())
-            {
-                check = true;
-                float space = math.distance(playerPosWorld, ltw.ValueRO.Position);
-                if (space < spaceNearest)
-                {
-                    positionNearest = ltw.ValueRO.Position;
-                    spaceNearest = space;
-                }
-            }
-
-            if (!check)
-            {
-                dirRota = _playerAspect.LocalToWorld.Forward;
-            }
-            else
-            {
-                dirRota = positionNearest - playerPosWorld;
-                if (!dirRota.Equals(float3.zero))
-                {
-                    dirRota = math.normalize(dirRota);
-                }
-            }
-
-            float ratio = 0;
-            if (spaceNearest < _distanceSetChangeRota)
-            {
-                ratio = 1 - (spaceNearest * 1.0f / _distanceSetChangeRota);
-            }
-
-            moveToWard = math.lerp(_moveToWardMin, _moveToWardMax,ratio);
-        }
-        else
-        {
-            float x = math.remap(0, 1920, -1, 1, _playerMoveInput.mousePos.x);
-            float y = 1 - math.abs(x);
-            dirRota = math.normalize(new float3(x, 0, y));
-        }
-        
-        
-        state.Dependency = new CharacterRotate()
-        {
-            ltComponentTypeHandle = state.GetComponentTypeHandle<LocalTransform>(),
-            directRota = dirRota,
-            moveToWard = moveToWard,
-            deltaTime = SystemAPI.Time.DeltaTime,
-        }.ScheduleParallel(_entityQueryPlayer, state.Dependency);
-    }
-
     private void CheckCollider(ref SystemState state, ref EntityCommandBuffer ecb)
     {
         _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
@@ -173,13 +97,16 @@ public partial struct PlayerSystem : ISystem
         var halfX = (_maxXGridCharacter - 1) * _spaceGrid.x / 2f + _characterRadius;
         var halfZ = (_maxYGridCharacter - 1) * _spaceGrid.y / 2f + _characterRadius;
         var halfSizeBox = new float3(halfX, 1, halfZ);
-
+        _arrHitItem.Clear();
         if (_physicsWorld.BoxCastAll(_ltwPlayer.Position, quaternion.identity, halfSizeBox, float3.zero, 0,
                 ref _arrHitItem, _filterItem))
         {
-            for (int i = 0; i < _arrHitItem.Length; i++)
+            foreach (var t in _arrHitItem)
             {
-                Entity entityItem = _arrHitItem[i].Entity;
+                Entity entityItem = t.Entity;
+                
+                if(!_entityManager.HasComponent<ItemInfo>(entityItem))continue;
+                
                 var itemInfo = _entityManager.GetComponentData<ItemInfo>(entityItem);
 
                 var entityCollectionNew = _entityManager.CreateEntity();
@@ -204,29 +131,11 @@ public partial struct PlayerSystem : ISystem
             }
         }
 
-        _arrHitItem.Clear();
     }
+}
 
-    private partial struct CharacterRotate : IJobChunk
-    {
-        public ComponentTypeHandle<LocalTransform> ltComponentTypeHandle;
-        [ReadOnly] public float3 directRota;
-        [ReadOnly] public float moveToWard;
-        [ReadOnly] public float deltaTime;
-        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
-        {
-            var lts = chunk.GetNativeArray(ltComponentTypeHandle);
-            if(chunk.Count == 0) return;
-            var targetRota = quaternion.LookRotationSafe(directRota,math.up());
-            var curRota = lts[0].Rotation;
-            var nextRota = MathExt.MoveTowards(curRota, targetRota, moveToWard * deltaTime);
-            for (int i = 0; i < chunk.Count; i++)
-            {
-                var lt = lts[i];
-                lt.Rotation = nextRota;
-                lts[i] = lt;
-            }
-        }
-    }
-    
+public enum AimType
+{
+    TeamAim,
+    IndividualAim
 }

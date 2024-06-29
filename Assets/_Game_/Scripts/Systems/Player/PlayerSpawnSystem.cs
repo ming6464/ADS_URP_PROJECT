@@ -3,7 +3,6 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
 
 [BurstCompile, UpdateInGroup(typeof(InitializationSystemGroup))]
 public partial struct PlayerSpawnSystem : ISystem
@@ -89,7 +88,6 @@ public partial struct PlayerSpawnSystem : ISystem
         foreach (var (collection,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess()
                      .WithNone<Disabled, SetActiveSP>())
         {
-            Debug.Log("m _ item 3");
             switch (collection.ValueRO.type)
             {
                 case ItemType.Character:

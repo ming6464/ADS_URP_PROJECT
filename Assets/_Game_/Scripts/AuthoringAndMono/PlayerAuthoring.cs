@@ -5,16 +5,17 @@ using UnityEngine;
 
 public class PlayerAuthoring : MonoBehaviour
 {
-    
     public Transform spawnPosition;
     public GameObject playerPrefab;
     public float speed;
     public float radius;
+    public float rotaAngleMax;
+    public AimType aimType;
     //
-    public float characterMoveToWardChangePos;
+    public float speedMoveToNextPoint;
     //
     public bool aimNearestEnemy;
-    public float distanceSetChangeRota;
+    public float distanceAim;
     public float moveToWardMax;
     public float moveToWardMin;
     public int numberSpawnDefault;
@@ -37,13 +38,14 @@ public class PlayerAuthoring : MonoBehaviour
                 spawnPosition = authoring.spawnPosition.position,
                 spaceGrid = authoring.spaceGrid,
                 numberSpawnDefault = authoring.numberSpawnDefault,
-                aimNearestEnemy = authoring.aimNearestEnemy,
+                aimType = authoring.aimType,
                 characterRadius = authoring.radius,
                 idWeaponDefault = authoring.idWeaponDefault,
-                distanceSetChangeRota = authoring.distanceSetChangeRota,
+                distanceAim = authoring.distanceAim,
                 moveToWardMin = authoring.moveToWardMin,
                 moveToWardMax = authoring.moveToWardMax,
-                characterMoveToWardChangePos = authoring.characterMoveToWardChangePos
+                speedMoveToNextPoint = authoring.speedMoveToNextPoint,
+                rotaAngleMax = authoring.rotaAngleMax,
             });
         
             AddComponent(entity, new PlayerInput

@@ -8,14 +8,15 @@ public struct PlayerProperty : IComponentData
     public Entity characterEntity;
     public float characterRadius;
     public float speed;
+    public AimType aimType;
     public float3 spawnPosition;
     public int numberSpawnDefault;
     public float2 spaceGrid;
-    public bool aimNearestEnemy;
-    public float distanceSetChangeRota;
+    public float distanceAim;
     public float moveToWardMax;
     public float moveToWardMin;
-    public float characterMoveToWardChangePos;
+    public float speedMoveToNextPoint;
+    public float rotaAngleMax;
 
 }
 

@@ -1,7 +1,9 @@
-﻿using Unity.Burst;
+﻿using System.Collections.Generic;
+using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 using Unity.Transforms;
 
 namespace _Game_.Scripts.Systems.Player
@@ -14,9 +16,12 @@ namespace _Game_.Scripts.Systems.Player
         private EntityManager _entityManager;
         private NativeQueue<Entity> _characterDieQueue;
         private EntityQuery _enQueryMove;
+        private EntityQuery _enQueryCharacterMove;
         private Entity _entityPlayerInfo;
         private bool _isInit;
         private float _characterMoveToWardChangePos;
+        private PlayerProperty _playerProperty;
+        private NativeList<TargetInfo> _targetNears;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -29,10 +34,14 @@ namespace _Game_.Scripts.Systems.Player
             _characterDieQueue = new NativeQueue<Entity>(Allocator.Persistent);
             _enQueryMove = SystemAPI.QueryBuilder().WithAll<CharacterInfo, NextPoint>().WithNone<Disabled, SetActiveSP>()
                 .Build();
+            _enQueryCharacterMove = SystemAPI.QueryBuilder().WithAll<CharacterInfo>().WithNone<Disabled, SetActiveSP>()
+                .Build();
+            _targetNears = new NativeList<TargetInfo>(Allocator.Persistent);
         }
-
+        [BurstCompile]
         public void OnDestroy(ref SystemState state)
         {
+            if (_targetNears.IsCreated) _targetNears.Dispose();
             if (_characterDieQueue.IsCreated) _characterDieQueue.Dispose();
         }
 
@@ -44,14 +53,79 @@ namespace _Game_.Scripts.Systems.Player
                 _isInit = true;
                 _entityManager = state.EntityManager;
                 _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
-                var playerProperty = SystemAPI.GetSingleton<PlayerProperty>();
-                _characterMoveToWardChangePos = playerProperty.characterMoveToWardChangePos;
+                _playerProperty = SystemAPI.GetSingleton<PlayerProperty>();
+                _characterMoveToWardChangePos = _playerProperty.speedMoveToNextPoint;
             }
             EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+            Rota(ref state);
             Move(ref state, ref ecb);
             CheckTakeDamage(ref state, ref ecb); 
             ecb.Playback(_entityManager);
             ecb.Dispose();
+        }
+
+        private void Rota(ref SystemState state)
+        {
+            _targetNears.Clear();
+            var playerPosition = SystemAPI.GetComponentRO<LocalTransform>(SystemAPI.GetSingletonEntity<PlayerInfo>()).ValueRO.Position;
+            var directRota = math.forward();
+            var distanceNearest = _playerProperty.distanceAim;
+            var positionNearest = float3.zero;
+            var moveToWard = _playerProperty.moveToWardMax;
+
+            bool check = false;
+            foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAny<ZombieInfo,ItemCanShoot>()
+                         .WithNone<Disabled, SetActiveSP>())
+            {
+                var posTarget = ltw.ValueRO.Position;
+                float distance = math.distance(playerPosition, posTarget);
+                if (distance < distanceNearest)
+                {
+                    if (_playerProperty.aimType == AimType.TeamAim)
+                    {
+                        if (MathExt.CalculateAngle(posTarget - playerPosition, new float3(0, 0, 1)) < _playerProperty.rotaAngleMax)
+                        {
+                            positionNearest = posTarget;
+                            distanceNearest = distance;
+                            check = true;
+                        }
+                        continue;
+                    }
+                    
+                    distanceNearest = distance;
+                    _targetNears.Add(new TargetInfo()
+                    {
+                        position = ltw.ValueRO.Position,
+                        distance = distance
+                    });
+                }
+            }
+
+            if (_playerProperty.aimType == AimType.IndividualAim && _targetNears.Length > 20)
+            {
+                _targetNears.Sort(new TargetInfoComparer());
+                _targetNears.Resize(20,NativeArrayOptions.ClearMemory);
+            }
+            
+            if(check)
+            {
+                directRota = positionNearest - playerPosition;
+                var ratio = 1 - math.clamp((distanceNearest * 1.0f / _playerProperty.distanceAim), 0, 1);
+                moveToWard = math.lerp(_playerProperty.moveToWardMin, _playerProperty.moveToWardMax,ratio);
+            }
+
+            var job = new CharacterRotaJOB()
+            {
+                ltComponentType = state.GetComponentTypeHandle<LocalTransform>(),
+                ltwComponentType = state.GetComponentTypeHandle<LocalToWorld>(),
+                targetNears = _targetNears,
+                playerProperty = _playerProperty,
+                deltaTime = SystemAPI.Time.DeltaTime,
+                directRota = directRota,
+                moveToWard = moveToWard,
+            };
+            state.Dependency = job.ScheduleParallel(_enQueryCharacterMove, state.Dependency);
+            state.Dependency.Complete();
         }
 
         private void Move(ref SystemState state, ref EntityCommandBuffer ecb)
@@ -107,7 +181,69 @@ namespace _Game_.Scripts.Systems.Player
                 });
             }
         }
+        
+        private struct TargetInfoComparer : IComparer<TargetInfo>
+        {
+            public int Compare(TargetInfo x, TargetInfo y)
+            {
+                return x.distance.CompareTo(y.distance);
+            }
+        }
+        
+        [BurstCompile]
+        partial struct CharacterRotaJOB : IJobChunk
+        {
+            public ComponentTypeHandle<LocalTransform> ltComponentType;
+            [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwComponentType;
+            [ReadOnly] public NativeList<TargetInfo> targetNears;
+            [ReadOnly] public PlayerProperty playerProperty;
+            [ReadOnly] public float deltaTime;
+            [ReadOnly] public float3 directRota;
+            [ReadOnly] public float moveToWard;
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                var lts = chunk.GetNativeArray(ref ltComponentType);
+                var ltws = chunk.GetNativeArray(ref ltwComponentType);
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    var directRota_ = directRota;
+                    var moveToWard_ = moveToWard;
+                    var lt = lts[i];
+                    if (playerProperty.aimType == AimType.IndividualAim)
+                    {
+                        LoadDirectRota(ref directRota_, ref moveToWard_, ltws[i].Position);
+                    }
+                    lt.Rotation = MathExt.MoveTowards(lt.Rotation, quaternion.LookRotationSafe(directRota_,math.up()),
+                        deltaTime * moveToWard_);
+                    lts[i] = lt;
+                }
+                
+            }
 
+            private void LoadDirectRota(ref float3 directRef, ref float moveToWardRef, float3 characterPos)
+            {
+                var disNearest = playerProperty.distanceAim;
+                var nearestEnemyPosition = float3.zero;
+                bool check = false;
+                foreach (var enemyPos in targetNears)
+                {
+                    var distance = math.distance(enemyPos.position, characterPos);
+                    if (distance < disNearest && MathExt.CalculateAngle(enemyPos.position - characterPos, math.forward()) < playerProperty.rotaAngleMax)
+                    {
+                        nearestEnemyPosition = enemyPos.position;
+                        disNearest = distance;
+                        check = true;
+                    }   
+                }
+
+                if (check)
+                {
+                    directRef = nearestEnemyPosition - characterPos;
+                    var ratio = 1 - math.clamp((disNearest - playerProperty.distanceAim), 0, 1);
+                    moveToWardRef = math.lerp(playerProperty.moveToWardMin, playerProperty.moveToWardMax, ratio);
+                }
+            }
+        }
 
         [BurstCompile]
         partial struct CharacterHandleTakeDamageJOB : IJobChunk
@@ -184,5 +320,12 @@ namespace _Game_.Scripts.Systems.Player
                 
             }
         }
+        
+        private struct TargetInfo
+        {
+            public float3 position;
+            public float distance;
+        }
+        
     }
 }

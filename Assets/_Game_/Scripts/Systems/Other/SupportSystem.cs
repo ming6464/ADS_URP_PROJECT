@@ -456,7 +456,6 @@ public partial class UpdateHybrid : SystemBase
     
     public EventHitFlashEffect UpdateHitFlashEff;
     private NativeQueue<LocalTransform> _hitFlashQueue;
-
     private EntityQuery _enQuery;
     //Effect }
     
