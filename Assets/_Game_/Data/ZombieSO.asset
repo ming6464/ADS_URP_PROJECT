@@ -16,7 +16,7 @@ MonoBehaviour:
   - id: 0
     prefab: {fileID: 7846563739282400770, guid: 916e68ea8558c93499f2a84488006f19,
       type: 3}
-    hp: 30
+    hp: 1
     speed: 1.5
     damage: 5
     attackRange: 1.5
@@ -25,7 +25,7 @@ MonoBehaviour:
   - id: 1
     prefab: {fileID: 7846563739282400770, guid: baa572274949be94980cc8a985878eff,
       type: 3}
-    hp: 50
+    hp: 1
     speed: 3
     damage: 5
     attackRange: 1.5
@@ -34,7 +34,7 @@ MonoBehaviour:
   - id: 2
     prefab: {fileID: 7846563739282400770, guid: c347fb1b1bfb83647a9c407dd3cb8bd4,
       type: 3}
-    hp: 30
+    hp: 1
     speed: 5
     damage: 5
     attackRange: 1.5

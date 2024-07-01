@@ -44,6 +44,7 @@ public struct BufferTurretObstacle : IBufferElementData
     public int bulletPerShot;
     public float spaceAnglePerBullet;
     public bool parallelOrbit;
+    public float timeLife;
     public float speed;
     public float damage;
     public float cooldown;
@@ -56,6 +57,8 @@ public struct TurretInfo : IComponentData
 {
     public int id;
     public ObstacleType type;
+    public float timeLife;
+    public float startTime;
 }
 
 public struct BarrelRunTime : IComponentData

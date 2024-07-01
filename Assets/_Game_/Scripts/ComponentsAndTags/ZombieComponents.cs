@@ -6,7 +6,6 @@ public struct ZombieProperty : IComponentData
 {
     public ZombieSpawner spawner;
     public float3 directNormal;
-    public bool applyTotalCount;
 }
 
 public struct ZombieSpawner
@@ -15,8 +14,8 @@ public struct ZombieSpawner
     public bool spawnInfinity;
     public bool allowRespawn;
     public int numberSpawn;
-    public float2 numberSpawnPerFrameRange;
-    public float timeSpawn;
+    public float2 spawnAmountRange;
+    public float2 timeRange;
     public float3 posMin;
     public float3 posMax;
 }
@@ -49,7 +48,6 @@ public struct BufferZombieStore : IBufferElementData
     public float delayAttack;
     public float chasingRange;
     //
-    public int numberSpawn;
 }
 
 public struct BufferZombieDie : IBufferElementData

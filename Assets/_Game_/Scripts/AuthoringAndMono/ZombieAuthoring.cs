@@ -6,14 +6,13 @@ using UnityEngine;
 public class ZombieAuthoring : MonoBehaviour
 {
     public ZombieSO data;
-    public SpawnData[] spawnDataArr;
+    public int[] spawnDataArr;
     public float timeDelaySpawn;
     public bool spawnInfinity;
     public bool allowRespawn;
-    public bool applyTotalCount;
     public int numberSpawn;
-    public float2 numberSpawnPerFrameRange;
-    public float timeSpawn;
+    public float2 spawnAmountRange;
+    public float2 timeRange;
     public Transform pointRange1;
     public Transform pointRange2;
     public Transform pointDir1;
@@ -33,12 +32,11 @@ class ZombieBaker : Baker<ZombieAuthoring>
         AddComponent(entity,new ZombieProperty
         {
             directNormal = dirNormal,
-            applyTotalCount = authoring.applyTotalCount,
             spawner = new ZombieSpawner
             {
                 numberSpawn = authoring.numberSpawn,
-                numberSpawnPerFrameRange = authoring.numberSpawnPerFrameRange,
-                timeSpawn = authoring.timeSpawn,
+                spawnAmountRange = authoring.spawnAmountRange ,
+                timeRange = authoring.timeRange,
                 spawnInfinity = authoring.spawnInfinity,
                 allowRespawn = authoring.allowRespawn,
                 timeDelay = authoring.timeDelaySpawn,
@@ -51,20 +49,17 @@ class ZombieBaker : Baker<ZombieAuthoring>
 
         foreach (var spawn in authoring.spawnDataArr)
         {
-            var zombie = GetZombieData_L(spawn.id);
-            
-            if(!authoring.applyTotalCount && spawn.count <= 0) continue;
+            var zombie = GetZombieData_L(spawn);
             
             buffer.Add(new BufferZombieStore()
             {
-                id = spawn.id,
+                id = spawn,
                 entity = GetEntity(zombie.prefab,TransformUsageFlags.Dynamic),
                 hp = zombie.hp,
                 speed = zombie.speed,
                 damage = zombie.damage,
                 attackRange = zombie.attackRange,
                 delayAttack = zombie.delayAttack,
-                numberSpawn = spawn.count,
                 chasingRange = zombie.chasingRange,
             });
         }
@@ -75,11 +70,4 @@ class ZombieBaker : Baker<ZombieAuthoring>
         }
         
     }
-}
-
-[Serializable]
-public struct SpawnData
-{
-    public int id;
-    public int count;
 }

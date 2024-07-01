@@ -9,7 +9,9 @@ public struct WeaponProperty : IComponentData
     public Entity entityBullet;
     public float length;
     //
-    public float expired;
+    public float timeLife;
+    public float2 damageRangeRatio;
+    public float2 timeRange;
 }
 
 public struct WeaponInfo : IComponentData

@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: Turret_1
   m_EditorClassIdentifier: Assembly-CSharp:_Game_.Scripts.Data:TurrentSO
   type: 0
+  timeLife: 20
   prefabs: {fileID: 4814179247621456887, guid: dab5384c1b899944fb005837a5adc5bb, type: 3}
   pivotFireOffset:
     x: -0.095

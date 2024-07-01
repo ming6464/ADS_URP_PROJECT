@@ -20,6 +20,7 @@ namespace _Game_.Scripts.Data
     public abstract class Obstacle : ScriptableObject
     {
         public ObstacleType type;
+        public float timeLife;
     }
     
 

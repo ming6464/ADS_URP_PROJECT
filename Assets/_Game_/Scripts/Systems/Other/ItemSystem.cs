@@ -13,9 +13,9 @@ namespace _Game_.Scripts.Systems.Other
     public partial struct ItemSystem : ISystem
     {
         private NativeArray<BufferTurretObstacle> _buffetObstacle;
-        private Entity _entityPlayerAuthoring;
         private EntityManager _entityManager;
         private bool _isInit;
+        private float _time; 
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -38,11 +38,13 @@ namespace _Game_.Scripts.Systems.Other
                 _entityManager = state.EntityManager;
                 _isInit = true;
                 _buffetObstacle = SystemAPI.GetSingletonBuffer<BufferTurretObstacle>().ToNativeArray(Allocator.Persistent);
-                _entityPlayerAuthoring = SystemAPI.GetSingletonEntity<PlayerInfo>();
-
+                _time = (float)SystemAPI.Time.ElapsedTime;
+                return;
             }
-            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
 
+            _time += SystemAPI.Time.DeltaTime;
+            
+            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
             CheckObstacleItem(ref state, ref ecb);
             CheckItemShooting(ref state, ref ecb);
             ecb.Playback(_entityManager);
@@ -93,6 +95,19 @@ namespace _Game_.Scripts.Systems.Other
             }
         }
 
+        private BufferTurretObstacle GetTurret(int id)
+        {
+            foreach (var i in _buffetObstacle)
+            {
+                if (i.id == id) return i;
+            }
+
+            return new BufferTurretObstacle()
+            {
+                id = -1,
+            };
+        }
+
         private void SpawnTurret(ref SystemState state,ref EntityCommandBuffer ecb,ItemCollection itemCollection)
         {
             BufferTurretObstacle buffetObstacle = default;
@@ -105,6 +120,8 @@ namespace _Game_.Scripts.Systems.Other
                 break;
             }
             if(!check) return;
+            var turret = GetTurret(itemCollection.id);
+            if(turret.id == -1) return;
             var points = _entityManager.GetBuffer<BufferSpawnPoint>(itemCollection.entityItem);
             LocalTransform lt = new LocalTransform()
             {
@@ -120,6 +137,7 @@ namespace _Game_.Scripts.Systems.Other
                 {
                     id = itemCollection.id,
                     type = ObstacleType.Turret,
+                    timeLife = turret.timeLife,
                 });
             }
             points.Clear();

@@ -16,7 +16,9 @@ namespace _Game_.Scripts.Systems.Weapon
         private Entity _entityWeaponAuthoring;
         private Entity _entityBulletInstantiate;
         private bool _isInit;
-
+        private WeaponProperty _weaponProperty;
+        private float _ratioDamage;
+        
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
@@ -30,12 +32,20 @@ namespace _Game_.Scripts.Systems.Weapon
             if (!_isInit)
             {
                 _isInit = true;
-                var weaponProperty = SystemAPI.GetSingleton<WeaponProperty>();
-                _entityBulletInstantiate = weaponProperty.entityBullet;
+                _weaponProperty = SystemAPI.GetSingleton<WeaponProperty>();
+                _entityBulletInstantiate = _weaponProperty.entityBullet;
                 _entityWeaponAuthoring = SystemAPI.GetSingletonEntity<WeaponProperty>();
             }
 
+            CalculateRatioDamage(ref state);
             SpawnBullet(ref state);
+        }
+
+        private void CalculateRatioDamage(ref SystemState state)
+        {
+            var time = math.clamp((float)SystemAPI.Time.ElapsedTime,_weaponProperty.timeRange.x, _weaponProperty.timeRange.y);
+            _ratioDamage = math.remap(_weaponProperty.timeRange.x, _weaponProperty.timeRange.y, _weaponProperty.damageRangeRatio.x, _weaponProperty.damageRangeRatio.y,
+                time);
         }
 
         private void SpawnBullet(ref SystemState state)
@@ -54,7 +64,7 @@ namespace _Game_.Scripts.Systems.Weapon
                 int halfNumberPreShot = (int)math.ceil(bulletSpawn.bulletPerShot / 2f);
                 var lt = bulletSpawn.lt;
                 var angleRota = MathExt.QuaternionToFloat3(lt.Rotation);
-                float damage = bulletSpawn.damage;
+                float damage = bulletSpawn.damage * _ratioDamage;
                 float speed = bulletSpawn.speed;
 
                 if (halfNumberPreShot % 2 != 0)

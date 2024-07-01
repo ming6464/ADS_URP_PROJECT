@@ -31,7 +31,29 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
             CheckAndInitRunTime(ref state);
             CheckSetupBarrel(ref state);
             PutEventSpawnBullet(ref state);
+            CheckAndHandleTimeLifeExpired(ref state);
         }
+
+        [BurstCompile]
+        private void CheckAndHandleTimeLifeExpired(ref SystemState state)
+        {
+            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+            float time = (float)SystemAPI.Time.ElapsedTime;
+            var setActiveComponent = new SetActiveSP()
+            {
+                state = StateID.Disable,
+            };
+            foreach (var (turret,entity) in SystemAPI.Query<RefRO<TurretInfo>>().WithEntityAccess().WithNone<Disabled, SetActiveSP>())
+            {
+                if (time - turret.ValueRO.startTime > turret.ValueRO.timeLife)
+                {
+                    ecb.AddComponent(entity,setActiveComponent);
+                }
+            }
+            ecb.Playback(_entityManager);
+            ecb.Dispose();
+        }
+
 
         [BurstCompile]
         private void CheckSetupBarrel(ref SystemState state)
@@ -224,6 +246,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                 foreach (var enemyPos in enemyPositions)
                 {
                     var distance = math.distance(pos, enemyPos);
+                    // var distance = math.abs(pos.z - enemyPos.z);
 
                     if (distance < distanceNearest)
                     {
@@ -238,8 +261,10 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
 
                 if (check)
                 {
+                    bool checkZ = false;
                     direct = positionNearest - pos;
                     var ratio = 1 - math.clamp(distanceNearest * 1.0f / info.distanceAim, 0, 1);
+                    if (checkZ) ratio = 1;
                     moveToWard = math.lerp(info.moveToWardMin, info.moveToWardMax, ratio);
                 }
                 else

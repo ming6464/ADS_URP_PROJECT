@@ -1,4 +1,5 @@
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 
 public class WeaponAuthoring : MonoBehaviour
@@ -6,10 +7,14 @@ public class WeaponAuthoring : MonoBehaviour
     public bool shootAuto;
     [Space(10)] 
     public WeaponSO data;
-
+    //
     public GameObject bulletPrefab;
     public float lengthRay;
-    public float expired;
+    public float timeLife;
+
+    public float2 damageRangeRatio;
+    public float2 timeRange;
+
 }
 
 class WeaponBaker : Baker<WeaponAuthoring>
@@ -22,7 +27,9 @@ class WeaponBaker : Baker<WeaponAuthoring>
             shootAuto = authoring.shootAuto,
             entityBullet = GetEntity(authoring.bulletPrefab,TransformUsageFlags.Dynamic),
             length = authoring.lengthRay,
-            expired = authoring.expired,
+            timeLife = authoring.timeLife,
+            damageRangeRatio = authoring.damageRangeRatio,
+            timeRange = authoring.timeRange,
         });
 
         AddBuffer<BufferBulletDisable>(entity);

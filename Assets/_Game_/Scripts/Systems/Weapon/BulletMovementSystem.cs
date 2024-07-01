@@ -13,7 +13,6 @@ using RaycastHit = Unity.Physics.RaycastHit;
 [BurstCompile]
 public partial struct BulletMovementSystem : ISystem
 {
-    private float _expired;
     private bool _isGetComponent;
     private EntityManager _entityManager;
     private WeaponProperty _weaponProperties;
@@ -53,7 +52,6 @@ public partial struct BulletMovementSystem : ISystem
             _entityManager = state.EntityManager;
             _isGetComponent = true;
             _weaponProperties = SystemAPI.GetSingleton<WeaponProperty>();
-            _expired = _weaponProperties.expired;
             var layerStore = SystemAPI.GetSingleton<LayerStoreComponent>();
             _collisionFilter = new CollisionFilter()
             {
@@ -83,7 +81,7 @@ public partial struct BulletMovementSystem : ISystem
             entityTypeHandle = _entityTypeHandle,
             currentTime = curTime,
             bulletInfoTypeHandle = state.GetComponentTypeHandle<BulletInfo>(),
-            expired = _expired,
+            expired = _weaponProperties.timeLife,
             zombieDamageMapQueue = _takeDamageQueue.AsParallelWriter(),
         };
         state.Dependency = jobChunk.Schedule(_enQueryBulletInfoAlive, state.Dependency);
