@@ -19,7 +19,7 @@ MonoBehaviour:
     x: 0
     y: 0
     z: 1.25
-  bulletPerShot: 5
+  bulletPerShot: 2
   spaceAnglePerBullet: 1
   parallelOrbit: 1
   speed: 80

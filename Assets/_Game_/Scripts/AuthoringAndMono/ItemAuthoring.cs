@@ -8,10 +8,10 @@ public class ItemAuthoring : MonoBehaviour
     public ItemType type;
     public Operation operation;
     public TypeUsing typeUsing;
-    public float hp;
+    public int hp;
     public int id;
     public TextMesh textObj;
-    public TextMesh textHp;
+    public int idTextHp;
     public Transform[] spawnPoints;
     
     private void OnValidate()
@@ -39,15 +39,10 @@ public class ItemAuthoring : MonoBehaviour
                 case ItemType.Character:
                     textObj.text = str  + count;
                     break;
-                default:
+                case ItemType.ObstacleTurret:
                     textObj.text = $"ID : {id}";
                     break;
             }
-        }
-
-        if (textHp)
-        {
-            textHp.text = hp.ToString(CultureInfo.InvariantCulture);
         }
     }
 
@@ -56,14 +51,25 @@ public class ItemAuthoring : MonoBehaviour
         public override void Bake(ItemAuthoring authoring)
         {
             Entity entity = GetEntity(TransformUsageFlags.None);
-            AddComponent(entity,new ItemInfo()
+
+            var info = new ItemInfo()
             {
                 id = authoring.id,
                 type = authoring.type,
                 count = authoring.count,
                 hp = authoring.hp,
                 operation = authoring.operation,
-            });
+            };
+            
+            if (authoring.typeUsing.Equals(TypeUsing.canShooting))
+            {
+                AddComponent(entity, new ItemCanShoot()
+                {
+                    currentHp = authoring.hp,
+                });
+                info.idTextHp = authoring.idTextHp;
+            }
+            
             if (authoring.spawnPoints.Length > 0)
             {
                 var buffer = AddBuffer<BufferSpawnPoint>(entity);
@@ -76,12 +82,8 @@ public class ItemAuthoring : MonoBehaviour
                     });
                 }
             }
-
-            if (authoring.typeUsing.Equals(TypeUsing.canShooting))
-            {
-                AddComponent<ItemCanShoot>(entity);
-                
-            }
+            
+            AddComponent(entity,info);
         }
     }
 }

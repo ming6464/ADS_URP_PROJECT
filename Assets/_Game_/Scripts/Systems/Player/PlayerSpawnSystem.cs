@@ -3,6 +3,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
 [BurstCompile, UpdateInGroup(typeof(InitializationSystemGroup))]
 public partial struct PlayerSpawnSystem : ISystem
@@ -28,6 +29,7 @@ public partial struct PlayerSpawnSystem : ISystem
     }
 
     public void OnUpdate(ref SystemState state)
+    
     {
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         if (_spawnPlayerState < 2)
@@ -131,8 +133,7 @@ public partial struct PlayerSpawnSystem : ISystem
                 length = characterAlive.Length;
                 spawnChange = length;
                 characterAlive.Dispose();
-                spawnChange /= count;
-                spawnChange -= length;
+                spawnChange = (int)math.ceil(spawnChange / count) - length;
                 break;
         }
 

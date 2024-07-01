@@ -14,8 +14,9 @@ public struct ItemInfo : IComponentData
     public int id;
     public ItemType type;
     public int count;
-    public float hp;
+    public int hp;
     public Operation operation;
+    public int idTextHp;
 }
 
 public struct ItemCollection : IComponentData
@@ -27,6 +28,12 @@ public struct ItemCollection : IComponentData
     public Operation operation;
 }
 
+public struct ChangeTextNumberMesh : IComponentData
+{
+    public int id;
+    public int value;
+}
+
 public struct BufferSpawnPoint : IBufferElementData
 {
     public float3 value;
@@ -34,7 +41,7 @@ public struct BufferSpawnPoint : IBufferElementData
 
 public struct ItemCanShoot : IComponentData
 {
-    
+    public int currentHp;
 }
 
 //obstacle

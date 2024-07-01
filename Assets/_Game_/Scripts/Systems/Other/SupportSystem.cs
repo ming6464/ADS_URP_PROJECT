@@ -7,8 +7,6 @@ using Unity.Physics;
 using Unity.Transforms;
 using UnityEngine;
 //
-
-
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 public partial class AnimationSystem : SystemBase
 {
@@ -76,8 +74,6 @@ public partial class AnimationSystem : SystemBase
     }
     
 }
-
-
 
 //
 
@@ -449,6 +445,9 @@ public partial class UpdateHybrid : SystemBase
     // Camera {
     public delegate void EventCamera(Vector3 positionWorld,Quaternion rotationWorld, CameraType type);
     public delegate void EventHitFlashEffect(Vector3 position,Quaternion rotation);
+
+    public delegate void EventChangText(int idText, int value);
+    
     public EventCamera UpdateCamera;
     // Camera }
     
@@ -456,15 +455,19 @@ public partial class UpdateHybrid : SystemBase
     
     public EventHitFlashEffect UpdateHitFlashEff;
     private NativeQueue<LocalTransform> _hitFlashQueue;
-    private EntityQuery _enQuery;
+    private EntityQuery _enQueryEffect;
     //Effect }
+    
+    //Change text {
+    public EventChangText UpdateText;
+    // Change Text}
     
     protected override void OnStartRunning()
     {
         base.OnStartRunning();
         RequireForUpdate<CameraComponent>();
         _hitFlashQueue = new NativeQueue<LocalTransform>(Allocator.Persistent);
-        _enQuery = SystemAPI.QueryBuilder().WithAll<EffectComponent>().Build();
+        _enQueryEffect = SystemAPI.QueryBuilder().WithAll<EffectComponent>().Build();
     }
 
     protected override void OnStopRunning()
@@ -477,6 +480,20 @@ public partial class UpdateHybrid : SystemBase
     {
         UpdateCameraEvent();
         UpdateEffectEvent();
+        UpdateChangeText();
+    }
+
+    private void UpdateChangeText()
+    {
+        var ecb = new EntityCommandBuffer(Unity.Collections.Allocator.TempJob);
+        Entities.ForEach((ref ChangeTextNumberMesh changeText,ref Entity entity) =>
+        {
+            Debug.Log("Hellvoealks111111111111111111");
+            UpdateText?.Invoke(changeText.id,changeText.value);
+            ecb.RemoveComponent<ChangeTextMesh>(entity);
+        }).WithoutBurst().Run();
+        ecb.Playback(EntityManager);
+        ecb.Dispose();
     }
 
     private void UpdateEffectEvent()
@@ -490,7 +507,7 @@ public partial class UpdateHybrid : SystemBase
             entityTypeHandle = GetEntityTypeHandle(),
             ecb = ecb.AsParallelWriter(),
         };
-        Dependency = hitFlashEff.ScheduleParallel(_enQuery, Dependency); 
+        Dependency = hitFlashEff.ScheduleParallel(_enQueryEffect, Dependency); 
         Dependency.Complete();
         while (_hitFlashQueue.TryDequeue(out var lt))
         {
@@ -503,7 +520,7 @@ public partial class UpdateHybrid : SystemBase
     {
         Entities.WithoutBurst().WithAll<CameraComponent>().ForEach((in LocalToWorld ltw, in CameraComponent camComponent) =>
         {
-            UpdateCamera(ltw.Position,ltw.Rotation, camComponent.type);
+            UpdateCamera?.Invoke(ltw.Position,ltw.Rotation, camComponent.type);
         }).Run();
     }
     
@@ -518,7 +535,7 @@ public partial class UpdateHybrid : SystemBase
         
         public void Execute(in ArchetypeChunk chunk, int indexQuery, bool useEnabledMask, in v128 chunkEnabledMask)
         {
-            var effs = chunk.GetNativeArray(effTypeHandle);
+            var effs = chunk.GetNativeArray(ref effTypeHandle);
             var entities = chunk.GetNativeArray(entityTypeHandle);
             LocalTransform lt;
             for (int i = 0; i < chunk.Count; i++)

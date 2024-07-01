@@ -517,5 +517,23 @@ public static class MathExt
         return angleDegrees;
     }
     
+    /// <summary>
+    /// Xoay một vector theo các góc Euler (x, y, z) cung cấp.
+    /// </summary>
+    /// <param name="vector">Vector cần xoay.</param>
+    /// <param name="rotationEuler">Góc Euler để xoay vector (đơn vị: độ).</param>
+    /// <returns>Vector đã được xoay.</returns>
+    public static float3 RotateVector(float3 vector, float3 rotationEuler)
+    {
+        // Chuyển đổi góc từ độ sang radian
+        float3 rotationRadians = math.radians(rotationEuler);
+        
+        // Tạo quaternion từ góc Euler
+        quaternion rotationQuat = quaternion.Euler(rotationRadians);
+        
+        // Thực hiện phép xoay vector với quaternion
+        return math.mul(rotationQuat, vector);
+    }
+    
 }
 

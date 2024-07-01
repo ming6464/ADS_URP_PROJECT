@@ -51,13 +51,20 @@ namespace _Game_.Scripts.Systems.Other
             ecb.Dispose();
         }
 
+        [BurstCompile]
         private void CheckItemShooting(ref SystemState state, ref EntityCommandBuffer ecb) 
         {
             foreach (var (itemInfo, takeDamage, entity) in SystemAPI.Query<RefRW<ItemInfo>, RefRO<TakeDamage>>()
                          .WithEntityAccess())
             {
-                itemInfo.ValueRW.hp -= takeDamage.ValueRO.value;
+                itemInfo.ValueRW.hp -= (int)takeDamage.ValueRO.value;
                 ecb.RemoveComponent<TakeDamage>(entity);
+                ecb.AddComponent(entity,new ChangeTextNumberMesh
+                {
+                    id = itemInfo.ValueRO.idTextHp,
+                    value = itemInfo.ValueRW.hp,
+                });
+                Debug.Log("Hellvoealks2222222222222222");
                 if (itemInfo.ValueRO.hp <= 0)
                 {
                     var entityNEw = _entityManager.CreateEntity();
@@ -85,6 +92,7 @@ namespace _Game_.Scripts.Systems.Other
                 switch (collection.ValueRO.type)
                 {
                     case ItemType.ObstacleTurret:
+                        Debug.Log("m_ log ");
                         SpawnTurret(ref state,ref ecb,collection.ValueRO);
                         ecb.AddComponent(entity,new SetActiveSP()
                         {
@@ -95,7 +103,7 @@ namespace _Game_.Scripts.Systems.Other
                 
             }
         }
-
+        [BurstCompile]
         private BufferTurretObstacle GetTurret(int id)
         {
             foreach (var i in _buffetObstacle)
@@ -108,9 +116,10 @@ namespace _Game_.Scripts.Systems.Other
                 id = -1,
             };
         }
-
+        [BurstCompile]
         private void SpawnTurret(ref SystemState state,ref EntityCommandBuffer ecb,ItemCollection itemCollection)
         {
+            Debug.Log("m_ log 1");
             BufferTurretObstacle buffetObstacle = default;
             bool check = false;
             foreach (var obs in _buffetObstacle)
@@ -120,9 +129,12 @@ namespace _Game_.Scripts.Systems.Other
                 check = true;
                 break;
             }
+            Debug.Log("m_ log 2");
             if(!check) return;
+            Debug.Log("m_ log 3");
             var turret = GetTurret(itemCollection.id);
             if(turret.id == -1) return;
+            Debug.Log("m_ log 4");
             var points = _entityManager.GetBuffer<BufferSpawnPoint>(itemCollection.entityItem);
             LocalTransform lt = new LocalTransform()
             {
@@ -141,6 +153,7 @@ namespace _Game_.Scripts.Systems.Other
                     timeLife = turret.timeLife,
                 });
             }
+            Debug.Log("m_ log 5");
             points.Clear();
         }
     }

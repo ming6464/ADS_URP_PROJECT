@@ -19,9 +19,9 @@ public partial struct ZombieSpawnSystem : ISystem
     private bool _isAllowRespawn;
     private int _numberSpawn;
     private int _numberSpawnPerFrame;
-    private float2 spawnAmountRange;
+    private float2 _spawnAmountRange;
     private float _timeDelay;
-    private float2 timeRangetimeRange;
+    private float2 _timeRangeTimeRange;
     private LocalTransform _localTransform;
     private float3 _pointRandomMin;
     private float3 _pointRandomMax;
@@ -29,7 +29,6 @@ public partial struct ZombieSpawnSystem : ISystem
     private ZombieProperty _zombieProperties;
     private EntityTypeHandle _entityTypeHandle;
     private int _totalSpawnCount;
-    private int _numberZombieAlive;
     private NativeArray<BufferZombieStore> _zombieStores;
     private EntityManager _entityManager;
     private EntityQuery _enQueryZombieNotUnique;
@@ -69,16 +68,16 @@ public partial struct ZombieSpawnSystem : ISystem
             _isSpawnInfinity = _zombieProperties.spawner.spawnInfinity;
             _isAllowRespawn = _zombieProperties.spawner.allowRespawn;
             _numberSpawn = _zombieProperties.spawner.numberSpawn;
-            spawnAmountRange = _zombieProperties.spawner.spawnAmountRange;
+            _spawnAmountRange = _zombieProperties.spawner.spawnAmountRange;
             _timeDelay = _zombieProperties.spawner.timeDelay;
-            timeRangetimeRange = _zombieProperties.spawner.timeRange;
+            _timeRangeTimeRange = _zombieProperties.spawner.timeRange;
             _zombieStores = SystemAPI.GetBuffer<BufferZombieStore>(_entityZombieProperty).ToNativeArray(Allocator.Persistent);
             _isInit = true;
         }
 
-        var ratioTime = math.clamp((float) SystemAPI.Time.ElapsedTime, timeRangetimeRange.x, timeRangetimeRange.y);
-        _numberSpawnPerFrame = (int)math.remap(timeRangetimeRange.x, timeRangetimeRange.y, spawnAmountRange.x,
-            spawnAmountRange.y, ratioTime);
+        var ratioTime = math.clamp((float) SystemAPI.Time.ElapsedTime, _timeRangeTimeRange.x, _timeRangeTimeRange.y);
+        _numberSpawnPerFrame = (int)math.remap(_timeRangeTimeRange.x, _timeRangeTimeRange.y, _spawnAmountRange.x,
+            _spawnAmountRange.y, ratioTime);
         
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         bool hasEntityNew = false;
@@ -132,19 +131,21 @@ public partial struct ZombieSpawnSystem : ISystem
     
     private void SpawnZombie(ref SystemState state,ref EntityCommandBuffer ecb,ref bool hasNewEntity)
     {
-        if((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < _timeDelay) return;
+        if ((SystemAPI.Time.ElapsedTime - _latestSpawnTime) < _timeDelay)return;
         _entityTypeHandle.Update(ref state);
         int numberZombieSet = _totalSpawnCount;
         DynamicBuffer<BufferZombieDie> bufferZombieDie = _entityManager.GetBuffer<BufferZombieDie>(_entityZombieProperty);
 
-        var aliveZombie = SystemAPI.QueryBuilder().WithAll<ZombieInfo>().WithNone<Disabled, SetActiveSP>().Build().ToEntityArray(Allocator.Temp);
-        aliveZombie.Dispose();
+        
         if (_isAllowRespawn)
         {
-            _numberZombieAlive -= bufferZombieDie.Length;
-            numberZombieSet = _numberZombieAlive;
+            var aliveZombie = SystemAPI.QueryBuilder().WithAll<ZombieInfo>().WithNone<Disabled, SetActiveSP>().Build().ToEntityArray(Allocator.Temp);
+            numberZombieSet = aliveZombie.Length;
+            aliveZombie.Dispose();
+           
         }
-        if(!_isSpawnInfinity && numberZombieSet >= _numberSpawn) return;
+
+        if (!_isSpawnInfinity && numberZombieSet >= _numberSpawn)return;
         int numberZombieCanSpawn = _isSpawnInfinity ? _numberSpawnPerFrame : (math.min(_numberSpawn - numberZombieSet,_numberSpawnPerFrame));
         var zomRunTime = new ZombieRuntime()
         {
@@ -155,21 +156,11 @@ public partial struct ZombieSpawnSystem : ISystem
         {
             Random random = Random.CreateFromIndex((uint)(_seedCount * 1.5f));
             _localTransform.Position = random.GetRandomRange(_pointRandomMin, _pointRandomMax);
-            int idZombieRandom;
-            BufferZombieStore zombieDataRandom;
-            int checkOverFlow = 0;
-            do
-            {
-                random = Random.CreateFromIndex((uint)(++_seedCount));
-                idZombieRandom = _zombieStores[random.NextInt(0,_zombieStores.Length)].id;
-                zombieDataRandom = GetZombieData(idZombieRandom);
-                checkOverFlow++;
-                if (checkOverFlow == 10)
-                {
-                    return;
-                }
-            }
-            while(idZombieRandom != zombieDataRandom.id);
+            
+            random = Random.CreateFromIndex((uint)(++_seedCount));
+            int idZombieRandom = _zombieStores[random.NextInt(0,_zombieStores.Length)].id;
+            BufferZombieStore zombieDataRandom = GetZombieData(idZombieRandom);
+            
             Entity entityNew = default;
             bool checkGetFromPool = false;
             for (int j = 0; j < bufferZombieDie.Length; j++)
@@ -209,7 +200,6 @@ public partial struct ZombieSpawnSystem : ISystem
         }
         _latestSpawnTime = (float)SystemAPI.Time.ElapsedTime;
         _totalSpawnCount += numberZombieCanSpawn;
-        _numberZombieAlive += numberZombieCanSpawn;
     }
     
     private void HandleNewZombie(ref SystemState state, ref EntityCommandBuffer ecb)

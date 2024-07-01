@@ -5,6 +5,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
 namespace _Game_.Scripts.Systems.Player
 {
@@ -56,18 +57,16 @@ namespace _Game_.Scripts.Systems.Player
                 _playerProperty = SystemAPI.GetSingleton<PlayerProperty>();
                 _characterMoveToWardChangePos = _playerProperty.speedMoveToNextPoint;
             }
-            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+            
             Rota(ref state);
-            Move(ref state, ref ecb);
-            CheckTakeDamage(ref state, ref ecb); 
-            ecb.Playback(_entityManager);
-            ecb.Dispose();
+            Move(ref state);
+            CheckTakeDamage(ref state); 
         }
 
         private void Rota(ref SystemState state)
         {
             _targetNears.Clear();
-            var playerPosition = SystemAPI.GetComponentRO<LocalTransform>(SystemAPI.GetSingletonEntity<PlayerInfo>()).ValueRO.Position;
+            var playerPosition = SystemAPI.GetComponentRO<LocalToWorld>(SystemAPI.GetSingletonEntity<PlayerInfo>()).ValueRO.Position;
             var directRota = math.forward();
             var distanceNearest = _playerProperty.distanceAim;
             var positionNearest = float3.zero;
@@ -109,7 +108,7 @@ namespace _Game_.Scripts.Systems.Player
             
             if(check)
             {
-                directRota = positionNearest - playerPosition;
+                directRota = MathExt.RotateVector(positionNearest - playerPosition, new float3(0,-(30.0f/distanceNearest),0));
                 var ratio = 1 - math.clamp((distanceNearest * 1.0f / _playerProperty.distanceAim), 0, 1);
                 moveToWard = math.lerp(_playerProperty.moveToWardMin, _playerProperty.moveToWardMax,ratio);
             }
@@ -128,8 +127,9 @@ namespace _Game_.Scripts.Systems.Player
             state.Dependency.Complete();
         }
 
-        private void Move(ref SystemState state, ref EntityCommandBuffer ecb)
+        private void Move(ref SystemState state)
         {
+            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
             _entityTypeHandle.Update(ref state);
 
             var listNextPointEntity = _enQueryMove.ToEntityArray(Allocator.Temp);
@@ -147,11 +147,13 @@ namespace _Game_.Scripts.Systems.Player
 
             state.Dependency = job.ScheduleParallel(_enQueryMove, state.Dependency);
             state.Dependency.Complete();
-
+            ecb.Playback(_entityManager);
+            ecb.Dispose();
         }
 
-        private void CheckTakeDamage(ref SystemState state, ref EntityCommandBuffer ecb)
+        private void CheckTakeDamage(ref SystemState state)
         {
+            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
             _characterDieQueue.Clear();
             float time = (float) SystemAPI.Time.ElapsedTime;
             _entityTypeHandle.Update(ref state);
@@ -180,6 +182,8 @@ namespace _Game_.Scripts.Systems.Player
                     entity = queue,
                 });
             }
+            ecb.Playback(_entityManager);
+            ecb.Dispose();
         }
         
         private struct TargetInfoComparer : IComparer<TargetInfo>
@@ -238,7 +242,7 @@ namespace _Game_.Scripts.Systems.Player
 
                 if (check)
                 {
-                    directRef = nearestEnemyPosition - characterPos;
+                    directRef = MathExt.RotateVector(nearestEnemyPosition - characterPos,new float3(0, - (31/disNearest),0));
                     var ratio = 1 - math.clamp((disNearest - playerProperty.distanceAim), 0, 1);
                     moveToWardRef = math.lerp(playerProperty.moveToWardMin, playerProperty.moveToWardMax, ratio);
                 }
