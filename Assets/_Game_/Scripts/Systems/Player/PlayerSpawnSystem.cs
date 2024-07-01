@@ -91,7 +91,7 @@ public partial struct PlayerSpawnSystem : ISystem
             switch (collection.ValueRO.type)
             {
                 case ItemType.Character:
-                    spawnChange += collection.ValueRO.count;
+                    spawnChange = CalculateNumberPlayer(collection.ValueRO.operation,collection.ValueRO.count);
                     ecb.AddComponent(entity,new SetActiveSP()
                     {
                         state = StateID.Disable,
@@ -102,7 +102,43 @@ public partial struct PlayerSpawnSystem : ISystem
         }
         
         Spawn(ref state, ref ecb, spawnChange);
+        
     }
+    
+    int CalculateNumberPlayer(Operation operation,int count)
+    {
+        int spawnChange = 0;
+        NativeArray<Entity> characterAlive;
+        int length = 0;
+        switch (operation)
+        {
+            case Operation.Addition:
+                spawnChange += count;
+                break;
+            case Operation.Subtraction:
+                spawnChange -= count;
+                break;
+            case Operation.Multiplication:
+                characterAlive = _enQueryCharacterAlive.ToEntityArray(Allocator.Temp);
+                length = characterAlive.Length;
+                spawnChange = length;
+                characterAlive.Dispose();
+                spawnChange *= count;
+                spawnChange -= length;
+                break;
+            case Operation.Division:
+                characterAlive = _enQueryCharacterAlive.ToEntityArray(Allocator.Temp);
+                length = characterAlive.Length;
+                spawnChange = length;
+                characterAlive.Dispose();
+                spawnChange /= count;
+                spawnChange -= length;
+                break;
+        }
+
+        return spawnChange;
+    }
+    
     private void Spawn(ref SystemState state, ref EntityCommandBuffer ecb, int count)
     {
         if(count == 0) return;

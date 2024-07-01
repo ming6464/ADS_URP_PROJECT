@@ -98,6 +98,7 @@ public partial struct PlayerSystem : ISystem
                 count = itemInfo.count,
                 id = itemInfo.id,
                 entityItem = entityCollectionNew,
+                operation = itemInfo.operation,
             });
             ecb.AddComponent(entityItem,new SetActiveSP()
             {

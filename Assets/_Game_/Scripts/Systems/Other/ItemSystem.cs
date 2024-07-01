@@ -67,6 +67,7 @@ namespace _Game_.Scripts.Systems.Other
                         entityItem = entityNEw,
                         id = itemInfo.ValueRO.id,
                         type = itemInfo.ValueRO.type,
+                        operation = itemInfo.ValueRO.operation,
                     });
                     ecb.AddComponent(entity,new SetActiveSP()
                     {

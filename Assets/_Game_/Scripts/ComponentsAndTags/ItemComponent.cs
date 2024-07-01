@@ -15,6 +15,7 @@ public struct ItemInfo : IComponentData
     public ItemType type;
     public int count;
     public float hp;
+    public Operation operation;
 }
 
 public struct ItemCollection : IComponentData
@@ -23,6 +24,7 @@ public struct ItemCollection : IComponentData
     public Entity entityItem;
     public int count;
     public int id;
+    public Operation operation;
 }
 
 public struct BufferSpawnPoint : IBufferElementData

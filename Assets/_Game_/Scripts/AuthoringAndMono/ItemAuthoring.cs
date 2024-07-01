@@ -1,10 +1,12 @@
-﻿using Unity.Entities;
+﻿using System.Globalization;
+using Unity.Entities;
 using UnityEngine;
 
 public class ItemAuthoring : MonoBehaviour
 {
     public int count;
     public ItemType type;
+    public Operation operation;
     public TypeUsing typeUsing;
     public float hp;
     public int id;
@@ -16,13 +18,26 @@ public class ItemAuthoring : MonoBehaviour
     {
         if (textObj)
         {
-            string str;
+            string str = "";
+            switch (operation)
+            {
+                case Operation.Addition:
+                    str = "+";
+                    break;
+                case Operation.Subtraction:
+                    str = "-";
+                    break;
+                case Operation.Multiplication:
+                    str = "x";
+                    break;
+                case Operation.Division:
+                    str = ":";
+                    break;
+            }
             switch (type)
             {
                 case ItemType.Character:
-                    str = "";
-                    if (count > 0) str = "+";
-                    textObj.text = str + " " + count;
+                    textObj.text = str  + count;
                     break;
                 default:
                     textObj.text = $"ID : {id}";
@@ -32,7 +47,7 @@ public class ItemAuthoring : MonoBehaviour
 
         if (textHp)
         {
-            textHp.text = hp.ToString();
+            textHp.text = hp.ToString(CultureInfo.InvariantCulture);
         }
     }
 
@@ -47,6 +62,7 @@ public class ItemAuthoring : MonoBehaviour
                 type = authoring.type,
                 count = authoring.count,
                 hp = authoring.hp,
+                operation = authoring.operation,
             });
             if (authoring.spawnPoints.Length > 0)
             {
@@ -74,4 +90,9 @@ public enum TypeUsing
 {
     none,
     canShooting
+}
+
+public enum Operation
+{
+    Addition, Subtraction, Multiplication, Division
 }
