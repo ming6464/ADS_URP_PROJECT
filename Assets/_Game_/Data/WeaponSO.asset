@@ -20,35 +20,48 @@ MonoBehaviour:
       x: 0.478
       y: 0.849
       z: 0.582
+    damage: 35
+    speed: 80
+    cooldown: 0.3
+    bulletPerShot: 2
+    spaceAnglePerBullet: 0.1
+    parallelOrbit: 0
+  - id: 0
+    weaponPrefab: {fileID: 2000419024880572935, guid: 7e525516c626dd24ab0bc9d9032763a5,
+      type: 3}
+    offset:
+      x: 0.205
+      y: 1.239
+      z: 0.844
     damage: 20
     speed: 80
-    cooldown: 0.1
-    bulletPerShot: 3
-    spaceAnglePerBullet: 1.4
-    parallelOrbit: 0
-  - id: 1
-    weaponPrefab: {fileID: 4502064372477858661, guid: e2e559d8fe8d0fc4fbdb32b4b492273c,
-      type: 3}
-    offset:
-      x: 0.478
-      y: 0.849
-      z: 0.582
-    damage: 15
-    speed: 80
-    cooldown: 0.15
-    bulletPerShot: 2
-    spaceAnglePerBullet: 0.7
+    cooldown: 0.7
+    bulletPerShot: 15
+    spaceAnglePerBullet: 0.15
     parallelOrbit: 1
-  - id: 2
-    weaponPrefab: {fileID: 4502064372477858661, guid: e2e559d8fe8d0fc4fbdb32b4b492273c,
+  - id: 0
+    weaponPrefab: {fileID: 6273623115974660280, guid: ae842307530afe449be50ee0ce966723,
       type: 3}
     offset:
-      x: 0.478
-      y: 0.849
-      z: 0.582
-    damage: 25
-    speed: 70
+      x: 0.211
+      y: 1.215
+      z: 0.813
+    damage: 20
+    speed: 80
     cooldown: 0.3
-    bulletPerShot: 25
-    spaceAnglePerBullet: 0.7
+    bulletPerShot: 1
+    spaceAnglePerBullet: 0.15
+    parallelOrbit: 1
+  - id: 0
+    weaponPrefab: {fileID: 6273623115974660280, guid: ae842307530afe449be50ee0ce966723,
+      type: 3}
+    offset:
+      x: 0.182
+      y: 1.215
+      z: 0.572
+    damage: 12
+    speed: 80
+    cooldown: 0.1
+    bulletPerShot: 1
+    spaceAnglePerBullet: 0.15
     parallelOrbit: 1
