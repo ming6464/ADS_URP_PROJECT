@@ -19,12 +19,16 @@ public partial struct ZombieSystem : ISystem
     private EntityQuery _enQueryZombieNew;
     private NativeQueue<TakeDamageItem> _takeDamageQueue;
     private NativeList<CharacterSetTakeDamage> _characterSetTakeDamages;
+    private NativeList<float3> _characterLtws;
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
-        state.RequireForUpdate<ZombieProperty>();
-        state.RequireForUpdate<ActiveZoneProperty>();
-        state.RequireForUpdate<ZombieInfo>();
+        RequireNecessaryComponents(ref state);
+        Init(ref state);
+    }
+    [BurstCompile]
+    private void Init(ref SystemState state)
+    {
         _enQueryZombie =
             SystemAPI.QueryBuilder().WithAll<ZombieInfo,LocalTransform,ZombieRuntime>().WithNone<Disabled, SetActiveSP, New>().Build();
 
@@ -32,31 +36,29 @@ public partial struct ZombieSystem : ISystem
         
         _takeDamageQueue = new NativeQueue<TakeDamageItem>(Allocator.Persistent);
         _characterSetTakeDamages = new NativeList<CharacterSetTakeDamage>(Allocator.Persistent);
+        _characterLtws = new NativeList<float3>(Allocator.Persistent);
     }
-
+    [BurstCompile]
+    private void RequireNecessaryComponents(ref SystemState state)
+    {
+        state.RequireForUpdate<ZombieProperty>();
+        state.RequireForUpdate<ActiveZoneProperty>();
+        state.RequireForUpdate<ZombieInfo>();
+    }
+    [BurstCompile]
     public void OnDestroy(ref SystemState state)
     {
         if (_characterSetTakeDamages.IsCreated) _characterSetTakeDamages.Dispose();
         if (_takeDamageQueue.IsCreated) _takeDamageQueue.Dispose();
-        
+        if (_characterLtws.IsCreated) _characterLtws.Dispose();
+
     }
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        if (!_init)
-        {
-            _init = true;
-
-            var zone = SystemAPI.GetSingleton<ActiveZoneProperty>();
-            _pointZoneMin = zone.pointRangeMin;
-            _pointZoneMax = zone.pointRangeMax;
-            _zombieProperty = SystemAPI
-                .GetComponentRO<ZombieProperty>(SystemAPI.GetSingletonEntity<ZombieProperty>()).ValueRO;
-        }
-        state.Dependency.Complete();
+        CheckAndInit(ref state);
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
-        _entityTypeHandle.Update(ref state);
         Move(ref state);
         CheckAttackPlayer(ref state,ref ecb);
         CheckZombieToDeadZone(ref state, ref ecb);
@@ -64,7 +66,20 @@ public partial struct ZombieSystem : ISystem
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
     }
-    
+    [BurstCompile]
+    private void CheckAndInit(ref SystemState state)
+    {
+        if (!_init)
+        {
+            _init = true;
+            var zone = SystemAPI.GetSingleton<ActiveZoneProperty>();
+            _pointZoneMin = zone.pointRangeMin;
+            _pointZoneMax = zone.pointRangeMax;
+            _zombieProperty = SystemAPI
+                .GetComponentRO<ZombieProperty>(SystemAPI.GetSingletonEntity<ZombieProperty>()).ValueRO;
+        }
+    }
+    [BurstCompile]
     private void CheckAttackPlayer(ref SystemState state,ref EntityCommandBuffer ecb)
     {
         _takeDamageQueue.Clear();
@@ -114,24 +129,39 @@ public partial struct ZombieSystem : ISystem
             });
         }
         characterTakeDamageMap.Dispose();
-        
     }
-
+    
+    [BurstCompile]
     private void Move(ref SystemState state)
     {
+        UpdateCharacterList(ref state);
         float deltaTime = SystemAPI.Time.DeltaTime;
         ZombieMovementJOB job = new ZombieMovementJOB()
         {
             deltaTime = deltaTime,
             ltTypeHandle = state.GetComponentTypeHandle<LocalTransform>(),
-            zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>(true)
+            zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>(true),
+            characterLtws = _characterLtws,
+            ltwTypeHandle = state.GetComponentTypeHandle<LocalToWorld>()
         };
         state.Dependency = job.ScheduleParallel(_enQueryZombie, state.Dependency);
         state.Dependency.Complete();
     }
 
+    private void UpdateCharacterList(ref SystemState state)
+    {
+        _characterLtws.Clear();
+        foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAll<CharacterInfo>()
+                     .WithNone<Disabled, SetActiveSP>())
+        {
+            _characterLtws.Add(ltw.ValueRO.Position);
+        }
+    }
+
+    [BurstCompile]
     private void CheckZombieToDeadZone(ref SystemState state, ref EntityCommandBuffer ecb)
     {
+        _entityTypeHandle.Update(ref state);
         var chunkJob = new CheckDeadZoneJOB
         {
             ecb = ecb.AsParallelWriter(),
@@ -145,29 +175,69 @@ public partial struct ZombieSystem : ISystem
         state.Dependency.Complete();
     }
 
+    
     [BurstCompile]
-    partial struct ZombieMovementJOB : IJobChunk
+partial struct ZombieMovementJOB : IJobChunk
+{
+    public ComponentTypeHandle<LocalTransform> ltTypeHandle;
+    [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwTypeHandle;
+    [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
+    [ReadOnly] public float deltaTime;
+    [ReadOnly] public NativeList<float3> characterLtws;
+
+    public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
+        in v128 chunkEnabledMask)
     {
-        public ComponentTypeHandle<LocalTransform> ltTypeHandle;
-        [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
-        [ReadOnly] public float deltaTime;
-
-        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
-            in v128 chunkEnabledMask)
+        var lts = chunk.GetNativeArray(ref ltTypeHandle);
+        var ltws = chunk.GetNativeArray(ref ltwTypeHandle);
+        var zombieInfos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
+        for (int i = 0; i < chunk.Count; i++)
         {
-            var lts = chunk.GetNativeArray(ltTypeHandle);
-            var zombieInfos = chunk.GetNativeArray(zombieInfoTypeHandle);
+            var ltw = ltws[i];
+            var lt = lts[i];
+            var info = zombieInfos[i];
+            var direct = GetDirect(ltw.Position, info.directNormal, info.chasingRange);
 
-            for (int i = 0; i < chunk.Count; i++)
-            {
-                var lt = lts[i];
-                var zombie = zombieInfos[i];
-                lt.Position += zombie.directNormal * zombie.speed * deltaTime;
-                lt.Rotation = quaternion.LookRotation(zombie.directNormal, math.up());
-                lts[i] = lt;
-            }
+            lt.Position += direct * info.speed * deltaTime;
+            lt.Rotation = quaternion.LookRotationSafe(direct, math.up());
+            lts[i] = lt;
         }
     }
+
+    private float3 GetDirect(float3 position, float3 defaultDirect, float chasingRange)
+    {
+        var dir = defaultDirect;
+
+        float distanceNearest = float.MaxValue; // Sử dụng float.MaxValue thay vì 99999
+        float3 characterPositionNearest = default;
+
+        foreach (var characterLtw in characterLtws)
+        {
+            var distance = math.distance(characterLtw, position);
+            if (distance <= chasingRange && distance <= distanceNearest)
+            {
+                distanceNearest = distance;
+                characterPositionNearest = characterLtw;
+            }
+        }
+        
+        if (distanceNearest < float.MaxValue)
+        {
+            if (position.ComparisionEqual(characterPositionNearest))
+            {
+                dir = float3.zero;
+            }
+            else
+            {
+                dir = math.normalize(characterPositionNearest - position);
+            }
+        }
+
+        return dir;
+    }
+}
+
+    
 
 
     [BurstCompile]

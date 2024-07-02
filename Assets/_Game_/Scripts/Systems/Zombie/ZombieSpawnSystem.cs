@@ -114,6 +114,7 @@ public partial struct ZombieSpawnSystem : ISystem
             attackRange = data.attackRange,
             delayAttack = data.delayAttack,
             directNormal = _zombieProperties.directNormal,
+            chasingRange = data.chasingRange,
         };
     }
     private BufferZombieStore GetZombieData(int id)
