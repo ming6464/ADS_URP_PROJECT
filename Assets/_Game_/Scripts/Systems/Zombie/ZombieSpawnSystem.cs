@@ -1,4 +1,4 @@
-﻿using Unity.Burst;
+﻿﻿using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
@@ -114,6 +114,7 @@ public partial struct ZombieSpawnSystem : ISystem
             attackRange = data.attackRange,
             delayAttack = data.delayAttack,
             directNormal = _zombieProperties.directNormal,
+            chasingRange = data.chasingRange,
         };
     }
     private BufferZombieStore GetZombieData(int id)
@@ -253,4 +254,3 @@ public partial struct ZombieSpawnSystem : ISystem
     }
     
 }
-

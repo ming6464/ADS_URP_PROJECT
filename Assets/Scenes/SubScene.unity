@@ -6142,10 +6142,10 @@ MonoBehaviour:
   timeLife: 1
   damageRangeRatio:
     x: 1
-    y: 0
+    y: 0.1
   timeRange:
     x: 1
-    y: 15
+    y: 25
 --- !u!4 &735154629
 Transform:
   m_ObjectHideFlags: 0
@@ -7754,10 +7754,10 @@ MonoBehaviour:
   numberSpawn: 1200
   spawnAmountRange:
     x: 5
-    y: 50
+    y: 30
   timeRange:
     x: 1
-    y: 30
+    y: 15
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}
   pointDir1: {fileID: 1398424327}

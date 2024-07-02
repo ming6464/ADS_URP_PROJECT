@@ -91,18 +91,16 @@ public partial struct BulletMovementSystem : ISystem
         {
             while(_takeDamageQueue.TryDequeue(out var item))
             {
-                if (item.damage == 0)
-                {
-                    
-                    continue;
-                }
+                if (item.damage == 0) continue;
+
+                var damage = _entityManager.HasComponent<ItemCanShoot>(item.entity) ? 1 : item.damage;
                 if (_takeDamageMap.ContainsKey(item.entity))
                 {
-                    _takeDamageMap[item.entity] += item.damage;
+                    _takeDamageMap[item.entity] += damage;
                 }
                 else
                 {
-                    _takeDamageMap.Add(item.entity,item.damage);
+                    _takeDamageMap.Add(item.entity,damage);
                 }
             }
             

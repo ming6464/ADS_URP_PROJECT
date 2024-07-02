@@ -68,6 +68,11 @@ public class ItemAuthoring : MonoBehaviour
                     currentHp = authoring.hp,
                 });
                 info.idTextHp = authoring.idTextHp;
+                AddComponent(entity,new ChangeTextNumberMesh()
+                {
+                    id = authoring.idTextHp,
+                    value = authoring.hp,
+                });
             }
             
             if (authoring.spawnPoints.Length > 0)

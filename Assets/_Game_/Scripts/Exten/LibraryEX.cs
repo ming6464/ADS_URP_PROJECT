@@ -453,8 +453,7 @@ public static class MathExt
     /// <returns>Trả về true nếu hai vector bằng nhau, ngược lại trả về false.</returns>
     public static bool ComparisionEqual(this float3 f1, float3 f2)
     {
-        var f = f1 - f2;
-        return !(f.x != 0 || f.y != 0 || f.z != 0);
+        return math.all(f1 == f2);
     }
     
     
@@ -536,4 +535,3 @@ public static class MathExt
     }
     
 }
-

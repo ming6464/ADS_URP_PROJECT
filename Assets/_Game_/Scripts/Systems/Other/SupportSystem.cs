@@ -74,7 +74,6 @@ public partial class AnimationSystem : SystemBase
     }
     
 }
-
 //
 
 [BurstCompile,UpdateInGroup(typeof(PresentationSystemGroup))]
@@ -122,7 +121,6 @@ public partial struct CameraSystem : ISystem
         }
     }
 }
-
 //
 [BurstCompile,UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial struct HandleSetActiveSystem : ISystem
@@ -488,9 +486,19 @@ public partial class UpdateHybrid : SystemBase
         var ecb = new EntityCommandBuffer(Unity.Collections.Allocator.TempJob);
         Entities.ForEach((ref ChangeTextNumberMesh changeText,ref Entity entity) =>
         {
-            Debug.Log("Hellvoealks111111111111111111");
             UpdateText?.Invoke(changeText.id,changeText.value);
-            ecb.RemoveComponent<ChangeTextMesh>(entity);
+            if (changeText.value <= 0)
+            {
+                ecb.AddComponent(entity, new SetActiveSP()
+                {
+                    state = StateID.Destroy,
+                });
+            }
+            else
+            {
+                ecb.RemoveComponent<ChangeTextMesh>(entity);
+            }
+            
         }).WithoutBurst().Run();
         ecb.Playback(EntityManager);
         ecb.Dispose();
@@ -552,5 +560,3 @@ public partial class UpdateHybrid : SystemBase
     }
     //JOB
 }
-
-
