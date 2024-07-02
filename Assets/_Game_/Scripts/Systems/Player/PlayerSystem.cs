@@ -146,7 +146,7 @@ public partial struct PlayerSystem : ISystem
     private void UpdateFieldRunTime(ref SystemState state)
     {
         _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
-        _playerInfo = SystemAPI.GetComponentRO<PlayerInfo>(_playerEntity).ValueRO;
+        _playerInfo = SystemAPI.GetSingleton<PlayerInfo>();
         _maxXGridCharacter = math.max(1,_playerInfo.maxXGridCharacter);
         _maxYGridCharacter = math.max(1,_playerInfo.maxYGridCharacter);
         _ltwPlayer = SystemAPI.GetComponentRO<LocalToWorld>(_playerEntity).ValueRO;
