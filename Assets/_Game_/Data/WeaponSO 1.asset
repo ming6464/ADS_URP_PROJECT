@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a8cb0692c2c04033a3ef2aec136e52fa, type: 3}
-  m_Name: WeaponSO
+  m_Name: WeaponSO 1
   m_EditorClassIdentifier: 
   weapons:
   - id: 0
@@ -20,8 +20,8 @@ MonoBehaviour:
       x: 0.478
       y: 0.849
       z: 0.582
-    damage: 40
-    speed: 90
+    damage: 0
+    speed: 80
     cooldown: 0.08
     bulletPerShot: 2
     spaceAnglePerBullet: 0.1
@@ -33,8 +33,8 @@ MonoBehaviour:
       x: 0.205
       y: 1.239
       z: 0.844
-    damage: 20
-    speed: 90
+    damage: 0
+    speed: 80
     cooldown: 0.5
     bulletPerShot: 20
     spaceAnglePerBullet: 2
@@ -46,8 +46,8 @@ MonoBehaviour:
       x: 0.211
       y: 1.215
       z: 0.813
-    damage: 20
-    speed: 100
+    damage: 0
+    speed: 80
     cooldown: 0.12
     bulletPerShot: 1
     spaceAnglePerBullet: 0.15
@@ -59,8 +59,8 @@ MonoBehaviour:
       x: 0.182
       y: 1.215
       z: 0.572
-    damage: 12
-    speed: 100
+    damage: 0
+    speed: 80
     cooldown: 0.05
     bulletPerShot: 1
     spaceAnglePerBullet: 0.15

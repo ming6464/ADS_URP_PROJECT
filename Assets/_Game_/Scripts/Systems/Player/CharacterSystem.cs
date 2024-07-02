@@ -78,7 +78,7 @@ namespace _Game_.Scripts.Systems.Player
             {
                 var posTarget = ltw.ValueRO.Position;
                 float distance = math.distance(playerPosition, posTarget);
-                if (distance < distanceNearest)
+                if (distance <= distanceNearest)
                 {
                     if (_playerProperty.aimType == AimType.TeamAim)
                     {
@@ -108,7 +108,7 @@ namespace _Game_.Scripts.Systems.Player
             
             if(check)
             {
-                directRota = MathExt.RotateVector(positionNearest - playerPosition, new float3(0,-(30.0f/distanceNearest),0));
+                directRota = MathExt.RotateVector(positionNearest - playerPosition, new float3(0,-(70.0f/distanceNearest),0));
                 var ratio = 1 - math.clamp((distanceNearest * 1.0f / _playerProperty.distanceAim), 0, 1);
                 moveToWard = math.lerp(_playerProperty.moveToWardMin, _playerProperty.moveToWardMax,ratio);
             }

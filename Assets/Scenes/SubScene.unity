@@ -5105,7 +5105,7 @@ MonoBehaviour:
   spaceGrid:
     x: 1
     y: 1
-  idWeaponDefault: 1
+  idWeaponDefault: 2
 --- !u!4 &592925932
 Transform:
   m_ObjectHideFlags: 0
@@ -6183,10 +6183,10 @@ MonoBehaviour:
   timeLife: 1
   damageRangeRatio:
     x: 1
-    y: 0.1
+    y: 0.02
   timeRange:
     x: 1
-    y: 25
+    y: 20
 --- !u!4 &735154629
 Transform:
   m_ObjectHideFlags: 0
@@ -7263,7 +7263,7 @@ Transform:
   m_GameObject: {fileID: 809366255}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.5, y: 0, z: 80}
+  m_LocalPosition: {x: -2.5, y: 0, z: 50.7}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -7798,7 +7798,7 @@ MonoBehaviour:
     y: 30
   timeRange:
     x: 1
-    y: 15
+    y: 10
   pointRange1: {fileID: 1398424327}
   pointRange2: {fileID: 496664265}
   pointDir1: {fileID: 1398424327}
@@ -10185,7 +10185,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1110625805
 Transform:
   m_ObjectHideFlags: 0
@@ -14102,7 +14102,7 @@ PrefabInstance:
     - target: {fileID: 8977010217024031814, guid: f799dda47fa6f4547bddb87befe930f0,
         type: 3}
       propertyPath: id
-      value: 2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8977010217024031814, guid: f799dda47fa6f4547bddb87befe930f0,
         type: 3}
@@ -14135,7 +14135,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1610657034
 Transform:
   m_ObjectHideFlags: 0
@@ -18792,7 +18792,7 @@ PrefabInstance:
     - target: {fileID: 8977010217024031814, guid: f799dda47fa6f4547bddb87befe930f0,
         type: 3}
       propertyPath: id
-      value: 1
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 8977010217024031814, guid: f799dda47fa6f4547bddb87befe930f0,
         type: 3}

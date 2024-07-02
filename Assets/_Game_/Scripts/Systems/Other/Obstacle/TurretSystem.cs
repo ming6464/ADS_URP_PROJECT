@@ -261,10 +261,10 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
 
                 if (check)
                 {
-                    bool checkZ = false;
-                    direct = positionNearest - pos;
+                    direct = MathExt.RotateVector(positionNearest - pos, new float3(0, -(70.0f / distanceNearest), 0));
                     var ratio = 1 - math.clamp(distanceNearest * 1.0f / info.distanceAim, 0, 1);
-                    if (checkZ) ratio = 1;
+                    
+                    
                     moveToWard = math.lerp(info.moveToWardMin, info.moveToWardMax, ratio);
                 }
                 else

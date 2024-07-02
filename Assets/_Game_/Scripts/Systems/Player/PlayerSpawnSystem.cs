@@ -257,11 +257,11 @@ public partial struct PlayerSpawnSystem : ISystem
             Rotation = quaternion.identity,
         });
 
+        
         var playInfo = SystemAPI.GetComponentRW<PlayerInfo>(_entityPlayerInfo);
         playInfo.ValueRW.maxXGridCharacter = maxX;
         playInfo.ValueRW.maxYGridCharacter = maxY;
         characterAlive.Dispose();
-        
         
         float3 GetPositionLocal_L(int index, int maxCol, float2 space)
         {
