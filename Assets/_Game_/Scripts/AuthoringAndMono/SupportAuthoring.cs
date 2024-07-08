@@ -10,7 +10,8 @@ namespace _Game_.Scripts.AuthoringAndMono
         [Header("Layer")] 
         public LayerMask playerLayer;
         public LayerMask characterLayer;
-        public LayerMask zombieLayer;
+        public LayerMask enemyLayer;
+        public LayerMask enemyDieLayer;
         public LayerMask bulletLayer;
         public LayerMask itemLayer;
         public LayerMask itemCanShootLayer;
@@ -39,7 +40,8 @@ namespace _Game_.Scripts.AuthoringAndMono
                 {
                     playerLayer = (uint)authoring.playerLayer.value,
                     characterLayer = (uint)authoring.characterLayer.value,
-                    zombieLayer = (uint)authoring.zombieLayer.value,
+                    enemyLayer = (uint)authoring.enemyLayer.value,
+                    enemyDieLayer = (uint)authoring.enemyDieLayer.value,
                     bulletLayer = (uint)authoring.bulletLayer.value,
                     itemLayer = (uint)authoring.itemLayer.value,
                     itemCanShootLayer = (uint)authoring.itemCanShootLayer.value,

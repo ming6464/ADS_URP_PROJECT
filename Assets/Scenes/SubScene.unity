@@ -15177,9 +15177,12 @@ MonoBehaviour:
   characterLayer:
     serializedVersion: 2
     m_Bits: 2048
-  zombieLayer:
+  enemyLayer:
     serializedVersion: 2
     m_Bits: 128
+  enemyDieLayer:
+    serializedVersion: 2
+    m_Bits: 512
   bulletLayer:
     serializedVersion: 2
     m_Bits: 64

@@ -12,11 +12,29 @@ public partial class AnimationSystem : SystemBase
 {
     private readonly FastAnimatorParameter _dyingAnimatorParameter = new("Die");
     private readonly FastAnimatorParameter _runAnimatorParameter = new("Run");
+    private LayerStoreComponent _layerStoreComponent;
+    private bool _isInit;
     
+    protected override void OnCreate()
+    {
+        base.OnCreate();
+        RequireForUpdate<LayerStoreComponent>();
+    }
+
     protected override void OnUpdate()
     {
+        CheckAndInit();
         AnimationZombieHandle();
         AnimationPlayerHandle();
+    }
+
+    private void CheckAndInit()
+    {
+        if (!_isInit)
+        {
+            _isInit = true;
+            _layerStoreComponent = SystemAPI.GetSingleton<LayerStoreComponent>();
+        }
     }
 
     private void AnimationPlayerHandle()
@@ -39,6 +57,8 @@ public partial class AnimationSystem : SystemBase
         {
             dyingAnimatorParameter = _dyingAnimatorParameter,
             time = (float)SystemAPI.Time.ElapsedTime,
+            enemyLayer = _layerStoreComponent.enemyLayer,
+            enemyDieLayer = _layerStoreComponent.enemyDieLayer
         };
         Dependency = zombieAnimatorJob.ScheduleParallel(Dependency);
         Dependency.Complete();
@@ -74,6 +94,8 @@ public partial class AnimationSystem : SystemBase
     {
         [ReadOnly] public FastAnimatorParameter dyingAnimatorParameter;
         [ReadOnly] public float time;
+        [ReadOnly] public uint enemyLayer;
+        [ReadOnly] public uint enemyDieLayer;
         void Execute( in ZombieInfo zombieInfo, ref SetActiveSP disableSp, AnimatorParametersAspect parametersAspect,ref PhysicsCollider physicsCollider)
         {
             var colliderFilter = physicsCollider.Value.Value.GetCollisionFilter();
@@ -81,13 +103,13 @@ public partial class AnimationSystem : SystemBase
             {
                 case StateID.Enable:
                     parametersAspect.SetBoolParameter(dyingAnimatorParameter,false);
-                    colliderFilter.BelongsTo = 1u << 7;
+                    colliderFilter.BelongsTo = enemyLayer;
                     physicsCollider.Value.Value.SetCollisionFilter(colliderFilter);
                     break;
                 case StateID.Wait:
                     parametersAspect.SetBoolParameter(dyingAnimatorParameter,true);
                     disableSp.state = StateID.WaitAnimation;
-                    colliderFilter.BelongsTo = 1u << 9;
+                    colliderFilter.BelongsTo = enemyDieLayer;
                     physicsCollider.Value.Value.SetCollisionFilter(colliderFilter);
                     break;
                 case StateID.WaitAnimation:

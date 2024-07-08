@@ -9,6 +9,7 @@ namespace _Game_.Scripts.Data
         public GameObject prefabs;
         public float3 pivotFireOffset;
         public int bulletPerShot;
+        public float spacePerBullet;
         public float spaceAnglePerBullet;
         public bool parallelOrbit;
         public float speed;

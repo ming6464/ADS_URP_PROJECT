@@ -19,7 +19,8 @@ public struct LayerStoreComponent : IComponentData
 {
     public uint playerLayer;
     public uint characterLayer;
-    public uint zombieLayer;
+    public uint enemyLayer;
+    public uint enemyDieLayer;
     public uint bulletLayer;
     public uint itemLayer;
     public uint itemCanShootLayer;

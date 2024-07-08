@@ -761,8 +761,8 @@ GameObject:
   - component: {fileID: 2859313800486943603}
   - component: {fileID: 6595799326656811663}
   - component: {fileID: 8560969580838190896}
-  - component: {fileID: 5960556779198882237}
   - component: {fileID: 7865899268212551337}
+  - component: {fileID: 5960556779198882237}
   m_Layer: 7
   m_Name: Zom_Slimnaked
   m_TagString: Untagged
@@ -832,26 +832,6 @@ LODGroup:
     renderers:
     - renderer: {fileID: 3195346237717147906}
   m_Enabled: 1
---- !u!114 &5960556779198882237
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7846563739282400770}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2fb757bd46edfe349a52b4ea886d67e7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  rigConfigSource: 1
-  avatar: {fileID: 9000000, guid: 966470e0f95a2cb41a534729a1ef6552, type: 3}
-  applyRootMotion: 0
-  animationCulling: 0
-  boneEntityStrippingMode: 0
-  boneStrippingMask: {fileID: 0}
-  hasAnimationEvents: 0
-  hasAnimatorControllerEvents: 0
 --- !u!65 &7865899268212551337
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -873,6 +853,26 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.8997773, y: 4.09, z: 0.7030029}
   m_Center: {x: 0.0017632842, y: 0.71000004, z: 0.038269043}
+--- !u!114 &5960556779198882237
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7846563739282400770}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2fb757bd46edfe349a52b4ea886d67e7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  rigConfigSource: 1
+  avatar: {fileID: 9000000, guid: 966470e0f95a2cb41a534729a1ef6552, type: 3}
+  applyRootMotion: 0
+  animationCulling: 0
+  boneEntityStrippingMode: 0
+  boneStrippingMask: {fileID: 0}
+  hasAnimationEvents: 0
+  hasAnimatorControllerEvents: 0
 --- !u!1 &8056733901188388350
 GameObject:
   m_ObjectHideFlags: 0

@@ -34,6 +34,7 @@ namespace _Game_.Scripts.AuthoringAndMono
                                 pivotFireOffset = turret.pivotFireOffset,
                                 speed = turret.speed,
                                 spaceAnglePerBullet = turret.spaceAnglePerBullet,
+                                spacePerBullet = turret.spacePerBullet,
                                 timeLife = turret.timeLife,
                             });
                             break;

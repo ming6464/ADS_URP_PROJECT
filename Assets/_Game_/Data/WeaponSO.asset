@@ -25,6 +25,7 @@ MonoBehaviour:
     cooldown: 0.08
     bulletPerShot: 2
     spaceAnglePerBullet: 0.1
+    spacePerBullet: 0
     parallelOrbit: 0
   - id: 1
     weaponPrefab: {fileID: 2000419024880572935, guid: 7e525516c626dd24ab0bc9d9032763a5,
@@ -38,6 +39,7 @@ MonoBehaviour:
     cooldown: 0.5
     bulletPerShot: 20
     spaceAnglePerBullet: 2
+    spacePerBullet: 0.2
     parallelOrbit: 1
   - id: 2
     weaponPrefab: {fileID: 6273623115974660280, guid: ae842307530afe449be50ee0ce966723,
@@ -51,7 +53,8 @@ MonoBehaviour:
     cooldown: 0.12
     bulletPerShot: 1
     spaceAnglePerBullet: 0.15
-    parallelOrbit: 1
+    spacePerBullet: 0
+    parallelOrbit: 0
   - id: 3
     weaponPrefab: {fileID: 4882288759568137940, guid: 2c534987f99a51e4a8c57b13fad0190d,
       type: 3}
@@ -64,4 +67,5 @@ MonoBehaviour:
     cooldown: 0.05
     bulletPerShot: 1
     spaceAnglePerBullet: 0.15
-    parallelOrbit: 1
+    spacePerBullet: 0
+    parallelOrbit: 0

@@ -25,6 +25,7 @@ public partial struct WeaponSystem : ISystem
     private float3 _offset;
     private float _cooldown;
     private int _bulletPerShot;
+    private float _spacePerBullet;
     private float _damage;
     private float _speed;
     private float _spaceAnglePerBullet;
@@ -129,6 +130,7 @@ public partial struct WeaponSystem : ISystem
         var weapon = GetWeapon(id);
         _offset = weapon.offset;
         _bulletPerShot = weapon.bulletPerShot;
+        _spacePerBullet = weapon.spacePerBullet;
         _cooldown = weapon.cooldown;
         _timeLatest = -_cooldown;
         _weaponEntityInstantiate = weapon.entity;
@@ -206,6 +208,7 @@ public partial struct WeaponSystem : ISystem
         var job = new PutEventSpawnBulletJOB()
         {
             bulletPerShot = _bulletPerShot,
+            spacePerBullet = _spacePerBullet,
             damage = _damage,
             speed = _speed,
             spaceAnglePerBullet = _spaceAnglePerBullet,
@@ -232,6 +235,7 @@ public partial struct WeaponSystem : ISystem
         public float damage;
         public float speed;
         public float spaceAnglePerBullet;
+        public float spacePerBullet;
         public bool parallelOrbit;
         public NativeQueue<BufferBulletSpawner>.ParallelWriter bulletSpawnQueue;
         [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwComponentTypeHandle;
@@ -247,6 +251,7 @@ public partial struct WeaponSystem : ISystem
                 {
                     bulletPerShot = bulletPerShot,
                     damage = damage,
+                    spacePerBullet = spacePerBullet,
                     parallelOrbit = parallelOrbit,
                     speed = speed,
                     spaceAnglePerBullet = spaceAnglePerBullet,

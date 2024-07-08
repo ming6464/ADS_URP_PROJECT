@@ -170,6 +170,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                 pivotFireOffset = turret.pivotFireOffset,
                 speed = turret.speed,
                 spaceAnglePerBullet = turret.spaceAnglePerBullet,
+                spacePerBullet = turret.spacePerBullet,
             };
             return barrel;
         }
@@ -230,6 +231,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                             parallelOrbit = info.parallelOrbit,
                             speed = info.speed,
                             spaceAnglePerBullet = info.spaceAnglePerBullet,
+                            spacePerBullet = info.spacePerBullet,
                         });
                         barrelRunTime.value = time;
                         barrelRunTimes[i] = barrelRunTime;

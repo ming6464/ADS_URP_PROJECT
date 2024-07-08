@@ -28,6 +28,7 @@ public struct BufferWeaponStore : IBufferElementData
     public float speed;
     public float cooldown;
     public int bulletPerShot;
+    public float spacePerBullet;
     public float spaceAnglePerBullet;
     public bool parallelOrbit;
 }
@@ -79,6 +80,7 @@ public struct BufferBulletSpawner : IBufferElementData
     public LocalTransform lt;
     public float bulletPerShot;
     public float spaceAnglePerBullet;
+    public float spacePerBullet;
     public bool parallelOrbit;
 }
 

@@ -52,6 +52,7 @@ public struct BufferTurretObstacle : IBufferElementData
     public float3 pivotFireOffset;
     public int bulletPerShot;
     public float spaceAnglePerBullet;
+    public float spacePerBullet;
     public bool parallelOrbit;
     public float timeLife;
     public float speed;
@@ -86,6 +87,7 @@ public struct BarrelInfo : IComponentData
     public float3 pivotFireOffset;
     public int bulletPerShot;
     public float spaceAnglePerBullet;
+    public float spacePerBullet;
     public bool parallelOrbit;
 }
 

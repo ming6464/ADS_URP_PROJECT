@@ -48,6 +48,7 @@ class WeaponBaker : Baker<WeaponAuthoring>
                 bulletPerShot = weapon.bulletPerShot,
                 spaceAnglePerBullet = weapon.spaceAnglePerBullet,
                 parallelOrbit = weapon.parallelOrbit,
+                spacePerBullet = weapon.spacePerBullet,
             });
         }
     }

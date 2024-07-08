@@ -32,7 +32,7 @@ MonoBehaviour:
     delayAttack: 0.5
     chasingRange: 0
   - id: 2
-    prefab: {fileID: 4746968753296184693, guid: 65118d20dd891b144a020405204e8cc5,
+    prefab: {fileID: 4218027828009085709, guid: 5bdc1fcf43ae4244c9adb071e3dbe86c,
       type: 3}
     hp: 12
     speed: 3.5

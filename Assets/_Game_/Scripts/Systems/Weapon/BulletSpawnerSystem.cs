@@ -76,16 +76,30 @@ namespace _Game_.Scripts.Systems.Weapon
 
                 for (int i = 1; i <= halfNumberPreShot; i++)
                 {
-                    float3 angleRotaNew = angleRota;
-                    float angle = (i - subtractIndex) * bulletSpawn.spaceAnglePerBullet;
-                    float angle1 = angleRotaNew.y + angle;
-                    float angle2 = angleRotaNew.y - angle;
-                    angleRotaNew.y = angle1;
-                    lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
-                    InstantiateBullet_L( lt, damage, speed, _entityBulletInstantiate);
-                    angleRotaNew.y = angle2;
-                    lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
-                    InstantiateBullet_L( lt, damage, speed, _entityBulletInstantiate);
+                    
+                    if (bulletSpawn.parallelOrbit)
+                    {
+                        float space = (i - subtractIndex) * bulletSpawn.spacePerBullet;
+                        var ltNew = lt;
+                        ltNew.Position = lt.Position + new float3(space,0,0);
+                        InstantiateBullet_L( ltNew, damage, speed, _entityBulletInstantiate);
+                        ltNew.Position = lt.Position + new float3(-space,0,0);
+                        InstantiateBullet_L( ltNew, damage, speed, _entityBulletInstantiate);
+                    }
+                    else
+                    {
+                        float space = (i - subtractIndex) * bulletSpawn.spaceAnglePerBullet;
+                        float3 angleRotaNew = angleRota;
+                        float angle1 = angleRotaNew.y + space;
+                        float angle2 = angleRotaNew.y - space;
+                        angleRotaNew.y = angle1;
+                        lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
+                        InstantiateBullet_L( lt, damage, speed, _entityBulletInstantiate);
+                        angleRotaNew.y = angle2;
+                        lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
+                        InstantiateBullet_L( lt, damage, speed, _entityBulletInstantiate);
+                    }
+                    
                 }
             }
 

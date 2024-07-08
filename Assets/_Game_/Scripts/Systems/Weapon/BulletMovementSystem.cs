@@ -56,7 +56,7 @@ public partial struct BulletMovementSystem : ISystem
             _collisionFilter = new CollisionFilter()
             {
                 BelongsTo = layerStore.bulletLayer,
-                CollidesWith = layerStore.zombieLayer | layerStore.itemCanShootLayer,
+                CollidesWith = layerStore.enemyLayer | layerStore.itemCanShootLayer,
             };
         }
         
