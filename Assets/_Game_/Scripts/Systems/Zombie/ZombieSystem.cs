@@ -13,16 +13,18 @@ public partial struct ZombieSystem : ISystem
     private float3 _pointZoneMin;
     private float3 _pointZoneMax;
     private bool _init;
+    private Entity _entityPlayerInfo;
     private ZombieProperty _zombieProperty;
     private EntityTypeHandle _entityTypeHandle;
     private EntityQuery _enQueryZombie;
-    private EntityQuery _enQueryZombieNew;
+    private EntityManager _entityManager;
     private NativeQueue<TakeDamageItem> _takeDamageQueue;
     private NativeList<CharacterSetTakeDamage> _characterSetTakeDamages;
     private NativeList<float3> _characterLtws;
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
+        state.RequireForUpdate<PlayerInfo>();
         RequireNecessaryComponents(ref state);
         Init(ref state);
     }
@@ -31,9 +33,6 @@ public partial struct ZombieSystem : ISystem
     {
         _enQueryZombie =
             SystemAPI.QueryBuilder().WithAll<ZombieInfo,LocalTransform,ZombieRuntime>().WithNone<Disabled, SetActiveSP, New>().Build();
-
-        _enQueryZombieNew = SystemAPI.QueryBuilder().WithAll<ZombieInfo,LocalTransform,New>().WithNone<Disabled, SetActiveSP>().Build();
-        
         _takeDamageQueue = new NativeQueue<TakeDamageItem>(Allocator.Persistent);
         _characterSetTakeDamages = new NativeList<CharacterSetTakeDamage>(Allocator.Persistent);
         _characterLtws = new NativeList<float3>(Allocator.Persistent);
@@ -77,6 +76,8 @@ public partial struct ZombieSystem : ISystem
             _pointZoneMax = zone.pointRangeMax;
             _zombieProperty = SystemAPI
                 .GetComponentRO<ZombieProperty>(SystemAPI.GetSingletonEntity<ZombieProperty>()).ValueRO;
+            _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
+            _entityManager = state.EntityManager;
         }
     }
     [BurstCompile]
@@ -93,6 +94,8 @@ public partial struct ZombieSystem : ISystem
                 position = ltw.ValueRO.Position
             });
         }
+
+        var playerPosition = SystemAPI.GetComponentRO<LocalToWorld>(_entityPlayerInfo).ValueRO.Position;
         
         var job = new CheckAttackPlayerJOB()
         {
@@ -101,7 +104,9 @@ public partial struct ZombieSystem : ISystem
             time = (float)SystemAPI.Time.ElapsedTime,
             zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>(),
             zombieRuntimeTypeHandle = state.GetComponentTypeHandle<ZombieRuntime>(),
-            takeDamageQueues = _takeDamageQueue.AsParallelWriter()
+            takeDamageQueues = _takeDamageQueue.AsParallelWriter(),
+            playerPosition = playerPosition,
+            distanceCheck = 10,
         };
         state.Dependency = job.ScheduleParallel(_enQueryZombie, state.Dependency);
         state.Dependency.Complete();
@@ -253,13 +258,13 @@ partial struct ZombieMovementJOB : IJobChunk
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
             in v128 chunkEnabledMask)
         {
-            var ltwArr = chunk.GetNativeArray(ltwTypeHandle);
-            var zombieInfos = chunk.GetNativeArray(zombieInfoTypeHandle);
+            var ltwArr = chunk.GetNativeArray(ref ltwTypeHandle);
+            var zombieInfos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
             var entities = chunk.GetNativeArray(entityTypeHandle);
 
             for (int i = 0; i < chunk.Count; i++)
             {
-                if (CheckInRange(ltwArr[i].Position, minPointRange, maxPointRange)) continue;
+                if (CheckInRange_L(ltwArr[i].Position, minPointRange, maxPointRange)) continue;
                 var zombieInfo = zombieInfos[i];
                 zombieInfo.hp = 0;
                 zombieInfos[i] = zombieInfo;
@@ -276,7 +281,7 @@ partial struct ZombieMovementJOB : IJobChunk
                 });
             }
 
-            bool CheckInRange(float3 value, float3 min, float3 max)
+            bool CheckInRange_L(float3 value, float3 min, float3 max)
             {
                 if ((value.x - min.x) * (max.x - value.x) < 0) return false;
                 if ((value.y - min.y) * (max.y - value.y) < 0) return false;
@@ -295,12 +300,14 @@ partial struct ZombieMovementJOB : IJobChunk
         [ReadOnly] public ComponentTypeHandle<LocalToWorld> localToWorldTypeHandle;
         [ReadOnly] public NativeList<CharacterSetTakeDamage> characterSetTakeDamages;
         [ReadOnly] public float time;
-        
+        [ReadOnly] public float3 playerPosition;
+        [ReadOnly] public float distanceCheck;
+         
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
-            var zombieInfos = chunk.GetNativeArray(zombieInfoTypeHandle);
-            var ltws = chunk.GetNativeArray(localToWorldTypeHandle);
-            var zombieRuntimes = chunk.GetNativeArray(zombieRuntimeTypeHandle);
+            var zombieInfos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
+            var ltws = chunk.GetNativeArray(ref localToWorldTypeHandle);
+            var zombieRuntimes = chunk.GetNativeArray(ref zombieRuntimeTypeHandle);
             for (int i = 0; i < chunk.Count; i++)
             {
                 var info = zombieInfos[i];
@@ -308,7 +315,9 @@ partial struct ZombieMovementJOB : IJobChunk
                 var runtime = zombieRuntimes[i];
                 
                 if( time - runtime.latestTimeAttack < info.delayAttack) continue;
-            
+                
+                if(math.distance(playerPosition,ltw.Position) > distanceCheck) continue;
+                
                 bool checkAttack = false;
                 for (int j = 0; j < characterSetTakeDamages.Length; j++)
                 {

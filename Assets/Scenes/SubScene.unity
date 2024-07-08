@@ -5092,6 +5092,7 @@ MonoBehaviour:
   spawnPosition: {fileID: 809366256}
   playerPrefab: {fileID: 3836318472321978554, guid: fdd796aa3f41f594baea47b30420e4f8,
     type: 3}
+  hp: 0
   speed: 3.5
   radius: 0.35
   rotaAngleMax: 120
@@ -7788,7 +7789,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   data: {fileID: 11400000, guid: d8be5c147f056f34fb5c6fd108543aaa, type: 2}
-  spawnDataArr: 00000000010000000200000003000000
+  spawnDataArr: 0000000001000000
   timeDelaySpawn: 0.08
   spawnInfinity: 0
   allowRespawn: 1

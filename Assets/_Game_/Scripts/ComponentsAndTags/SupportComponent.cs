@@ -49,7 +49,8 @@ public enum StateID
     DisableAll,
     EnableAll,
     Destroy,
-    DestroyAll
+    DestroyAll,
+    Run
 }
 
 public enum CameraType

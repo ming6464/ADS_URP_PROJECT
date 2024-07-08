@@ -141,9 +141,9 @@ public partial struct BulletMovementSystem : ISystem
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
             in v128 chunkEnabledMask)
         {
-            var ltArr = chunk.GetNativeArray(localTransformType);
+            var ltArr = chunk.GetNativeArray(ref localTransformType);
             var entities = chunk.GetNativeArray(entityTypeHandle);
-            var bulletInfos = chunk.GetNativeArray(bulletInfoTypeHandle);
+            var bulletInfos = chunk.GetNativeArray(ref bulletInfoTypeHandle);
             var setActiveSP = new SetActiveSP()
             {
                 state = StateID.Disable,

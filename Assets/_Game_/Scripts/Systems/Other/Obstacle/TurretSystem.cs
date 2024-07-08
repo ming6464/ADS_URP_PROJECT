@@ -197,10 +197,10 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
                 in v128 chunkEnabledMask)
             {
-                var lts = chunk.GetNativeArray(ltComponentType);
-                var barrelInfos = chunk.GetNativeArray(barrelInfoComponentType);
-                var barrelRunTimes = chunk.GetNativeArray(barrelRunTimeComponentType);
-                var ltws = chunk.GetNativeArray(ltwComponentTypeHandle);
+                var lts = chunk.GetNativeArray(ref ltComponentType);
+                var barrelInfos = chunk.GetNativeArray(ref barrelInfoComponentType);
+                var barrelRunTimes = chunk.GetNativeArray(ref barrelRunTimeComponentType);
+                var ltws = chunk.GetNativeArray(ref ltwComponentTypeHandle);
                 var lt_bullet = new LocalTransform()
                 {
                     Scale = 1

@@ -4,6 +4,7 @@ using Unity.Transforms;
 
 public struct PlayerProperty : IComponentData
 {
+    public float hp;
     public int idWeaponDefault;
     public Entity characterEntity;
     public float characterRadius;
@@ -17,6 +18,7 @@ public struct PlayerProperty : IComponentData
     public float moveToWardMin;
     public float speedMoveToNextPoint;
     public float rotaAngleMax;
+    public bool aimNearestEnemy;
 
 }
 

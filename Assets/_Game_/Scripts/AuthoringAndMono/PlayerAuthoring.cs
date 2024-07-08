@@ -7,6 +7,7 @@ public class PlayerAuthoring : MonoBehaviour
 {
     public Transform spawnPosition;
     public GameObject playerPrefab;
+    public float hp;
     public float speed;
     public float radius;
     public float rotaAngleMax;
@@ -46,6 +47,8 @@ public class PlayerAuthoring : MonoBehaviour
                 moveToWardMax = authoring.moveToWardMax,
                 speedMoveToNextPoint = authoring.speedMoveToNextPoint,
                 rotaAngleMax = authoring.rotaAngleMax,
+                hp = authoring.hp,
+                aimNearestEnemy = authoring.aimNearestEnemy,
             });
         
             AddComponent(entity, new PlayerInput

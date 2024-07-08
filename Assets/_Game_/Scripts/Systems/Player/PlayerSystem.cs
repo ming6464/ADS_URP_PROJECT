@@ -1,6 +1,4 @@
-using System;
 using Unity.Burst;
-using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -47,12 +45,8 @@ public partial struct PlayerSystem : ISystem
     {
         CheckAndInit(ref state);
         UpdateFieldRunTime(ref state);
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         Move(ref state);
-        CheckCollider(ref state,ref ecb);
-        state.Dependency.Complete();
-        ecb.Playback(_entityManager);
-        ecb.Dispose();
+        CheckCollider(ref state);
     }
     [BurstCompile]
     private void Move(ref SystemState state)
@@ -63,8 +57,9 @@ public partial struct PlayerSystem : ISystem
         _playerAspect.Position += new float3(direct.x, 0, direct.y) * _playerProperty.speed * SystemAPI.Time.DeltaTime;
     }
     [BurstCompile]
-    private void CheckCollider(ref SystemState state, ref EntityCommandBuffer ecb)
+    private void CheckCollider(ref SystemState state)
     {
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         var halfSizeBox = GetHalfSizeBoxPlayer(ref state);
         _itemColliders.Clear();
         if (_physicsWorld.BoxCastAll(_ltwPlayer.Position, quaternion.identity, halfSizeBox, float3.zero, 0,
@@ -72,6 +67,7 @@ public partial struct PlayerSystem : ISystem
         {
             HandleItemCollider(ref state, ref ecb, _itemColliders);
         }
+        ecb.Playback(_entityManager);
     }
     [BurstCompile]
     private void HandleItemCollider(ref SystemState state,ref EntityCommandBuffer ecb, NativeList<ColliderCastHit> arrItem)

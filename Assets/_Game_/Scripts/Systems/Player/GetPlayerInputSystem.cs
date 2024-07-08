@@ -32,6 +32,7 @@ public partial class GetPlayerInputSystem : SystemBase
         float2 curMoveInput = _inputs.Player.PlayerMovement.ReadValue<Vector2>();
         float2 mousePos = _inputs.Player.Mouse.ReadValue<Vector2>();
         bool isShot = _inputs.Player.Shot.ReadValue<float>() > 0;
+
         SystemAPI.SetSingleton(new PlayerInput()
         {
             directMove = curMoveInput,

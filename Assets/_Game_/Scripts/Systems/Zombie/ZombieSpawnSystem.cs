@@ -241,7 +241,7 @@ public partial struct ZombieSpawnSystem : ISystem
         public ComponentTypeHandle<PhysicsCollider> physicColliderTypeHandle;
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
-            var physicColliders = chunk.GetNativeArray(physicColliderTypeHandle);
+            var physicColliders = chunk.GetNativeArray(ref physicColliderTypeHandle);
             for (int i = 0; i < chunk.Count; i++)
             {
                 var collider = physicColliders[i];

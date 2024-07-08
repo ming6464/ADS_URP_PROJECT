@@ -64,8 +64,8 @@ namespace _Game.Scripts.Systems.Zombie
             
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var zombieInfos = chunk.GetNativeArray(zombieInfoComponentType);
-                var takeDamages = chunk.GetNativeArray(takeDamageComponentType);
+                var zombieInfos = chunk.GetNativeArray(ref zombieInfoComponentType);
+                var takeDamages = chunk.GetNativeArray(ref takeDamageComponentType);
                 var entities = chunk.GetNativeArray(entityTypeHandle);
                 var setActive = new SetActiveSP()
                 {

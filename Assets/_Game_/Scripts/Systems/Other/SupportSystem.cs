@@ -11,31 +11,59 @@ using UnityEngine;
 public partial class AnimationSystem : SystemBase
 {
     private readonly FastAnimatorParameter _dyingAnimatorParameter = new("Die");
+    private readonly FastAnimatorParameter _runAnimatorParameter = new("Run");
     
     protected override void OnUpdate()
+    {
+        AnimationZombieHandle();
+        AnimationPlayerHandle();
+    }
+
+    private void AnimationPlayerHandle()
+    {
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+        var characterAnimJob = new ProcessAnimCharacter()
+        {
+            runAnimatorParameter = _runAnimatorParameter,
+            ecb = ecb.AsParallelWriter()
+        };
+        Dependency = characterAnimJob.ScheduleParallel(Dependency);
+        Dependency.Complete();
+        ecb.Playback(EntityManager);
+        ecb.Dispose();
+    }
+
+    private void AnimationZombieHandle()
     {
         var zombieAnimatorJob = new ProcessAnimZombie()
         {
             dyingAnimatorParameter = _dyingAnimatorParameter,
             time = (float)SystemAPI.Time.ElapsedTime,
         };
-
-        var characterAnimJob = new ProcessAnimCharacter();
-        Dependency = characterAnimJob.ScheduleParallel(Dependency);
-        Dependency.Complete();
         Dependency = zombieAnimatorJob.ScheduleParallel(Dependency);
         Dependency.Complete();
     }
-    
+
+
     [BurstCompile]
     partial struct ProcessAnimCharacter : IJobEntity
     {
-        void Execute(in CharacterInfo characterInfo, ref SetActiveSP disableSp)
+        public EntityCommandBuffer.ParallelWriter ecb;
+        [ReadOnly] public FastAnimatorParameter runAnimatorParameter;
+        void Execute(in CharacterInfo characterInfo, ref SetActiveSP setActiveSp,Entity entity,[EntityIndexInQuery] int queryIndex, AnimatorParametersAspect parametersAspect)
         {
-            switch (disableSp.state)
+            switch (setActiveSp.state)
             {
+                case StateID.None:
+                    parametersAspect.SetBoolParameter(runAnimatorParameter,false);
+                    ecb.RemoveComponent<SetActiveSP>(queryIndex,entity);
+                    break;
+                case StateID.Run:
+                    parametersAspect.SetBoolParameter(runAnimatorParameter,true);
+                    ecb.RemoveComponent<SetActiveSP>(queryIndex,entity);
+                    break;
                 case StateID.Wait:
-                    disableSp.state = StateID.Disable;
+                    setActiveSp.state = StateID.Disable;
                     break;
             }       
         }
@@ -168,7 +196,7 @@ public partial struct HandleSetActiveSystem : ISystem
 
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
-            var setActiveSps = chunk.GetNativeArray(setActiveSpTypeHandle);
+            var setActiveSps = chunk.GetNativeArray(ref setActiveSpTypeHandle);
             var entities = chunk.GetNativeArray(entityTypeHandle);
 
             for (int i = 0; i < chunk.Count; i++)
@@ -317,7 +345,7 @@ public partial struct HandlePoolZombie : ISystem
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
             var entities = chunk.GetNativeArray(entityTypeHandle);
-            var zombieInfos = chunk.GetNativeArray(zombieInfoTypeHandle);
+            var zombieInfos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
 
             for (int i = 0; i < chunk.Count; i++)
             {

@@ -23,10 +23,14 @@ namespace _Game_.Scripts.Systems.Player
         private float _characterMoveToWardChangePos;
         private PlayerProperty _playerProperty;
         private NativeList<TargetInfo> _targetNears;
+        private PlayerInput _playerMoveInput;
+        private float2 _currentDirectMove;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
+            state.RequireForUpdate<PlayerProperty>();
+            state.RequireForUpdate<PlayerInput>();
             state.RequireForUpdate<PlayerInfo>();
             state.RequireForUpdate<CharacterInfo>();
             _entityTypeHandle = state.GetEntityTypeHandle();
@@ -57,10 +61,44 @@ namespace _Game_.Scripts.Systems.Player
                 _playerProperty = SystemAPI.GetSingleton<PlayerProperty>();
                 _characterMoveToWardChangePos = _playerProperty.speedMoveToNextPoint;
             }
-            
+            _playerMoveInput = SystemAPI.GetSingleton<PlayerInput>();
+
+            HandleAnimation(ref state);
+            CheckTakeDamage(ref state); 
             Rota(ref state);
             Move(ref state);
-            CheckTakeDamage(ref state); 
+        }
+
+        private void HandleAnimation(ref SystemState state)
+        {
+            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+            if (!_playerMoveInput.directMove.ComparisionEqual(_currentDirectMove))
+            {
+                _currentDirectMove = _playerMoveInput.directMove;
+                StateID stateID = _currentDirectMove.ComparisionEqual(float2.zero) ? StateID.None : StateID.Run;
+                foreach (var (characterInfo, entity) in SystemAPI.Query<RefRO<CharacterInfo>>().WithEntityAccess()
+                             .WithNone<Disabled>())
+                {
+                    ecb.AddComponent(entity,new SetActiveSP()
+                    {
+                        state = stateID,
+                    });
+                }
+            }
+            else
+            {
+                StateID stateID = _currentDirectMove.ComparisionEqual(float2.zero) ? StateID.None : StateID.Run;
+                foreach (var (characterInfo, entity) in SystemAPI.Query<RefRO<CharacterInfo>>().WithEntityAccess()
+                             .WithNone<Disabled>().WithAll<New>())
+                {
+                    ecb.AddComponent(entity,new SetActiveSP()
+                    {
+                        state = stateID,
+                    });
+                    ecb.RemoveComponent<New>(entity);
+                }
+            }
+            ecb.Playback(_entityManager);
         }
 
         private void Rota(ref SystemState state)
@@ -73,37 +111,46 @@ namespace _Game_.Scripts.Systems.Player
             var moveToWard = _playerProperty.moveToWardMax;
 
             bool check = false;
-            foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAny<ZombieInfo,ItemCanShoot>()
-                         .WithNone<Disabled, SetActiveSP>())
+
+            if (_playerProperty.aimNearestEnemy)
             {
-                var posTarget = ltw.ValueRO.Position;
-                float distance = math.distance(playerPosition, posTarget);
-                if (distance <= distanceNearest)
+                foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAny<ZombieInfo,ItemCanShoot>()
+                             .WithNone<Disabled, SetActiveSP>())
                 {
-                    if (_playerProperty.aimType == AimType.TeamAim)
+                    var posTarget = ltw.ValueRO.Position;
+                    float distance = math.distance(playerPosition, posTarget);
+                    if (distance <= distanceNearest)
                     {
-                        if (MathExt.CalculateAngle(posTarget - playerPosition, new float3(0, 0, 1)) < _playerProperty.rotaAngleMax)
+                        if (_playerProperty.aimType == AimType.TeamAim)
                         {
-                            positionNearest = posTarget;
-                            distanceNearest = distance;
-                            check = true;
+                            if (MathExt.CalculateAngle(posTarget - playerPosition, new float3(0, 0, 1)) < _playerProperty.rotaAngleMax)
+                            {
+                                positionNearest = posTarget;
+                                distanceNearest = distance;
+                                check = true;
+                            }
+                            continue;
                         }
-                        continue;
-                    }
                     
-                    distanceNearest = distance;
-                    _targetNears.Add(new TargetInfo()
-                    {
-                        position = ltw.ValueRO.Position,
-                        distance = distance
-                    });
+                        distanceNearest = distance;
+                        _targetNears.Add(new TargetInfo()
+                        {
+                            position = ltw.ValueRO.Position,
+                            distance = distance
+                        });
+                    }
+                }
+
+                if (_playerProperty.aimType == AimType.IndividualAim && _targetNears.Length > 20)
+                {
+                    _targetNears.Sort(new TargetInfoComparer());
+                    _targetNears.Resize(20,NativeArrayOptions.ClearMemory);
                 }
             }
-
-            if (_playerProperty.aimType == AimType.IndividualAim && _targetNears.Length > 20)
+            else
             {
-                _targetNears.Sort(new TargetInfoComparer());
-                _targetNears.Resize(20,NativeArrayOptions.ClearMemory);
+                directRota = new float3(_playerMoveInput.mousePos.x,0,_playerMoveInput.mousePos.y);
+                moveToWard = _playerProperty.moveToWardMax;
             }
             
             if(check)
@@ -115,6 +162,7 @@ namespace _Game_.Scripts.Systems.Player
 
             var job = new CharacterRotaJOB()
             {
+                aimNearestEnemy = _playerProperty.aimNearestEnemy,
                 ltComponentType = state.GetComponentTypeHandle<LocalTransform>(),
                 ltwComponentType = state.GetComponentTypeHandle<LocalToWorld>(),
                 targetNears = _targetNears,
@@ -198,6 +246,7 @@ namespace _Game_.Scripts.Systems.Player
         partial struct CharacterRotaJOB : IJobChunk
         {
             public ComponentTypeHandle<LocalTransform> ltComponentType;
+            [ReadOnly] public bool aimNearestEnemy;
             [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwComponentType;
             [ReadOnly] public NativeList<TargetInfo> targetNears;
             [ReadOnly] public PlayerProperty playerProperty;
@@ -213,10 +262,7 @@ namespace _Game_.Scripts.Systems.Player
                     var directRota_ = directRota;
                     var moveToWard_ = moveToWard;
                     var lt = lts[i];
-                    if (playerProperty.aimType == AimType.IndividualAim)
-                    {
-                        LoadDirectRota(ref directRota_, ref moveToWard_, ltws[i].Position);
-                    }
+                    LoadDirectRota(ref directRota_, ref moveToWard_, ltws[i].Position);
                     lt.Rotation = MathExt.MoveTowards(lt.Rotation, quaternion.LookRotationSafe(directRota_,math.up()),
                         deltaTime * moveToWard_);
                     lts[i] = lt;
@@ -226,6 +272,8 @@ namespace _Game_.Scripts.Systems.Player
 
             private void LoadDirectRota(ref float3 directRef, ref float moveToWardRef, float3 characterPos)
             {
+                if (playerProperty.aimType != AimType.IndividualAim) return;
+                if (!aimNearestEnemy) return;
                 var disNearest = playerProperty.distanceAim;
                 var nearestEnemyPosition = float3.zero;
                 bool check = false;
@@ -258,13 +306,12 @@ namespace _Game_.Scripts.Systems.Player
             public EntityTypeHandle entityTypeHandle;
             [ReadOnly] public float time;
             [ReadOnly] public ComponentTypeHandle<TakeDamage> takeDamageTypeHandle;
-            
+            [ReadOnly] public float characterRadius;
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var characterInfos = chunk.GetNativeArray(characterInfoTypeHandle);
-                var takeDamages = chunk.GetNativeArray(takeDamageTypeHandle);
+                var characterInfos = chunk.GetNativeArray(ref characterInfoTypeHandle);
+                var takeDamages = chunk.GetNativeArray(ref takeDamageTypeHandle);
                 var entities = chunk.GetNativeArray(entityTypeHandle);
-                
                 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -304,8 +351,8 @@ namespace _Game_.Scripts.Systems.Player
             
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var lts = chunk.GetNativeArray(ltComponentType);
-                var nextPoints = chunk.GetNativeArray(nextPointComponentType);
+                var lts = chunk.GetNativeArray(ref ltComponentType);
+                var nextPoints = chunk.GetNativeArray(ref nextPointComponentType);
                 var entities = chunk.GetNativeArray(entityTypeHandle);
                 
                 for (int i = 0; i < chunk.Count; i++)

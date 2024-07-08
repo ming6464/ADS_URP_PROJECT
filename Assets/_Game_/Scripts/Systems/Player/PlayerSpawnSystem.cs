@@ -190,9 +190,10 @@ public partial struct PlayerSpawnSystem : ISystem
                 ecb.AddComponent(entitySet, new CharacterInfo()
                 {
                     index = i,
-                    hp = 15,
+                    hp = _playerProperty.hp,
                 });
                 ecb.AddComponent(entitySet,lt);
+                ecb.AddComponent<New>(entitySet);
             }
         }
         else

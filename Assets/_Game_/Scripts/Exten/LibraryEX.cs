@@ -458,6 +458,18 @@ public static class MathExt
     
     
     /// <summary>
+    /// So sánh hai vector float3 để kiểm tra xem chúng có bằng nhau hay không.
+    /// </summary>
+    /// <param name="f1">Vector float2 thứ nhất.</param>
+    /// <param name="f2">Vector float2 thứ hai.</param>
+    /// <returns>Trả về true nếu hai vector bằng nhau, ngược lại trả về false.</returns>
+    public static bool ComparisionEqual(this float2 f1, float2 f2)
+    {
+        return math.all(f1 == f2);
+    }
+    
+    
+    /// <summary>
     /// Tính toán góc giữa hai vector float2.
     /// </summary>
     /// <param name="vecA">Vector đầu tiên.</param>

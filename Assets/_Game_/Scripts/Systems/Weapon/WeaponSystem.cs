@@ -238,7 +238,7 @@ public partial struct WeaponSystem : ISystem
         
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
-            var ltws = chunk.GetNativeArray(ltwComponentTypeHandle);
+            var ltws = chunk.GetNativeArray(ref ltwComponentTypeHandle);
 
             for (int i = 0; i < chunk.Count; i++)
             {
