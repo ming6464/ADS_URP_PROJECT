@@ -155,8 +155,7 @@ public partial struct PlayerSpawnSystem : ISystem
             }
             totalNumber = 0;
         }
-        float time = (float)SystemAPI.Time.ElapsedTime;
-        var bufferDisable = _entityManager.GetBuffer<BufferCharacterDie>(_entityPlayerInfo);
+        // var bufferDisable = _entityManager.GetBuffer<BufferCharacterDie>(_entityPlayerInfo);
         if (count > 0)
         {
             var lt = DotsEX.LocalTransformDefault();
@@ -164,25 +163,25 @@ public partial struct PlayerSpawnSystem : ISystem
             for (int i = characterAliveCount;i < totalNumber; i++)
             {
                 Entity entitySet;
-                if (bufferDisable.Length > 1)
-                {
-                    entitySet = bufferDisable[0].entity;
-                    bufferDisable.RemoveAt(0);
-                    ecb.RemoveComponent<Disabled>(entitySet);
-                    ecb.AddComponent(entitySet,new SetActiveSP()
-                    {
-                        state = StateID.Enable,
-                    });
-                }
-                else
-                {
-                    entitySet = _entityManager.Instantiate(_characterEntityInstantiate);
-                    ecb.AddComponent<LocalToWorld>(entitySet);
-                    ecb.AddComponent(entitySet, new Parent()
-                    {
-                        Value = _parentCharacterEntity,
-                    });
-                }
+                // if (bufferDisable.Length > 0)
+                // {
+                //     entitySet = bufferDisable[0].entity;
+                //     bufferDisable.RemoveAt(0);
+                //     ecb.RemoveComponent<Disabled>(entitySet);
+                //     ecb.AddComponent(entitySet,new SetActiveSP()
+                //     {
+                //         state = StateID.Enable,
+                //     });
+                // }
+                // else
+                // {
+                //     entitySet = _entityManager.Instantiate(_characterEntityInstantiate);
+                //     ecb.AddComponent<LocalToWorld>(entitySet);
+                // }
+                
+                entitySet = _entityManager.Instantiate(_characterEntityInstantiate);
+                ecb.AddComponent<LocalToWorld>(entitySet);
+                
                 characterBuffer.Add(new BufferCharacterNew()
                 {
                     entity = entitySet,
@@ -191,6 +190,10 @@ public partial struct PlayerSpawnSystem : ISystem
                 {
                     index = i,
                     hp = _playerProperty.hp,
+                });
+                ecb.AddComponent(entitySet, new Parent()
+                {
+                    Value = _parentCharacterEntity,
                 });
                 ecb.AddComponent(entitySet,lt);
                 ecb.AddComponent<New>(entitySet);
@@ -207,16 +210,14 @@ public partial struct PlayerSpawnSystem : ISystem
             }
         }
         characterAlive.Dispose();
-        
     }
 
     private void ArrangeCharacter(ref SystemState state,ref EntityCommandBuffer ecb)
     {
         NativeArray<Entity> characterAlive = _enQueryCharacterAlive.ToEntityArray(Allocator.Temp);
-        var characterInfos = _enQueryCharacterAlive.ToComponentDataArray<CharacterInfo>(Allocator.Temp);
         int length = characterAlive.Length;
-        
         if(length == _passCountCharacter) return;
+        var characterInfos = _enQueryCharacterAlive.ToComponentDataArray<CharacterInfo>(Allocator.Temp);
         int countOfCol = math.max(2,(int)math.ceil(math.sqrt(length)));
         for (int i = 0; i < length - 1; i++)
         {

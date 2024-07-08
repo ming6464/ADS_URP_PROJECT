@@ -4,6 +4,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 public partial struct PlayerSystem : ISystem
@@ -25,12 +26,14 @@ public partial struct PlayerSystem : ISystem
     private NativeList<ColliderCastHit> _itemColliders;
     private CollisionFilter _filterItem;
     private LayerStoreComponent _layerStore;
+    private EntityQuery _entityQuery;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         RequireNecessaryComponents(ref state);
         _itemColliders = new NativeList<ColliderCastHit>(Allocator.Persistent);
+        _entityQuery = SystemAPI.QueryBuilder().WithAll<CharacterInfo>().WithNone<Disabled,AddToBuffer>().Build();
     }
     
     [BurstCompile]
@@ -51,6 +54,7 @@ public partial struct PlayerSystem : ISystem
     [BurstCompile]
     private void Move(ref SystemState state)
     {
+        if(_entityQuery.IsEmpty) return;
         _playerMoveInput = SystemAPI.GetSingleton<PlayerInput>();
         _playerAspect = SystemAPI.GetAspect<PlayerAspect>(_playerEntity);
         float2 direct = _playerMoveInput.directMove;

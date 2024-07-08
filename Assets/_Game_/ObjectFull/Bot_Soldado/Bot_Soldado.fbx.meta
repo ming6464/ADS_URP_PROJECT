@@ -44,12 +44,12 @@ ModelImporter:
     meshCompression: 0
     addColliders: 0
     useSRGBMaterialColor: 1
-    sortHierarchyByName: 1
+    sortHierarchyByName: 0
     importPhysicalCameras: 1
     importVisibility: 1
     importBlendShapes: 1
     importCameras: 0
-    importLights: 1
+    importLights: 0
     nodeNameCollisionStrategy: 1
     fileIdsGeneration: 2
     swapUVChannels: 0
@@ -83,15 +83,9 @@ ModelImporter:
     blendShapeNormalImportMode: 1
     normalSmoothingSource: 0
   referencedClips:
+  - a09839d1c7bafa44d8d778a881732cbe
   - 94d83d2fc2e0aad4c85432427d1cc8f7
-  - 8965c507e3ba9ed4d8a2569574e53126
-  - b761a23c9cfed614e8b18834c22cf5e0
-  - 184db4d3917da834a8746f5f4797d1b1
-  - cc2ed9f5aedca2b48a0b1ef2619a551a
-  - ace77a5963580d648bfe624882cdc98a
   - c4345e97defff41498d0a54cec372ed6
-  - b61716b728cef234997f54f8ca5bb1c9
-  - 0d0b3b3c1e41145428c2d6027987c852
   importAnimation: 1
   humanDescription:
     serializedVersion: 3

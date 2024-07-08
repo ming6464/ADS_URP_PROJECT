@@ -5,7 +5,6 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
 
 namespace _Game_.Scripts.Systems.Player
 {
@@ -18,13 +17,13 @@ namespace _Game_.Scripts.Systems.Player
         private NativeQueue<Entity> _characterDieQueue;
         private EntityQuery _enQueryMove;
         private EntityQuery _enQueryCharacterMove;
-        private Entity _entityPlayerInfo;
         private bool _isInit;
         private float _characterMoveToWardChangePos;
         private PlayerProperty _playerProperty;
         private NativeList<TargetInfo> _targetNears;
         private PlayerInput _playerMoveInput;
         private float2 _currentDirectMove;
+        private float _divisionAngle;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -57,8 +56,8 @@ namespace _Game_.Scripts.Systems.Player
             {
                 _isInit = true;
                 _entityManager = state.EntityManager;
-                _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
                 _playerProperty = SystemAPI.GetSingleton<PlayerProperty>();
+                _divisionAngle = _playerProperty.divisionAngle;
                 _characterMoveToWardChangePos = _playerProperty.speedMoveToNextPoint;
             }
             _playerMoveInput = SystemAPI.GetSingleton<PlayerInput>();
@@ -77,7 +76,7 @@ namespace _Game_.Scripts.Systems.Player
                 _currentDirectMove = _playerMoveInput.directMove;
                 StateID stateID = _currentDirectMove.ComparisionEqual(float2.zero) ? StateID.None : StateID.Run;
                 foreach (var (characterInfo, entity) in SystemAPI.Query<RefRO<CharacterInfo>>().WithEntityAccess()
-                             .WithNone<Disabled>())
+                             .WithNone<Disabled,New,SetActiveSP>())
                 {
                     ecb.AddComponent(entity,new SetActiveSP()
                     {
@@ -89,7 +88,7 @@ namespace _Game_.Scripts.Systems.Player
             {
                 StateID stateID = _currentDirectMove.ComparisionEqual(float2.zero) ? StateID.None : StateID.Run;
                 foreach (var (characterInfo, entity) in SystemAPI.Query<RefRO<CharacterInfo>>().WithEntityAccess()
-                             .WithNone<Disabled>().WithAll<New>())
+                             .WithNone<Disabled,SetActiveSP>().WithAll<New>())
                 {
                     ecb.AddComponent(entity,new SetActiveSP()
                     {
@@ -155,7 +154,7 @@ namespace _Game_.Scripts.Systems.Player
             
             if(check)
             {
-                directRota = MathExt.RotateVector(positionNearest - playerPosition, new float3(0,-(70.0f/distanceNearest),0));
+                directRota = MathExt.RotateVector(positionNearest - playerPosition, new float3(0,-(_divisionAngle/distanceNearest),0));
                 var ratio = 1 - math.clamp((distanceNearest * 1.0f / _playerProperty.distanceAim), 0, 1);
                 moveToWard = math.lerp(_playerProperty.moveToWardMin, _playerProperty.moveToWardMax,ratio);
             }
@@ -170,6 +169,7 @@ namespace _Game_.Scripts.Systems.Player
                 deltaTime = SystemAPI.Time.DeltaTime,
                 directRota = directRota,
                 moveToWard = moveToWard,
+                divisionAngle = _divisionAngle,
             };
             state.Dependency = job.ScheduleParallel(_enQueryCharacterMove, state.Dependency);
             state.Dependency.Complete();
@@ -179,7 +179,6 @@ namespace _Game_.Scripts.Systems.Player
         {
             EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
             _entityTypeHandle.Update(ref state);
-
             var listNextPointEntity = _enQueryMove.ToEntityArray(Allocator.Temp);
             listNextPointEntity.Dispose();
             
@@ -210,13 +209,13 @@ namespace _Game_.Scripts.Systems.Player
                 ecb = ecb.AsParallelWriter(),
                 characterInfoTypeHandle = state.GetComponentTypeHandle<CharacterInfo>(),
                 entityTypeHandle = _entityTypeHandle,
-                time = time,
                 takeDamageTypeHandle = state.GetComponentTypeHandle<TakeDamage>(),
                 characterDieQueue = _characterDieQueue.AsParallelWriter(),
+                ltwTypeHandle = state.GetComponentTypeHandle<LocalToWorld>(),
+                ltTypeHandle = state.GetComponentTypeHandle<LocalTransform>()
             };
             state.Dependency = job.ScheduleParallel(_enQueryCharacterTakeDamage, state.Dependency);
             state.Dependency.Complete();
-            var bufferCharacterDie = _entityManager.GetBuffer<BufferCharacterDie>(_entityPlayerInfo);
             while (_characterDieQueue.TryDequeue(out var queue))
             {
                 ecb.AddComponent(queue, new SetActiveSP()
@@ -225,10 +224,7 @@ namespace _Game_.Scripts.Systems.Player
                     startTime = time,
                 });
                 
-                bufferCharacterDie.Add(new BufferCharacterDie()
-                {
-                    entity = queue,
-                });
+                ecb.AddComponent<AddToBuffer>(queue);
             }
             ecb.Playback(_entityManager);
             ecb.Dispose();
@@ -253,6 +249,7 @@ namespace _Game_.Scripts.Systems.Player
             [ReadOnly] public float deltaTime;
             [ReadOnly] public float3 directRota;
             [ReadOnly] public float moveToWard;
+            [ReadOnly] public float divisionAngle;
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var lts = chunk.GetNativeArray(ref ltComponentType);
@@ -290,7 +287,7 @@ namespace _Game_.Scripts.Systems.Player
 
                 if (check)
                 {
-                    directRef = MathExt.RotateVector(nearestEnemyPosition - characterPos,new float3(0, - (31/disNearest),0));
+                    directRef = MathExt.RotateVector(nearestEnemyPosition - characterPos,new float3(0, - (divisionAngle/disNearest),0));
                     var ratio = 1 - math.clamp((disNearest - playerProperty.distanceAim), 0, 1);
                     moveToWardRef = math.lerp(playerProperty.moveToWardMin, playerProperty.moveToWardMax, ratio);
                 }
@@ -304,7 +301,8 @@ namespace _Game_.Scripts.Systems.Player
             public EntityCommandBuffer.ParallelWriter ecb;
             public ComponentTypeHandle<CharacterInfo> characterInfoTypeHandle;
             public EntityTypeHandle entityTypeHandle;
-            [ReadOnly] public float time;
+            public ComponentTypeHandle<LocalTransform> ltTypeHandle;
+            public ComponentTypeHandle<LocalToWorld> ltwTypeHandle;
             [ReadOnly] public ComponentTypeHandle<TakeDamage> takeDamageTypeHandle;
             [ReadOnly] public float characterRadius;
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
@@ -312,6 +310,8 @@ namespace _Game_.Scripts.Systems.Player
                 var characterInfos = chunk.GetNativeArray(ref characterInfoTypeHandle);
                 var takeDamages = chunk.GetNativeArray(ref takeDamageTypeHandle);
                 var entities = chunk.GetNativeArray(entityTypeHandle);
+                var ltws = chunk.GetNativeArray(ref ltwTypeHandle);
+                var lts = chunk.GetNativeArray(ref ltTypeHandle);
                 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -323,6 +323,10 @@ namespace _Game_.Scripts.Systems.Player
                     ecb.RemoveComponent<TakeDamage>(unfilteredChunkIndex,entity);
                     if (info.hp <= 0)
                     {
+                        var lt = lts[i];
+                        lt.Position = ltws[i].Position;
+                        ecb.RemoveComponent<Parent>(unfilteredChunkIndex,entity);
+                        lts[i] = lt;
                         characterDieQueue.Enqueue(entity);
                         if (!info.weaponEntity.Equals(default))
                         {
@@ -362,7 +366,7 @@ namespace _Game_.Scripts.Systems.Player
                     if (lt.Position.ComparisionEqual(nextPoint))
                     {
                         ecb.RemoveComponent<NextPoint>(unfilteredChunkIndex,entities[i]);
-                        return;
+                        continue;
                     }
 
                     lt.Position =MathExt.MoveTowards(lt.Position, nextPoint, deltaTime * moveToWardValue);

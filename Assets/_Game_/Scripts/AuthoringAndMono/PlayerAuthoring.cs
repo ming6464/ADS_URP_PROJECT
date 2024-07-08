@@ -23,6 +23,8 @@ public class PlayerAuthoring : MonoBehaviour
     public float2 spaceGrid;
     //
     public int idWeaponDefault;
+    //
+    public float divisionAngle;
     
     
     
@@ -49,6 +51,7 @@ public class PlayerAuthoring : MonoBehaviour
                 rotaAngleMax = authoring.rotaAngleMax,
                 hp = authoring.hp,
                 aimNearestEnemy = authoring.aimNearestEnemy,
+                divisionAngle = authoring.divisionAngle,
             });
         
             AddComponent(entity, new PlayerInput

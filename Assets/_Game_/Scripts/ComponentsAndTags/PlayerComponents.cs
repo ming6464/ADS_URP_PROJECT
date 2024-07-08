@@ -19,7 +19,7 @@ public struct PlayerProperty : IComponentData
     public float speedMoveToNextPoint;
     public float rotaAngleMax;
     public bool aimNearestEnemy;
-
+    public float divisionAngle;
 }
 
 public struct PlayerInfo : IComponentData

@@ -37,7 +37,7 @@ MonoBehaviour:
     damage: 20
     speed: 90
     cooldown: 0.5
-    bulletPerShot: 20
+    bulletPerShot: 15
     spaceAnglePerBullet: 2
     spacePerBullet: 0.2
     parallelOrbit: 1
