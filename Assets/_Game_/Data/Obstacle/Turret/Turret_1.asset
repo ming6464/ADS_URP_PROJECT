@@ -25,6 +25,6 @@ MonoBehaviour:
   speed: 80
   damage: 10
   cooldown: 0.1
-  distanceAim: 100
-  moveToWardMax: 10
-  moveToWardMin: 200
+  distanceAim: 200
+  moveToWardMax: 50
+  moveToWardMin: 300

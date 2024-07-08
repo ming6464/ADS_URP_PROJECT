@@ -31,3 +31,12 @@ MonoBehaviour:
     attackRange: 0.5
     delayAttack: 0.5
     chasingRange: 0
+  - id: 2
+    prefab: {fileID: 4746968753296184693, guid: 65118d20dd891b144a020405204e8cc5,
+      type: 3}
+    hp: 12
+    speed: 3.5
+    damage: 5
+    attackRange: 0.5
+    delayAttack: 0.5
+    chasingRange: 0

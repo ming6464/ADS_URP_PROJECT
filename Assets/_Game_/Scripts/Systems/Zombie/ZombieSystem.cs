@@ -1,10 +1,9 @@
-﻿﻿using Unity.Burst;
+﻿using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup)),UpdateBefore(typeof(AnimationSystem))]
 [BurstCompile]
@@ -24,7 +23,6 @@ public partial struct ZombieSystem : ISystem
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
-        state.RequireForUpdate<PlayerInfo>();
         RequireNecessaryComponents(ref state);
         Init(ref state);
     }
@@ -40,6 +38,7 @@ public partial struct ZombieSystem : ISystem
     [BurstCompile]
     private void RequireNecessaryComponents(ref SystemState state)
     {
+        state.RequireForUpdate<PlayerInfo>();
         state.RequireForUpdate<ZombieProperty>();
         state.RequireForUpdate<ActiveZoneProperty>();
         state.RequireForUpdate<ZombieInfo>();
@@ -57,13 +56,9 @@ public partial struct ZombieSystem : ISystem
     public void OnUpdate(ref SystemState state)
     {
         CheckAndInit(ref state);
-        var ecb = new EntityCommandBuffer(Allocator.TempJob);
         Move(ref state);
-        CheckAttackPlayer(ref state,ref ecb);
-        CheckZombieToDeadZone(ref state, ref ecb);
-        state.Dependency.Complete();
-        ecb.Playback(state.EntityManager);
-        ecb.Dispose();
+        CheckAttackPlayer(ref state);
+        CheckZombieToDeadZone(ref state);
     }
     [BurstCompile]
     private void CheckAndInit(ref SystemState state)
@@ -81,8 +76,9 @@ public partial struct ZombieSystem : ISystem
         }
     }
     [BurstCompile]
-    private void CheckAttackPlayer(ref SystemState state,ref EntityCommandBuffer ecb)
+    private void CheckAttackPlayer(ref SystemState state)
     {
+        var ecb = new EntityCommandBuffer(Allocator.TempJob);
         _takeDamageQueue.Clear();
         _characterSetTakeDamages.Clear();
 
@@ -96,7 +92,6 @@ public partial struct ZombieSystem : ISystem
         }
 
         var playerPosition = SystemAPI.GetComponentRO<LocalToWorld>(_entityPlayerInfo).ValueRO.Position;
-        
         var job = new CheckAttackPlayerJOB()
         {
             characterSetTakeDamages = _characterSetTakeDamages,
@@ -110,7 +105,6 @@ public partial struct ZombieSystem : ISystem
         };
         state.Dependency = job.ScheduleParallel(_enQueryZombie, state.Dependency);
         state.Dependency.Complete();
-        
         NativeHashMap<int, float> characterTakeDamageMap =
             new NativeHashMap<int, float>(_takeDamageQueue.Count, Allocator.Temp);
         while(_takeDamageQueue.TryDequeue(out var queue))
@@ -134,6 +128,8 @@ public partial struct ZombieSystem : ISystem
             });
         }
         characterTakeDamageMap.Dispose();
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
     }
     
     [BurstCompile]
@@ -164,8 +160,9 @@ public partial struct ZombieSystem : ISystem
     }
 
     [BurstCompile]
-    private void CheckZombieToDeadZone(ref SystemState state, ref EntityCommandBuffer ecb)
+    private void CheckZombieToDeadZone(ref SystemState state)
     {
+        var ecb = new EntityCommandBuffer(Allocator.TempJob);
         _entityTypeHandle.Update(ref state);
         var chunkJob = new CheckDeadZoneJOB
         {
@@ -178,6 +175,8 @@ public partial struct ZombieSystem : ISystem
         };
         state.Dependency = chunkJob.ScheduleParallel(_enQueryZombie, state.Dependency);
         state.Dependency.Complete();
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
     }
 
     
