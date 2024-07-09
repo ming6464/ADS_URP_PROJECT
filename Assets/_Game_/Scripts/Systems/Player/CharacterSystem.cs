@@ -50,7 +50,7 @@ namespace _Game_.Scripts.Systems.Player
             _characterDieQueue = new NativeQueue<Entity>(Allocator.Persistent);
             _enQueryMove = SystemAPI.QueryBuilder().WithAll<CharacterInfo, NextPoint>().WithNone<Disabled, SetActiveSP>()
                 .Build();
-            _enQueryCharacterMove = SystemAPI.QueryBuilder().WithAll<CharacterInfo>().WithNone<Disabled, SetActiveSP>()
+            _enQueryCharacterMove = SystemAPI.QueryBuilder().WithAll<CharacterInfo>().WithNone<Disabled, SetActiveSP,AddToBuffer>()
                 .Build();
             _targetNears = new NativeList<TargetInfo>(Allocator.Persistent);
         }
@@ -98,9 +98,9 @@ namespace _Game_.Scripts.Systems.Player
                 _currentDirectMove = _playerMoveInput.directMove;
                 StateID stateID = _currentDirectMove.ComparisionEqual(float2.zero) ? StateID.None : StateID.Run;
                 foreach (var (characterInfo, entity) in SystemAPI.Query<RefRO<CharacterInfo>>().WithEntityAccess()
-                             .WithNone<Disabled,New,SetActiveSP>())
+                             .WithNone<Disabled,New,SetAnimationSP>())
                 {
-                    ecb.AddComponent(entity,new SetActiveSP()
+                    ecb.AddComponent(entity,new SetAnimationSP()
                     {
                         state = stateID,
                     });
@@ -110,9 +110,9 @@ namespace _Game_.Scripts.Systems.Player
             {
                 StateID stateID = _currentDirectMove.ComparisionEqual(float2.zero) ? StateID.None : StateID.Run;
                 foreach (var (characterInfo, entity) in SystemAPI.Query<RefRO<CharacterInfo>>().WithEntityAccess()
-                             .WithNone<Disabled,SetActiveSP>().WithAll<New>())
+                             .WithNone<Disabled,SetAnimationSP>().WithAll<New>())
                 {
-                    ecb.AddComponent(entity,new SetActiveSP()
+                    ecb.AddComponent(entity,new SetAnimationSP()
                     {
                         state = stateID,
                     });
@@ -130,13 +130,12 @@ namespace _Game_.Scripts.Systems.Player
             var distanceNearest = _playerProperty.distanceAim;
             var positionNearest = float3.zero;
             var moveToWard = _playerProperty.moveToWardMax;
-
             bool check = false;
 
             if (_playerProperty.aimNearestEnemy)
             {
                 foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAny<ZombieInfo,ItemCanShoot>()
-                             .WithNone<Disabled, SetActiveSP>())
+                             .WithNone<Disabled, SetActiveSP,AddToBuffer>())
                 {
                     var posTarget = ltw.ValueRO.Position;
                     float distance = math.distance(playerPosition, posTarget);
@@ -247,10 +246,10 @@ namespace _Game_.Scripts.Systems.Player
             state.Dependency.Complete();
             while (_characterDieQueue.TryDequeue(out var queue))
             {
-                ecb.AddComponent(queue, new SetActiveSP()
+                ecb.AddComponent(queue, new SetAnimationSP()
                 {
                     state = StateID.Wait,
-                    startTime = time,
+                    timeDelay = 4,
                 });
                 
                 ecb.AddComponent<AddToBuffer>(queue);
@@ -362,7 +361,7 @@ namespace _Game_.Scripts.Systems.Player
                             ecb.RemoveComponent<Parent>(unfilteredChunkIndex,info.weaponEntity);
                             ecb.AddComponent(unfilteredChunkIndex,info.weaponEntity,new SetActiveSP()
                             {
-                                state = StateID.Disable,
+                                state = DisableID.Disable,
                             });
                         }
                         

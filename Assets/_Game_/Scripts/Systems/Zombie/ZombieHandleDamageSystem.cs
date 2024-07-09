@@ -48,7 +48,7 @@ namespace _Game.Scripts.Systems.Zombie
                 zombieInfoComponentType = _zombieInfoComponentType,
                 entityTypeHandle = _entityTypeHandle,
                 takeDamageComponentType = _takeDamageComponentType,
-                time = (float)SystemAPI.Time.ElapsedTime
+                timeDelay = 4
             };
             state.Dependency = job.ScheduleParallel(_queryZombieTakeDamage, state.Dependency);
         }
@@ -59,7 +59,7 @@ namespace _Game.Scripts.Systems.Zombie
             public EntityCommandBuffer.ParallelWriter ecb;
             public ComponentTypeHandle<ZombieInfo> zombieInfoComponentType;
             public EntityTypeHandle entityTypeHandle;
-            [ReadOnly] public float time;
+            [ReadOnly] public float timeDelay;
             [ReadOnly] public ComponentTypeHandle<TakeDamage> takeDamageComponentType;
             
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
@@ -67,10 +67,10 @@ namespace _Game.Scripts.Systems.Zombie
                 var zombieInfos = chunk.GetNativeArray(ref zombieInfoComponentType);
                 var takeDamages = chunk.GetNativeArray(ref takeDamageComponentType);
                 var entities = chunk.GetNativeArray(entityTypeHandle);
-                var setActive = new SetActiveSP()
+                var setActive = new SetAnimationSP()
                 {
                     state = StateID.Wait,
-                    startTime = time,
+                    timeDelay = timeDelay,
                 };
                 var addToBuffer = new AddToBuffer();
                 

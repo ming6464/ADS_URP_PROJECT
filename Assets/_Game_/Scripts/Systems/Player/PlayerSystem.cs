@@ -102,7 +102,7 @@ public partial struct PlayerSystem : ISystem
             });
             ecb.AddComponent(entityItem,new SetActiveSP()
             {
-                state = StateID.DestroyAll,
+                state = DisableID.DestroyAll,
             });
         }
     }

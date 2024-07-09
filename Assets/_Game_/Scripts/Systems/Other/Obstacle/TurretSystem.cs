@@ -45,7 +45,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
             float time = (float)SystemAPI.Time.ElapsedTime;
             var setActiveComponent = new SetActiveSP()
             {
-                state = StateID.Disable,
+                state = DisableID.Disable,
             };
             foreach (var (turret,entity) in SystemAPI.Query<RefRO<TurretInfo>>().WithEntityAccess().WithNone<Disabled, SetActiveSP>())
             {

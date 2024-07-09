@@ -100,7 +100,7 @@ namespace _Game_.Scripts.Systems.Other
                     });
                     ecb.AddComponent(entity,new SetActiveSP()
                     {
-                        state = StateID.DestroyAll
+                        state = DisableID.DestroyAll
                     });
                 }
             }
@@ -120,7 +120,7 @@ namespace _Game_.Scripts.Systems.Other
                         SpawnTurret(ref state,ref ecb,collection.ValueRO);
                         ecb.AddComponent(entity,new SetActiveSP()
                         {
-                            state = StateID.Disable
+                            state = DisableID.Disable
                         });
                         break;
                 }

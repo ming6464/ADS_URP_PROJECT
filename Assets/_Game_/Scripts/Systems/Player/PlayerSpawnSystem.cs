@@ -96,7 +96,7 @@ public partial struct PlayerSpawnSystem : ISystem
                     spawnChange = CalculateNumberPlayer(collection.ValueRO.operation,collection.ValueRO.count);
                     ecb.AddComponent(entity,new SetActiveSP()
                     {
-                        state = StateID.Disable,
+                        state = DisableID.Disable,
                     });
                     break;
             }

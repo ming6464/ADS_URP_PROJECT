@@ -13,6 +13,7 @@ public partial class AnimationSystem : SystemBase
 {
     private readonly FastAnimatorParameter _dieAnimatorParameter = new("Die");
     private readonly FastAnimatorParameter _runAnimatorParameter = new("Run");
+    private readonly FastAnimatorParameter _attackAnimatorParameter = new("Attack");
     private LayerStoreComponent _layerStoreComponent;
     private bool _isInit;
 
@@ -45,7 +46,7 @@ public partial class AnimationSystem : SystemBase
         {
             runAnimatorParameter = _runAnimatorParameter,
             ecb = ecb.AsParallelWriter(),
-            time = (float)SystemAPI.Time.ElapsedTime,
+            timeDelta = (float)SystemAPI.Time.DeltaTime,
             dieAnimatorParameter = _dieAnimatorParameter,
         };
         Dependency = characterAnimJob.ScheduleParallel(Dependency);
@@ -56,15 +57,20 @@ public partial class AnimationSystem : SystemBase
 
     private void AnimationZombieHandle()
     {
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         var zombieAnimatorJob = new ProcessAnimZombie()
         {
             dieAnimatorParameter = _dieAnimatorParameter,
-            time = (float)SystemAPI.Time.ElapsedTime,
+            timeDelta = (float)SystemAPI.Time.DeltaTime,
             enemyLayer = _layerStoreComponent.enemyLayer,
-            enemyDieLayer = _layerStoreComponent.enemyDieLayer
+            enemyDieLayer = _layerStoreComponent.enemyDieLayer,
+            attackAnimatorParameter = _attackAnimatorParameter,
+            ecb = ecb.AsParallelWriter()
         };
         Dependency = zombieAnimatorJob.ScheduleParallel(Dependency);
         Dependency.Complete();
+        ecb.Playback(EntityManager);
+        ecb.Dispose();
     }
 
 
@@ -72,37 +78,41 @@ public partial class AnimationSystem : SystemBase
     partial struct ProcessAnimCharacter : IJobEntity
     {
         public EntityCommandBuffer.ParallelWriter ecb;
-        [ReadOnly] public float time;
+        [ReadOnly] public float timeDelta;
         [ReadOnly] public FastAnimatorParameter runAnimatorParameter;
         [ReadOnly] public FastAnimatorParameter dieAnimatorParameter;
 
-        void Execute(in CharacterInfo characterInfo, ref SetActiveSP setActiveSp, Entity entity,
-            [EntityIndexInQuery] int queryIndex, AnimatorParametersAspect parametersAspect)
+        void Execute(in CharacterInfo characterInfo, ref SetAnimationSP setActiveSp, Entity entity,
+            [EntityIndexInQuery] int indexQuery, AnimatorParametersAspect parametersAspect)
         {
+            setActiveSp.timeDelay -= timeDelta;
             switch (setActiveSp.state)
             {
                 case StateID.Enable:
                     parametersAspect.SetBoolParameter(dieAnimatorParameter, false);
-                    ecb.RemoveComponent<SetActiveSP>(queryIndex, entity);
+                    ecb.RemoveComponent<SetAnimationSP>(indexQuery, entity);
                     break;
                 case StateID.None:
                     parametersAspect.SetBoolParameter(runAnimatorParameter, false);
-                    ecb.RemoveComponent<SetActiveSP>(queryIndex, entity);
+                    ecb.RemoveComponent<SetAnimationSP>(indexQuery, entity);
                     break;
                 case StateID.Run:
                     parametersAspect.SetBoolParameter(runAnimatorParameter, true);
-                    ecb.RemoveComponent<SetActiveSP>(queryIndex, entity);
+                    ecb.RemoveComponent<SetAnimationSP>(indexQuery, entity);
                     break;
                 case StateID.Wait:
                     parametersAspect.SetBoolParameter(dieAnimatorParameter, true);
                     setActiveSp.state = StateID.WaitAnimation;
                     break;
                 case StateID.WaitAnimation:
-                    if (time - setActiveSp.startTime > 4)
+                    if (setActiveSp.timeDelay <= 0)
                     {
-                        setActiveSp.state = StateID.Disable;
+                        ecb.RemoveComponent<SetAnimationSP>(indexQuery,entity);
+                        ecb.AddComponent(indexQuery, entity, new SetActiveSP()
+                        {
+                            state = DisableID.Disable,
+                        });
                     }
-
                     break;
             }
         }
@@ -111,34 +121,50 @@ public partial class AnimationSystem : SystemBase
     [BurstCompile]
     partial struct ProcessAnimZombie : IJobEntity
     {
+        public EntityCommandBuffer.ParallelWriter ecb;
         [ReadOnly] public FastAnimatorParameter dieAnimatorParameter;
-        [ReadOnly] public float time;
+        [ReadOnly] public FastAnimatorParameter attackAnimatorParameter;
+        [ReadOnly] public float timeDelta;
         [ReadOnly] public uint enemyLayer;
         [ReadOnly] public uint enemyDieLayer;
 
-        void Execute(in ZombieInfo zombieInfo, ref SetActiveSP disableSp, AnimatorParametersAspect parametersAspect,
+        void Execute(in ZombieInfo zombieInfo, ref SetAnimationSP setAnimation,Entity entity,[EntityIndexInQuery]int indexQuery  , AnimatorParametersAspect parametersAspect,
             ref PhysicsCollider physicsCollider)
         {
+            setAnimation.timeDelay -= timeDelta;
             var colliderFilter = physicsCollider.Value.Value.GetCollisionFilter();
-            switch (disableSp.state)
+            switch (setAnimation.state)
             {
                 case StateID.Enable:
                     parametersAspect.SetBoolParameter(dieAnimatorParameter, false);
+                    // parametersAspect.SetBoolParameter(attackAnimatorParameter, false);
                     colliderFilter.BelongsTo = enemyLayer;
                     physicsCollider.Value.Value.SetCollisionFilter(colliderFilter);
+                    ecb.RemoveComponent<SetAnimationSP>(indexQuery,entity);
                     break;
                 case StateID.Wait:
                     parametersAspect.SetBoolParameter(dieAnimatorParameter, true);
-                    disableSp.state = StateID.WaitAnimation;
+                    setAnimation.state = StateID.WaitAnimation;
                     colliderFilter.BelongsTo = enemyDieLayer;
                     physicsCollider.Value.Value.SetCollisionFilter(colliderFilter);
                     break;
                 case StateID.WaitAnimation:
-                    if ((time - disableSp.startTime) > 4)
+                    if (setAnimation.timeDelay <= 0)
                     {
-                        disableSp.state = StateID.Disable;
+                        ecb.RemoveComponent<SetAnimationSP>(indexQuery,entity);
+                        ecb.AddComponent(indexQuery, entity, new SetActiveSP()
+                        {
+                            state = DisableID.Disable,
+                        });
                     }
-
+                    break;
+                case StateID.Attack:
+                    parametersAspect.SetBoolParameter(attackAnimatorParameter, true);
+                    if (setAnimation.timeDelay <= 0)
+                    {
+                        ecb.RemoveComponent<SetAnimationSP>(indexQuery,entity);
+                        parametersAspect.SetBoolParameter(attackAnimatorParameter, false);
+                    }
                     break;
             }
         }
@@ -261,14 +287,14 @@ public partial struct HandleSetActiveSystem : ISystem
             }
         }
 
-        private bool HandleState(StateID state, Entity entity, int chunkIndex)
+        private bool HandleState(DisableID state, Entity entity, int chunkIndex)
         {
             switch (state)
             {
-                case StateID.Disable:
+                case DisableID.Disable:
                     ecb.SetEnabled(chunkIndex, entity, false);
                     return true;
-                case StateID.Enable:
+                case DisableID.Enable:
                     if (linkedGroupBufferLookup.HasBuffer(entity))
                     {
                         var buffer = linkedGroupBufferLookup[entity];
@@ -279,10 +305,10 @@ public partial struct HandleSetActiveSystem : ISystem
                     }
 
                     return true;
-                case StateID.Destroy:
+                case DisableID.Destroy:
                     ecb.DestroyEntity(chunkIndex, entity);
                     return true;
-                case StateID.DestroyAll:
+                case DisableID.DestroyAll:
                     DestroyAllChildren(entity, chunkIndex);
                     return true;
                 default:
@@ -356,7 +382,7 @@ public partial struct HandlePoolZombie : ISystem
     public void OnUpdate(ref SystemState state)
     {
         _entityManager = state.EntityManager;
-        CheckAndInit(ref state);
+        CheckAndInit();
         LoadZombieToPool(ref state);
     }
 
@@ -393,7 +419,7 @@ public partial struct HandlePoolZombie : ISystem
     }
 
     [BurstCompile]
-    private void CheckAndInit(ref SystemState state)
+    private void CheckAndInit()
     {
         if (!_isInit)
         {
@@ -447,112 +473,112 @@ public partial struct HandlePoolZombie : ISystem
 //
 //
 
-[BurstCompile, UpdateInGroup(typeof(PresentationSystemGroup)), UpdateAfter(typeof(HandleSetActiveSystem))]
-public partial struct HandlePoolCharacter : ISystem
-{
-    private NativeList<BufferCharacterDie> _characterDieToPoolList;
-    private Entity _entityPlayerInfo;
-    private EntityQuery _entityQuery;
-    private EntityTypeHandle _entityTypeHandle;
-    private EntityManager _entityManager;
-    private bool _isInit;
-
-    private int _currentCountCharacterDie;
-    private int _passCountCharacterDie;
-    private int _countCheck;
-
-    [BurstCompile]
-    public void OnCreate(ref SystemState state)
-    {
-        state.RequireForUpdate<CharacterInfo>();
-        state.RequireForUpdate<AddToBuffer>();
-        state.RequireForUpdate<Disabled>();
-        _countCheck = 20;
-        _entityQuery = SystemAPI.QueryBuilder().WithAll<CharacterInfo, AddToBuffer, Disabled>().Build();
-        _entityTypeHandle = state.GetEntityTypeHandle();
-    }
-
-    [BurstCompile]
-    public void OnDestroy(ref SystemState state)
-    {
-        if (_characterDieToPoolList.IsCreated)
-            _characterDieToPoolList.Dispose();
-    }
-
-    [BurstCompile]
-    public void OnUpdate(ref SystemState state)
-    {
-        return;
-        _entityManager = state.EntityManager;
-        if (!_isInit)
-        {
-            _isInit = true;
-            _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
-            _currentCountCharacterDie = 0;
-            _characterDieToPoolList =
-                new NativeList<BufferCharacterDie>(_currentCountCharacterDie, Allocator.Persistent);
-        }
-
-        if (_currentCountCharacterDie - _passCountCharacterDie < _countCheck)
-        {
-            _characterDieToPoolList.Dispose();
-            _currentCountCharacterDie = _passCountCharacterDie + _countCheck;
-            _characterDieToPoolList =
-                new NativeList<BufferCharacterDie>(_currentCountCharacterDie, Allocator.Persistent);
-            return;
-        }
-        else
-        {
-            _characterDieToPoolList.Clear();
-        }
-
-        _entityTypeHandle.Update(ref state);
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
-        var job = new GetListCharacterDataToPool()
-        {
-            characterDieToPoolList = _characterDieToPoolList.AsParallelWriter(),
-            entityTypeHandle = _entityTypeHandle,
-            ecb = ecb.AsParallelWriter(),
-        };
-        state.Dependency = job.ScheduleParallel(_entityQuery, state.Dependency);
-        state.Dependency.Complete();
-        ecb.Playback(_entityManager);
-        ecb.Dispose();
-
-        if (_countCheck < (_characterDieToPoolList.Length - _passCountCharacterDie))
-        {
-            _countCheck = _characterDieToPoolList.Length - _passCountCharacterDie + 10;
-        }
-
-        _passCountCharacterDie = _characterDieToPoolList.Length;
-        _entityManager.GetBuffer<BufferCharacterDie>(_entityPlayerInfo).AddRange(_characterDieToPoolList);
-    }
-
-    [BurstCompile]
-    partial struct GetListCharacterDataToPool : IJobChunk
-    {
-        public EntityCommandBuffer.ParallelWriter ecb;
-        [WriteOnly] public NativeList<BufferCharacterDie>.ParallelWriter characterDieToPoolList;
-        [ReadOnly] public EntityTypeHandle entityTypeHandle;
-
-        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
-            in v128 chunkEnabledMask)
-        {
-            var entities = chunk.GetNativeArray(entityTypeHandle);
-
-            for (int i = 0; i < chunk.Count; i++)
-            {
-                var entity = entities[i];
-                characterDieToPoolList.AddNoResize(new BufferCharacterDie()
-                {
-                    entity = entity,
-                });
-            }
-
-            ecb.RemoveComponent<AddToBuffer>(unfilteredChunkIndex, entities);
-        }
-    }
-}
+// [BurstCompile, UpdateInGroup(typeof(PresentationSystemGroup)), UpdateAfter(typeof(HandleSetActiveSystem))]
+// public partial struct HandlePoolCharacter : ISystem
+// {
+//     private NativeList<BufferCharacterDie> _characterDieToPoolList;
+//     private Entity _entityPlayerInfo;
+//     private EntityQuery _entityQuery;
+//     private EntityTypeHandle _entityTypeHandle;
+//     private EntityManager _entityManager;
+//     private bool _isInit;
+//
+//     private int _currentCountCharacterDie;
+//     private int _passCountCharacterDie;
+//     private int _countCheck;
+//
+//     [BurstCompile]
+//     public void OnCreate(ref SystemState state)
+//     {
+//         state.RequireForUpdate<CharacterInfo>();
+//         state.RequireForUpdate<AddToBuffer>();
+//         state.RequireForUpdate<Disabled>();
+//         _countCheck = 20;
+//         _entityQuery = SystemAPI.QueryBuilder().WithAll<CharacterInfo, AddToBuffer, Disabled>().Build();
+//         _entityTypeHandle = state.GetEntityTypeHandle();
+//     }
+//
+//     [BurstCompile]
+//     public void OnDestroy(ref SystemState state)
+//     {
+//         if (_characterDieToPoolList.IsCreated)
+//             _characterDieToPoolList.Dispose();
+//     }
+//
+//     [BurstCompile]
+//     public void OnUpdate(ref SystemState state)
+//     {
+//         return;
+//         _entityManager = state.EntityManager;
+//         if (!_isInit)
+//         {
+//             _isInit = true;
+//             _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
+//             _currentCountCharacterDie = 0;
+//             _characterDieToPoolList =
+//                 new NativeList<BufferCharacterDie>(_currentCountCharacterDie, Allocator.Persistent);
+//         }
+//
+//         if (_currentCountCharacterDie - _passCountCharacterDie < _countCheck)
+//         {
+//             _characterDieToPoolList.Dispose();
+//             _currentCountCharacterDie = _passCountCharacterDie + _countCheck;
+//             _characterDieToPoolList =
+//                 new NativeList<BufferCharacterDie>(_currentCountCharacterDie, Allocator.Persistent);
+//             return;
+//         }
+//         else
+//         {
+//             _characterDieToPoolList.Clear();
+//         }
+//
+//         _entityTypeHandle.Update(ref state);
+//         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+//         var job = new GetListCharacterDataToPool()
+//         {
+//             characterDieToPoolList = _characterDieToPoolList.AsParallelWriter(),
+//             entityTypeHandle = _entityTypeHandle,
+//             ecb = ecb.AsParallelWriter(),
+//         };
+//         state.Dependency = job.ScheduleParallel(_entityQuery, state.Dependency);
+//         state.Dependency.Complete();
+//         ecb.Playback(_entityManager);
+//         ecb.Dispose();
+//
+//         if (_countCheck < (_characterDieToPoolList.Length - _passCountCharacterDie))
+//         {
+//             _countCheck = _characterDieToPoolList.Length - _passCountCharacterDie + 10;
+//         }
+//
+//         _passCountCharacterDie = _characterDieToPoolList.Length;
+//         _entityManager.GetBuffer<BufferCharacterDie>(_entityPlayerInfo).AddRange(_characterDieToPoolList);
+//     }
+//
+//     [BurstCompile]
+//     partial struct GetListCharacterDataToPool : IJobChunk
+//     {
+//         public EntityCommandBuffer.ParallelWriter ecb;
+//         [WriteOnly] public NativeList<BufferCharacterDie>.ParallelWriter characterDieToPoolList;
+//         [ReadOnly] public EntityTypeHandle entityTypeHandle;
+//
+//         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
+//             in v128 chunkEnabledMask)
+//         {
+//             var entities = chunk.GetNativeArray(entityTypeHandle);
+//
+//             for (int i = 0; i < chunk.Count; i++)
+//             {
+//                 var entity = entities[i];
+//                 characterDieToPoolList.AddNoResize(new BufferCharacterDie()
+//                 {
+//                     entity = entity,
+//                 });
+//             }
+//
+//             ecb.RemoveComponent<AddToBuffer>(unfilteredChunkIndex, entities);
+//         }
+//     }
+// }
 
 //
 [BurstCompile, UpdateInGroup(typeof(PresentationSystemGroup))]
@@ -719,7 +745,7 @@ public partial class UpdateHybrid : SystemBase
             {
                 ecb.AddComponent(entity, new SetActiveSP()
                 {
-                    state = StateID.Destroy,
+                    state = DisableID.Destroy,
                 });
             }
             else

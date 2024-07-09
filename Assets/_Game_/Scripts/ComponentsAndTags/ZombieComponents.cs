@@ -57,6 +57,11 @@ public struct ZombieInfo : IComponentData
     public float3 directNormal;
 }
 
+public struct BossInfo : IComponentData
+{
+    
+}
+
 public struct ZombieRuntime : IComponentData
 {
     public float latestTimeAttack;

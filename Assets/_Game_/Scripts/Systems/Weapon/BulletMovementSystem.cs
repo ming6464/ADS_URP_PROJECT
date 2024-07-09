@@ -163,8 +163,7 @@ public partial struct BulletMovementSystem : ISystem
             var bulletInfos = chunk.GetNativeArray(ref bulletInfoTypeHandle);
             var setActiveSP = new SetActiveSP()
             {
-                state = StateID.Disable,
-                startTime = time,
+                state = DisableID.Disable,
             };
 
             var eff = new EffectComponent();

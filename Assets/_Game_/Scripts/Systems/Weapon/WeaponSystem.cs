@@ -121,7 +121,7 @@ public partial struct WeaponSystem : ISystem
                 case ItemType.Weapon:
                     ecb.AddComponent(entity,new SetActiveSP()
                     {
-                        state = StateID.Disable,
+                        state = DisableID.Disable,
                     });
                     if(_idCurrentWeapon == collection.ValueRO.id) continue;
                     ChangeWeapon(collection.ValueRO.id,ref ecb);
@@ -183,7 +183,7 @@ public partial struct WeaponSystem : ISystem
                 ecb.RemoveComponent<Parent>(entity);
                 ecb.AddComponent(entity,new SetActiveSP()
                 {
-                    state = StateID.Disable,
+                    state = DisableID.Disable,
                 });
             }
             _isNewWeapon = false;

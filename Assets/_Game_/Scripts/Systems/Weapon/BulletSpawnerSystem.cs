@@ -1,16 +1,14 @@
-﻿using _Game_.Scripts.Systems.Other.Obstacle;
-using Unity.Burst;
+﻿using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
 
 namespace _Game_.Scripts.Systems.Weapon
 {
     [BurstCompile, UpdateInGroup(typeof(PresentationSystemGroup))]
-    public partial struct BulletSpawnerSystem : ISystem
+    public partial struct BulletSpawnerSystem : ISystemSupport
     {
         private EntityManager _entityManager;
         private Entity _entityWeaponAuthoring;
@@ -18,11 +16,17 @@ namespace _Game_.Scripts.Systems.Weapon
         private bool _isInit;
         private WeaponProperty _weaponProperty;
         private float _ratioDamage;
-        
-        [BurstCompile]
+
+        public bool IsInitialized { get; set; }
+
+        public void Init(ref SystemState state) {}
         public void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<WeaponProperty>();
+            
+        }
+
+        public void OnDestroy(ref SystemState state)
+        {
         }
 
         [BurstCompile]
@@ -39,6 +43,11 @@ namespace _Game_.Scripts.Systems.Weapon
 
             CalculateRatioDamage(ref state);
             SpawnBullet(ref state);
+        }
+
+        public void RequireNecessaryComponents(ref SystemState state)
+        {
+            state.RequireForUpdate<WeaponProperty>();
         }
 
         private void CalculateRatioDamage(ref SystemState state)
@@ -76,30 +85,17 @@ namespace _Game_.Scripts.Systems.Weapon
 
                 for (int i = 1; i <= halfNumberPreShot; i++)
                 {
-                    
+                    float space = (i - subtractIndex) * (bulletSpawn.parallelOrbit ? bulletSpawn.spacePerBullet : bulletSpawn.spaceAnglePerBullet);
                     if (bulletSpawn.parallelOrbit)
                     {
-                        float space = (i - subtractIndex) * bulletSpawn.spacePerBullet;
-                        var ltNew = lt;
-                        ltNew.Position = lt.Position + new float3(space,0,0);
-                        InstantiateBullet_L( ltNew, damage, speed, _entityBulletInstantiate);
-                        ltNew.Position = lt.Position + new float3(-space,0,0);
-                        InstantiateBullet_L( ltNew, damage, speed, _entityBulletInstantiate);
+                        InstantiateParallelBullets_L(bulletSpawn.lt, damage, speed, space,_entityBulletInstantiate);
+                        
                     }
                     else
                     {
-                        float space = (i - subtractIndex) * bulletSpawn.spaceAnglePerBullet;
-                        float3 angleRotaNew = angleRota;
-                        float angle1 = angleRotaNew.y + space;
-                        float angle2 = angleRotaNew.y - space;
-                        angleRotaNew.y = angle1;
-                        lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
-                        InstantiateBullet_L( lt, damage, speed, _entityBulletInstantiate);
-                        angleRotaNew.y = angle2;
-                        lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
-                        InstantiateBullet_L( lt, damage, speed, _entityBulletInstantiate);
+                        InstantiateAngularBullets_L(bulletSpawn.lt, damage, speed, space, angleRota,_entityBulletInstantiate);
+                        
                     }
-                    
                 }
             }
 
@@ -107,6 +103,29 @@ namespace _Game_.Scripts.Systems.Weapon
             bulletSpawnerArr.Dispose();
             _entityManager.GetBuffer<BufferBulletSpawner>(_entityWeaponAuthoring).Clear();
             ecb.Dispose();
+            
+            void InstantiateAngularBullets_L(LocalTransform lt, float damage, float speed, float space, float3 angleRota, Entity entityBulletInstantiate)
+            {
+                float3 angleRotaNew = angleRota;
+                float angle1 = angleRotaNew.y + space;
+                float angle2 = angleRotaNew.y - space;
+                angleRotaNew.y = angle1;
+                lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
+                InstantiateBullet_L( lt, damage, speed, entityBulletInstantiate);
+                angleRotaNew.y = angle2;
+                lt.Rotation = MathExt.Float3ToQuaternion(angleRotaNew);
+                InstantiateBullet_L( lt, damage, speed, entityBulletInstantiate);
+            }
+            
+            void InstantiateParallelBullets_L(LocalTransform lt, float damage, float speed, float space,Entity entityBulletInstantiate)
+            {
+                var ltNew = lt;
+                ltNew.Position = lt.Position + new float3(space,0,0);
+                InstantiateBullet_L( ltNew, damage, speed, entityBulletInstantiate);
+                ltNew.Position = lt.Position + new float3(-space,0,0);
+                InstantiateBullet_L( ltNew, damage, speed, entityBulletInstantiate);
+            }
+            
             void InstantiateBullet_L(LocalTransform lt, float damage, float speed, Entity entityBullet)
             {
                 Entity entity;
@@ -114,7 +133,7 @@ namespace _Game_.Scripts.Systems.Weapon
                 {
                     entity = bufferBulletDisables[0].entity;
                     ecb.RemoveComponent<Disabled>(entity);
-                    ecb.AddComponent(entity, new SetActiveSP { state = StateID.Enable });
+                    ecb.AddComponent(entity, new SetActiveSP { state = DisableID.Enable });
                     bufferBulletDisables.RemoveAt(0);
                 }
                 else
@@ -176,7 +195,7 @@ namespace _Game_.Scripts.Systems.Weapon
                 if (bulletDisableArr.Length > index)
                 {
                     entity = bulletDisableArr[index].entity;
-                    ecb.AddComponent(index, entity, new SetActiveSP { state = StateID.Enable });
+                    ecb.AddComponent(index, entity, new SetActiveSP { state = DisableID.Enable });
                     ecb.RemoveComponent<Disabled>(index, entity);
                 }
                 else

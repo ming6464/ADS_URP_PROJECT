@@ -34,24 +34,36 @@ public struct EffectComponent : IComponentData
 
 public struct SetActiveSP : IComponentData
 {
-    public StateID state;
-    public float startTime;
+    public DisableID state;
 }
 
 
-//Enum
-public enum StateID
+public struct SetAnimationSP : IComponentData
 {
-    None,
-    Wait,
-    WaitAnimation,
+    public StateID state;
+    public float timeDelay;
+}
+
+//Enum
+public enum DisableID
+{
     Disable,
     Enable,
     DisableAll,
     EnableAll,
     Destroy,
     DestroyAll,
-    Run
+}
+
+
+public enum StateID
+{
+    None,
+    Wait,
+    WaitAnimation,
+    Enable,
+    Run,
+    Attack
 }
 
 public enum CameraType
