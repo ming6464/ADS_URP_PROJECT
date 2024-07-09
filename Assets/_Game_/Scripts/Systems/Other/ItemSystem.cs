@@ -13,14 +13,24 @@ namespace _Game_.Scripts.Systems.Other
         private NativeArray<BufferTurretObstacle> _buffetObstacle;
         private EntityManager _entityManager;
         private bool _isInit;
-        private float _time; 
-        
+        private float _time;
+
+        #region OnCreate
+
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
+            RequireNecessaryComponents(ref state);
+        }
+        [BurstCompile]
+        private void RequireNecessaryComponents(ref SystemState state)
+        {
             state.RequireForUpdate<PlayerInfo>();
         }
+
+        #endregion
         
+
         [BurstCompile]
         public void OnDestroy(ref SystemState state)
         {
@@ -33,25 +43,26 @@ namespace _Game_.Scripts.Systems.Other
         {
             if (!_isInit)
             {
-                _entityManager = state.EntityManager;
                 _isInit = true;
-                _buffetObstacle = SystemAPI.GetSingletonBuffer<BufferTurretObstacle>().ToNativeArray(Allocator.Persistent);
-                _time = (float)SystemAPI.Time.ElapsedTime;
+                InitUpdate(ref state);
                 return;
             }
-
             _time += SystemAPI.Time.DeltaTime;
-            
-            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
-            CheckObstacleItem(ref state, ref ecb);
-            CheckItemShooting(ref state, ref ecb);
-            ecb.Playback(_entityManager);
-            ecb.Dispose();
+            CheckObstacleItem(ref state);
+            CheckItemShooting(ref state);
+        }
+
+        private void InitUpdate(ref SystemState state)
+        {
+            _entityManager = state.EntityManager;
+            _buffetObstacle = SystemAPI.GetSingletonBuffer<BufferTurretObstacle>().ToNativeArray(Allocator.Persistent);
+            _time = (float)SystemAPI.Time.ElapsedTime;
         }
 
         [BurstCompile]
-        private void CheckItemShooting(ref SystemState state, ref EntityCommandBuffer ecb) 
+        private void CheckItemShooting(ref SystemState state)
         {
+            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
             foreach (var (itemInfo, takeDamage, entity) in SystemAPI.Query<RefRW<ItemInfo>, RefRO<TakeDamage>>()
                          .WithEntityAccess())
             {
@@ -93,10 +104,13 @@ namespace _Game_.Scripts.Systems.Other
                     });
                 }
             }
+            ecb.Playback(_entityManager);
+            ecb.Dispose();
         }
-
-        private void CheckObstacleItem(ref SystemState state, ref EntityCommandBuffer ecb)
+        [BurstCompile]
+        private void CheckObstacleItem(ref SystemState state)
         {
+            EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
             foreach (var (collection,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess()
                          .WithNone<Disabled, SetActiveSP>())
             {
@@ -112,6 +126,8 @@ namespace _Game_.Scripts.Systems.Other
                 }
                 
             }
+            ecb.Playback(_entityManager);
+            ecb.Dispose();
         }
         [BurstCompile]
         private BufferTurretObstacle GetTurret(int id)

@@ -16,10 +16,8 @@ public partial struct WeaponSystem : ISystem
     private Entity _entityWeaponAuthoring;
     private WeaponProperty _weaponProperties;
     private float _timeLatest;
-    
-    private bool _isSpawnDefault;
-    private bool _isGetComponent;
-    private bool _shootAuto;
+
+    private bool _isInit;
     private bool _pullTrigger;
     private int _idCurrentWeapon;
     private float3 _offset;
@@ -35,94 +33,103 @@ public partial struct WeaponSystem : ISystem
     private EntityQuery _enQueryWeapon;
     private NativeArray<BufferWeaponStore> _weaponStores;
     private NativeQueue<BufferBulletSpawner> _bulletSpawnQueue;
-    
+    private ComponentTypeHandle<LocalToWorld> _ltwTypeHandle;
+
+    #region OnCreate
+
     [BurstCompile]
     public void OnCreate(ref SystemState state)
+    {
+        RequireNecessaryComponents(ref state);
+        Init(ref state);
+    }
+    [BurstCompile]
+    private void Init(ref SystemState state)
+    {
+        _ltwTypeHandle = state.GetComponentTypeHandle<LocalToWorld>();
+        _bulletSpawnQueue = new NativeQueue<BufferBulletSpawner>(Allocator.Persistent);
+        _enQueryWeapon = SystemAPI.QueryBuilder().WithAll<WeaponInfo>().WithNone<Disabled, SetActiveSP>().Build();
+        _idCurrentWeapon = -1;
+    }
+    [BurstCompile]
+    private void RequireNecessaryComponents(ref SystemState state)
     {
         state.RequireForUpdate<PlayerInput>();
         state.RequireForUpdate<WeaponProperty>();
         state.RequireForUpdate<PlayerInfo>();
         state.RequireForUpdate<CharacterInfo>();
-        _bulletSpawnQueue = new NativeQueue<BufferBulletSpawner>(Allocator.Persistent);
-        _enQueryWeapon = SystemAPI.QueryBuilder().WithAll<WeaponInfo>().WithNone<Disabled, SetActiveSP>().Build();
-        _isSpawnDefault = false;
-        _isGetComponent = false;
-        _idCurrentWeapon = -1;
+        state.RequireForUpdate<DataProperty>();
     }
+
+    #endregion
+    
 
     public void OnDestroy(ref SystemState state)
     {
         if (_bulletSpawnQueue.IsCreated)
             _bulletSpawnQueue.Dispose();
+        if (_weaponStores.IsCreated)
+            _weaponStores.Dispose();
     }
 
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
-        
-        if (!_isSpawnDefault)
+        if (!_isInit)
         {
-            _entityWeaponAuthoring = SystemAPI.GetSingletonEntity<WeaponProperty>();
-            _weaponProperties = SystemAPI.GetSingleton<WeaponProperty>();
-            _weaponStores = SystemAPI.GetBuffer<BufferWeaponStore>(_entityWeaponAuthoring).ToNativeArray(Allocator.Persistent);
-            _entityPlayer = SystemAPI.GetSingletonEntity<PlayerInfo>();
-            _shootAuto = _weaponProperties.shootAuto;
-            _pullTrigger = _shootAuto;
-            _entityManager = state.EntityManager;
-            UpdateDataWeapon(ref state,ref ecb);
-            ecb.Playback(state.EntityManager);
-            ecb.Dispose();
-            _isSpawnDefault = true;
+            _isInit = true;
+            InitUpdate(ref state);
             return;
         }
-        if (!_isGetComponent)
-        {
-            _isGetComponent = true;
-        }
-        if (!_shootAuto)
+        if (!_weaponProperties.shootAuto)
         {
             _pullTrigger = SystemAPI.GetSingleton<PlayerInput>().pullTrigger;
         }
         Shot(ref state);
-        UpdateDataWeapon(ref state,ref ecb);
-        UpdateWeapon(ref state,ref ecb);
-        
+        UpdateDataWeapon(ref state);
+        UpdateWeapon(ref state);
+    }
+
+    private void InitUpdate(ref SystemState state)
+    {
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+        _entityWeaponAuthoring = SystemAPI.GetSingletonEntity<WeaponProperty>();
+        _weaponProperties = SystemAPI.GetSingleton<WeaponProperty>();
+        _entityPlayer = SystemAPI.GetSingletonEntity<PlayerInfo>();
+        _pullTrigger = _weaponProperties.shootAuto;
+        _entityManager = state.EntityManager;
+
+        _weaponStores = SystemAPI.GetSingletonBuffer<BufferWeaponStore>().ToNativeArray(Allocator.Persistent);
+        int getId = SystemAPI.GetSingleton<PlayerInfo>().idWeapon;
+        if (_idCurrentWeapon != getId)
+        {
+            ChangeWeapon(getId,ref ecb);
+        }
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
 
-
-    private void UpdateDataWeapon(ref SystemState state,ref EntityCommandBuffer ecb)
+    private void UpdateDataWeapon(ref SystemState state)
     {
-        if (!_isSpawnDefault)
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+        foreach (var (collection,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess()
+                     .WithNone<Disabled, SetActiveSP>())
         {
-            int getId = SystemAPI.GetSingleton<PlayerInfo>().idWeapon;
-            if (_idCurrentWeapon != getId)
+            switch (collection.ValueRO.type)
             {
-                ChangeWeapon(getId,ref ecb);
+                case ItemType.Weapon:
+                    ecb.AddComponent(entity,new SetActiveSP()
+                    {
+                        state = StateID.Disable,
+                    });
+                    if(_idCurrentWeapon == collection.ValueRO.id) continue;
+                    ChangeWeapon(collection.ValueRO.id,ref ecb);
+                    break;
             }
         }
-        else
-        {
-            foreach (var (collection,entity) in SystemAPI.Query<RefRO<ItemCollection>>().WithEntityAccess()
-                         .WithNone<Disabled, SetActiveSP>())
-            {
-                switch (collection.ValueRO.type)
-                {
-                    case ItemType.Weapon:
-                        ecb.AddComponent(entity,new SetActiveSP()
-                        {
-                            state = StateID.Disable,
-                        });
-                        if(_idCurrentWeapon == collection.ValueRO.id) continue;
-                        ChangeWeapon(collection.ValueRO.id,ref ecb);
-                        break;
-                }
-           
-            }
-        }
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
     }
     private void ChangeWeapon(int id,ref EntityCommandBuffer ecb)
     {
@@ -154,8 +161,9 @@ public partial struct WeaponSystem : ISystem
         return weaponStore;
     }
 
-    private void UpdateWeapon(ref SystemState state,ref EntityCommandBuffer ecb)
+    private void UpdateWeapon(ref SystemState state)
     {
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         if (_isNewWeapon)
         {
             foreach (var (wpInfo,parent, entity) in SystemAPI.Query<RefRO<WeaponInfo>,RefRO<Parent>>().WithEntityAccess()
@@ -197,6 +205,8 @@ public partial struct WeaponSystem : ISystem
             _entityManager.SetComponentData(b.entity,characterInfo);
         }
         buffer.Clear();
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
     }
 
     private void Shot(ref SystemState state)
@@ -204,7 +214,8 @@ public partial struct WeaponSystem : ISystem
         if(!_pullTrigger) return;
         if ((SystemAPI.Time.ElapsedTime - _timeLatest) < _cooldown) return;
         _bulletSpawnQueue.Clear();
-
+        _ltwTypeHandle.Update(ref state);
+        
         var job = new PutEventSpawnBulletJOB()
         {
             bulletPerShot = _bulletPerShot,
@@ -214,7 +225,7 @@ public partial struct WeaponSystem : ISystem
             spaceAnglePerBullet = _spaceAnglePerBullet,
             parallelOrbit = _parallelOrbit,
             bulletSpawnQueue = _bulletSpawnQueue.AsParallelWriter(),
-            ltwComponentTypeHandle = state.GetComponentTypeHandle<LocalToWorld>()
+            ltwComponentTypeHandle = _ltwTypeHandle
         };
         state.Dependency = job.ScheduleParallel(_enQueryWeapon, state.Dependency);
         state.Dependency.Complete();

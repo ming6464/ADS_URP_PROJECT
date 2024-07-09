@@ -29,8 +29,6 @@ public struct PlayerInfo : IComponentData
     public int maxYGridCharacter;
 }
 
-
-
 public readonly partial struct PlayerAspect : IAspect
 {
     public readonly Entity entity;

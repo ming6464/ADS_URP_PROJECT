@@ -13,13 +13,18 @@ public partial struct ZombieSystem : ISystem
     private float3 _pointZoneMax;
     private bool _init;
     private Entity _entityPlayerInfo;
-    private ZombieProperty _zombieProperty;
     private EntityTypeHandle _entityTypeHandle;
     private EntityQuery _enQueryZombie;
     private EntityManager _entityManager;
     private NativeQueue<TakeDamageItem> _takeDamageQueue;
     private NativeList<CharacterSetTakeDamage> _characterSetTakeDamages;
     private NativeList<float3> _characterLtws;
+    private ComponentTypeHandle<LocalToWorld> _ltwTypeHandle;
+    private ComponentTypeHandle<ZombieRuntime> _zombieRunTimeTypeHandle;
+    private ComponentTypeHandle<ZombieInfo> _zombieInfoTypeHandle;
+    private ComponentTypeHandle<LocalTransform> _ltTypeHandle;
+    
+    
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
@@ -29,6 +34,10 @@ public partial struct ZombieSystem : ISystem
     [BurstCompile]
     private void Init(ref SystemState state)
     {
+        _ltwTypeHandle = state.GetComponentTypeHandle<LocalToWorld>();
+        _zombieRunTimeTypeHandle = state.GetComponentTypeHandle<ZombieRuntime>();
+        _zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>();
+        _ltTypeHandle = state.GetComponentTypeHandle<LocalTransform>();
         _enQueryZombie =
             SystemAPI.QueryBuilder().WithAll<ZombieInfo,LocalTransform,ZombieRuntime>().WithNone<Disabled, SetActiveSP, New>().Build();
         _takeDamageQueue = new NativeQueue<TakeDamageItem>(Allocator.Persistent);
@@ -69,8 +78,6 @@ public partial struct ZombieSystem : ISystem
             var zone = SystemAPI.GetSingleton<ActiveZoneProperty>();
             _pointZoneMin = zone.pointRangeMin;
             _pointZoneMax = zone.pointRangeMax;
-            _zombieProperty = SystemAPI
-                .GetComponentRO<ZombieProperty>(SystemAPI.GetSingletonEntity<ZombieProperty>()).ValueRO;
             _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
             _entityManager = state.EntityManager;
         }
@@ -92,13 +99,16 @@ public partial struct ZombieSystem : ISystem
         }
 
         var playerPosition = SystemAPI.GetComponentRO<LocalToWorld>(_entityPlayerInfo).ValueRO.Position;
+        _ltwTypeHandle.Update(ref state);
+        _zombieInfoTypeHandle.Update(ref state);
+        _zombieRunTimeTypeHandle.Update(ref state);
         var job = new CheckAttackPlayerJOB()
         {
             characterSetTakeDamages = _characterSetTakeDamages,
-            localToWorldTypeHandle = state.GetComponentTypeHandle<LocalToWorld>(),
+            localToWorldTypeHandle = _ltwTypeHandle,
             time = (float)SystemAPI.Time.ElapsedTime,
-            zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>(),
-            zombieRuntimeTypeHandle = state.GetComponentTypeHandle<ZombieRuntime>(),
+            zombieInfoTypeHandle = _zombieInfoTypeHandle,
+            zombieRuntimeTypeHandle = _zombieRunTimeTypeHandle,
             takeDamageQueues = _takeDamageQueue.AsParallelWriter(),
             playerPosition = playerPosition,
             distanceCheck = 10,
@@ -137,13 +147,16 @@ public partial struct ZombieSystem : ISystem
     {
         UpdateCharacterList(ref state);
         float deltaTime = SystemAPI.Time.DeltaTime;
+        _zombieInfoTypeHandle.Update(ref state);
+        _ltwTypeHandle.Update(ref state);
+        _ltTypeHandle.Update(ref state);
         ZombieMovementJOB job = new ZombieMovementJOB()
         {
             deltaTime = deltaTime,
-            ltTypeHandle = state.GetComponentTypeHandle<LocalTransform>(),
-            zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>(true),
+            ltTypeHandle = _ltTypeHandle,
+            zombieInfoTypeHandle = _zombieInfoTypeHandle,
             characterLtws = _characterLtws,
-            ltwTypeHandle = state.GetComponentTypeHandle<LocalToWorld>()
+            ltwTypeHandle = _ltwTypeHandle
         };
         state.Dependency = job.ScheduleParallel(_enQueryZombie, state.Dependency);
         state.Dependency.Complete();
@@ -164,12 +177,14 @@ public partial struct ZombieSystem : ISystem
     {
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
         _entityTypeHandle.Update(ref state);
+        _ltwTypeHandle.Update(ref state);
+        _zombieInfoTypeHandle.Update(ref state);
         var chunkJob = new CheckDeadZoneJOB
         {
             ecb = ecb.AsParallelWriter(),
             entityTypeHandle = _entityTypeHandle,
-            ltwTypeHandle = state.GetComponentTypeHandle<LocalToWorld>(true),
-            zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>(),
+            ltwTypeHandle = _ltwTypeHandle,
+            zombieInfoTypeHandle = _zombieInfoTypeHandle,
             minPointRange = _pointZoneMin,
             maxPointRange = _pointZoneMax,
         };
@@ -210,35 +225,27 @@ partial struct ZombieMovementJOB : IJobChunk
 
     private float3 GetDirect(float3 position, float3 defaultDirect, float chasingRange)
     {
-        var dir = defaultDirect;
-
-        float distanceNearest = float.MaxValue; // Sử dụng float.MaxValue thay vì 99999
-        float3 characterPositionNearest = default;
+        float3 nearestPosition = default;
+        float distanceNearest = float.MaxValue;
 
         foreach (var characterLtw in characterLtws)
         {
-            var distance = math.distance(characterLtw, position);
-            if (distance <= chasingRange && distance <= distanceNearest)
+            float distance = math.distance(characterLtw, position);
+            if (distance <= chasingRange && distance < distanceNearest)
             {
                 distanceNearest = distance;
-                characterPositionNearest = characterLtw;
-            }
-        }
-        
-        if (distanceNearest < float.MaxValue)
-        {
-            if (position.ComparisionEqual(characterPositionNearest))
-            {
-                dir = float3.zero;
-            }
-            else
-            {
-                dir = math.normalize(characterPositionNearest - position);
+                nearestPosition = characterLtw;
             }
         }
 
-        return dir;
+        if (distanceNearest < float.MaxValue)
+        {
+            return math.all(position == nearestPosition) ? float3.zero : math.normalize(nearestPosition - position);
+        }
+
+        return defaultDirect;
     }
+
 }
 
     

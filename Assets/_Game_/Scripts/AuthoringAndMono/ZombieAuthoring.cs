@@ -5,18 +5,18 @@ using UnityEngine;
 
 public class ZombieAuthoring : MonoBehaviour
 {
-    public ZombieSO data;
-    public int[] spawnDataArr;
-    public float timeDelaySpawn;
-    public bool spawnInfinity;
-    public bool allowRespawn;
-    public int numberSpawn;
+    [Header("Spawn Zombie Normal")]
+    public int[] zombieNormalIds;
+    public SpawnRange[] spawnRanges;
+    public int totalNumber;
+    public float cooldown;
     public float2 spawnAmountRange;
     public float2 timeRange;
-    public Transform pointRange1;
-    public Transform pointRange2;
-    public Transform pointDir1;
-    public Transform pointDir2;
+    public bool spawnInfinity;
+    public bool allowRespawn;
+    
+    [Header("Spawn Zombie Boss")] 
+    public SpawnBoss[] spawnBosses;
 }
 
 
@@ -24,50 +24,83 @@ class ZombieBaker : Baker<ZombieAuthoring>
 {
     public override void Bake(ZombieAuthoring authoring)
     {
-        Entity entity = GetEntity(TransformUsageFlags.Dynamic);
-        float3 posMin = authoring.pointRange1.position;
-        float3 posMax = authoring.pointRange2.position;
-        float3 dirNormal = math.normalize(authoring.pointDir2.position - authoring.pointDir1.position);
-        dirNormal.y = 0;
-        AddComponent(entity,new ZombieProperty
-        {
-            directNormal = dirNormal,
-            spawner = new ZombieSpawner
-            {
-                numberSpawn = authoring.numberSpawn,
-                spawnAmountRange = authoring.spawnAmountRange ,
-                timeRange = authoring.timeRange,
-                spawnInfinity = authoring.spawnInfinity,
-                allowRespawn = authoring.allowRespawn,
-                timeDelay = authoring.timeDelaySpawn,
-                posMax = posMax,
-                posMin = posMin,
-            }
-        });
+        Entity entity = GetEntity(TransformUsageFlags.None);
         AddBuffer<BufferZombieDie>(entity);
-        var buffer = AddBuffer<BufferZombieStore>(entity);
-
-        foreach (var spawn in authoring.spawnDataArr)
+        AddComponent<ZombieSpawnRuntime>(entity);
+        AddComponent(entity, new ZombieProperty
         {
-            var zombie = GetZombieData_L(spawn);
-            
-            buffer.Add(new BufferZombieStore()
+            entity = entity,
+        });
+        AddComponent(entity, new ZombieSpawner
+        {
+            spawnInfinity = authoring.spawnInfinity,
+            allowRespawn = authoring.allowRespawn,
+            cooldown = authoring.cooldown,
+            totalNumber = authoring.totalNumber,
+            spawnAmountRange = authoring.spawnAmountRange,
+            timeRange = authoring.timeRange,
+        });
+        
+        // Add buffer zombie normal id spawn
+        var bufferZombieNormalId = AddBuffer<BufferZombieNormalSpawnID>(entity);
+        foreach (int id in authoring.zombieNormalIds)
+        {
+            bufferZombieNormalId.Add(new BufferZombieNormalSpawnID()
             {
-                id = spawn,
-                entity = GetEntity(zombie.prefab,TransformUsageFlags.Dynamic),
-                hp = zombie.hp,
-                speed = zombie.speed,
-                damage = zombie.damage,
-                attackRange = zombie.attackRange,
-                delayAttack = zombie.delayAttack,
-                chasingRange = zombie.chasingRange,
+                id = id,
             });
         }
-
-        Zombie GetZombieData_L(int id)
-        {
-            return Array.Find(authoring.data.zombies, x => x.id == id);
-        }
+        //
         
+        // Add buffer zombie Spawn
+        var bufferZombieSpawn = AddBuffer<BufferZombieSpawnRange>(entity);
+        foreach (var spawnRange in authoring.spawnRanges)
+        {
+            float3 posMin = spawnRange.pointRange1.position;
+            float3 posMax = spawnRange.pointRange2.position;
+            float3 dirNormal = math.normalize(spawnRange.pointDir2.position - spawnRange.pointDir1.position);
+            bufferZombieSpawn.Add(new BufferZombieSpawnRange()
+            {
+                posMax = posMax,
+                posMin = posMin,
+                directNormal = dirNormal,
+            });
+        }
+        //
+        
+        // Add buffer zombie boss spawn
+        var bufferZombieBossSpawn = AddBuffer<BufferZombieBossSpawn>(entity);
+        foreach (var boss in authoring.spawnBosses)
+        {
+            float3 dirNormal = math.normalize(boss.pointDir2.position - boss.pointDir1.position);
+            bufferZombieBossSpawn.Add(new BufferZombieBossSpawn()
+            {
+                id = boss.id,
+                timeDelay = boss.timeDelay,
+                directNormal = dirNormal,
+                position = boss.spawnPos.position,
+            });
+        }
+        //
     }
 }
+
+[Serializable]
+public struct SpawnRange
+{
+    public Transform pointRange1;
+    public Transform pointRange2;
+    public Transform pointDir1;
+    public Transform pointDir2;
+}
+
+[Serializable]
+public struct SpawnBoss
+{
+    public int id;
+    public float timeDelay;
+    public Transform spawnPos;
+    public Transform pointDir1;
+    public Transform pointDir2;
+}
+

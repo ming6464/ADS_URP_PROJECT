@@ -88,4 +88,9 @@ public struct New : IComponentData
     
 }
 
+public struct DataProperty : IComponentData
+{
+    
+}
+
 //

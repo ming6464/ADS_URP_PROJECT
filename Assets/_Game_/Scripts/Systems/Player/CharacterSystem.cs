@@ -24,14 +24,26 @@ namespace _Game_.Scripts.Systems.Player
         private PlayerInput _playerMoveInput;
         private float2 _currentDirectMove;
         private float _divisionAngle;
+        private ComponentTypeHandle<LocalToWorld> _ltwTypeHandle;
+        private ComponentTypeHandle<LocalTransform> _ltTypeHandle;
+        private ComponentTypeHandle<TakeDamage> _takeDamageTypeHandle;
+        private ComponentTypeHandle<CharacterInfo> _characterInfoTypeHandle;
+        private ComponentTypeHandle<NextPoint> _nextPointTypeHandle;
         
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<PlayerProperty>();
-            state.RequireForUpdate<PlayerInput>();
-            state.RequireForUpdate<PlayerInfo>();
-            state.RequireForUpdate<CharacterInfo>();
+            RequireNecessaryComponents(ref state);
+            Init(ref state);
+        }
+
+        private void Init(ref SystemState state)
+        {
+            _ltwTypeHandle = state.GetComponentTypeHandle<LocalToWorld>();
+            _ltTypeHandle = state.GetComponentTypeHandle<LocalTransform>();
+            _takeDamageTypeHandle = state.GetComponentTypeHandle<TakeDamage>();
+            _characterInfoTypeHandle = state.GetComponentTypeHandle<CharacterInfo>();
+            _nextPointTypeHandle = state.GetComponentTypeHandle<NextPoint>();
             _entityTypeHandle = state.GetEntityTypeHandle();
             _enQueryCharacterTakeDamage = SystemAPI.QueryBuilder().WithAll<CharacterInfo,TakeDamage>()
                 .WithNone<Disabled, SetActiveSP>().Build();
@@ -42,6 +54,16 @@ namespace _Game_.Scripts.Systems.Player
                 .Build();
             _targetNears = new NativeList<TargetInfo>(Allocator.Persistent);
         }
+
+        [BurstCompile]
+        private void RequireNecessaryComponents(ref SystemState state)
+        {
+            state.RequireForUpdate<PlayerProperty>();
+            state.RequireForUpdate<PlayerInput>();
+            state.RequireForUpdate<PlayerInfo>();
+            state.RequireForUpdate<CharacterInfo>();
+        }
+
         [BurstCompile]
         public void OnDestroy(ref SystemState state)
         {
@@ -158,12 +180,13 @@ namespace _Game_.Scripts.Systems.Player
                 var ratio = 1 - math.clamp((distanceNearest * 1.0f / _playerProperty.distanceAim), 0, 1);
                 moveToWard = math.lerp(_playerProperty.moveToWardMin, _playerProperty.moveToWardMax,ratio);
             }
-
+            _ltTypeHandle.Update(ref state);
+            _ltwTypeHandle.Update(ref state);
             var job = new CharacterRotaJOB()
             {
                 aimNearestEnemy = _playerProperty.aimNearestEnemy,
-                ltComponentType = state.GetComponentTypeHandle<LocalTransform>(),
-                ltwComponentType = state.GetComponentTypeHandle<LocalToWorld>(),
+                ltComponentType = _ltTypeHandle,
+                ltwComponentType = _ltwTypeHandle,
                 targetNears = _targetNears,
                 playerProperty = _playerProperty,
                 deltaTime = SystemAPI.Time.DeltaTime,
@@ -181,15 +204,17 @@ namespace _Game_.Scripts.Systems.Player
             _entityTypeHandle.Update(ref state);
             var listNextPointEntity = _enQueryMove.ToEntityArray(Allocator.Temp);
             listNextPointEntity.Dispose();
-            
+            _ltTypeHandle.Update(ref state);
+            _ltwTypeHandle.Update(ref state);
+            _nextPointTypeHandle.Update(ref state);
             var job = new CharacterMoveNextPointJOB()
             {
                 deltaTime = SystemAPI.Time.DeltaTime,
                 ecb = ecb.AsParallelWriter(),
                 entityTypeHandle = _entityTypeHandle,
-                ltComponentType = state.GetComponentTypeHandle<LocalTransform>(),
+                ltComponentType = _ltTypeHandle,
                 moveToWardValue = _characterMoveToWardChangePos,
-                nextPointComponentType = state.GetComponentTypeHandle<NextPoint>()
+                nextPointComponentType = _nextPointTypeHandle
             };
 
             state.Dependency = job.ScheduleParallel(_enQueryMove, state.Dependency);
@@ -204,15 +229,19 @@ namespace _Game_.Scripts.Systems.Player
             _characterDieQueue.Clear();
             float time = (float) SystemAPI.Time.ElapsedTime;
             _entityTypeHandle.Update(ref state);
+            _takeDamageTypeHandle.Update(ref state);
+            _characterInfoTypeHandle.Update(ref state);
+            _ltwTypeHandle.Update(ref state);
+            _ltTypeHandle.Update(ref state);
             var job = new CharacterHandleTakeDamageJOB()
             {
                 ecb = ecb.AsParallelWriter(),
-                characterInfoTypeHandle = state.GetComponentTypeHandle<CharacterInfo>(),
+                characterInfoTypeHandle = _characterInfoTypeHandle,
                 entityTypeHandle = _entityTypeHandle,
-                takeDamageTypeHandle = state.GetComponentTypeHandle<TakeDamage>(),
+                takeDamageTypeHandle = _takeDamageTypeHandle,
                 characterDieQueue = _characterDieQueue.AsParallelWriter(),
-                ltwTypeHandle = state.GetComponentTypeHandle<LocalToWorld>(),
-                ltTypeHandle = state.GetComponentTypeHandle<LocalTransform>()
+                ltwTypeHandle = _ltwTypeHandle,
+                ltTypeHandle = _ltTypeHandle
             };
             state.Dependency = job.ScheduleParallel(_enQueryCharacterTakeDamage, state.Dependency);
             state.Dependency.Complete();

@@ -17,6 +17,10 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
         private Entity _entityWeaponAuthoring;
         private EntityManager _entityManager;
         private bool _isInit;
+        private ComponentTypeHandle<LocalTransform> _ltTypeHandle;
+        private ComponentTypeHandle<BarrelInfo> _barrelInfoTypeHandle;
+        private ComponentTypeHandle<BarrelRunTime> _barrelRunTimeTypeHandle;
+        private ComponentTypeHandle<LocalToWorld> _ltwTypeHandle;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -91,26 +95,30 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
             {
                 _enemyPositions.Add(ltw.ValueRO.Position);
             }
+            
+            _ltTypeHandle.Update(ref state);
+            _ltwTypeHandle.Update(ref state);
+            _barrelInfoTypeHandle.Update(ref state);
+            _barrelRunTimeTypeHandle.Update(ref state);
+            
             var job = new BarreJOB()
             {
-                ltComponentType = state.GetComponentTypeHandle<LocalTransform>(),
+                ltComponentType = _ltTypeHandle,
                 enemyPositions = _enemyPositions,
-                barrelInfoComponentType = state.GetComponentTypeHandle<BarrelInfo>(),
+                barrelInfoComponentType = _barrelInfoTypeHandle,
                 deltaTime = SystemAPI.Time.DeltaTime,
-                barrelRunTimeComponentType = state.GetComponentTypeHandle<BarrelRunTime>(),
+                barrelRunTimeComponentType = _barrelRunTimeTypeHandle,
                 time = (float)SystemAPI.Time.ElapsedTime,
-                ltwComponentTypeHandle = state.GetComponentTypeHandle<LocalToWorld>(),
+                ltwComponentTypeHandle = _ltwTypeHandle,
                 bulletSpawnQueue = _bulletSpawnQueue.AsParallelWriter(),
             };
             state.Dependency = job.ScheduleParallel(_enQueryBarrelInfo, state.Dependency);
             state.Dependency.Complete();
-            if (_bulletSpawnQueue.Count > 0)
+            if (_bulletSpawnQueue.Count <= 0) return;
+            var bufferSpawnBullet = state.EntityManager.GetBuffer<BufferBulletSpawner>(_entityWeaponAuthoring);
+            while (_bulletSpawnQueue.TryDequeue(out var queue))
             {
-                var bufferSpawnBullet = state.EntityManager.GetBuffer<BufferBulletSpawner>(_entityWeaponAuthoring);
-                while (_bulletSpawnQueue.TryDequeue(out var queue))
-                {
-                    bufferSpawnBullet.Add(queue);
-                }
+                bufferSpawnBullet.Add(queue);
             }
         }
 
@@ -139,6 +147,10 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
             _enQueryBarrelInfo = SystemAPI.QueryBuilder().WithAll<BarrelInfo, BarrelRunTime>()
                 .WithNone<Disabled, SetActiveSP>().Build();
             _bulletSpawnQueue = new NativeQueue<BufferBulletSpawner>(Allocator.Persistent);
+            _ltTypeHandle = state.GetComponentTypeHandle<LocalTransform>();
+            _ltwTypeHandle = state.GetComponentTypeHandle<LocalToWorld>();
+            _barrelInfoTypeHandle = state.GetComponentTypeHandle<BarrelInfo>();
+            _barrelRunTimeTypeHandle = state.GetComponentTypeHandle<BarrelRunTime>();
         }
         
         [BurstCompile]

@@ -4,21 +4,46 @@ using Unity.Transforms;
 
 public struct ZombieProperty : IComponentData
 {
-    public ZombieSpawner spawner;
-    public float3 directNormal;
+    public Entity entity;
 }
 
-public struct ZombieSpawner
+public struct ZombieSpawner : IComponentData
 {
-    public float timeDelay;
     public bool spawnInfinity;
     public bool allowRespawn;
-    public int numberSpawn;
+    public float cooldown;
+    public int totalNumber;
     public float2 spawnAmountRange;
     public float2 timeRange;
+}
+
+public struct ZombieSpawnRuntime : IComponentData
+{
+    public int zombieAlive;
+    // public int zombieDie;
+}
+
+
+public struct BufferZombieNormalSpawnID : IBufferElementData
+{
+    public int id;
+}
+
+public struct BufferZombieSpawnRange : IBufferElementData
+{
+    public float3 directNormal;
     public float3 posMin;
     public float3 posMax;
 }
+
+public struct BufferZombieBossSpawn : IBufferElementData
+{
+    public int id;
+    public float timeDelay;
+    public float3 position;
+    public float3 directNormal;
+}
+
 
 public struct ZombieInfo : IComponentData
 {

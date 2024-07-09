@@ -22,19 +22,34 @@ public partial struct BulletMovementSystem : ISystem
     private NativeQueue<ItemTakeDamage> _takeDamageQueue;
     private NativeHashMap<Entity, float> _takeDamageMap;
     private EntityQuery _enQueryBulletInfoAlive;
+    private ComponentTypeHandle<LocalTransform> _ltComponentTypeHandle;
+    private ComponentTypeHandle<BulletInfo> _bulletInfoComponentTypeHandle;
     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
-        state.RequireForUpdate<LayerStoreComponent>();
-        state.RequireForUpdate<EffectProperty>();
-        state.RequireForUpdate<WeaponProperty>();
-        state.RequireForUpdate<PhysicsWorldSingleton>();
+        RequireNecessaryComponents(ref state);
+        Init(ref state);
+    }
+    [BurstCompile]
+    private void Init(ref SystemState state)
+    {
+        _ltComponentTypeHandle = state.GetComponentTypeHandle<LocalTransform>();
+        _bulletInfoComponentTypeHandle = state.GetComponentTypeHandle<BulletInfo>();
         _entityTypeHandle = state.GetEntityTypeHandle();
         _takeDamageQueue = new NativeQueue<ItemTakeDamage>( Allocator.Persistent);
         _takeDamageMap =
             new NativeHashMap<Entity, float>(100, Allocator.Persistent);
         _enQueryBulletInfoAlive = SystemAPI.QueryBuilder().WithAll<BulletInfo>().WithNone<Disabled, SetActiveSP>().Build();
+    }
+
+    [BurstCompile]
+    private void RequireNecessaryComponents(ref SystemState state)
+    {
+        state.RequireForUpdate<LayerStoreComponent>();
+        state.RequireForUpdate<EffectProperty>();
+        state.RequireForUpdate<WeaponProperty>();
+        state.RequireForUpdate<PhysicsWorldSingleton>();
     }
 
     public void OnDestroy(ref SystemState state)
@@ -69,6 +84,8 @@ public partial struct BulletMovementSystem : ISystem
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
         _entityTypeHandle.Update(ref state);
+        _ltComponentTypeHandle.Update(ref state);
+        _bulletInfoComponentTypeHandle.Update(ref state);
         var jobChunk = new BulletMovementJOB()
         {
             ecb = ecb.AsParallelWriter(),
@@ -77,10 +94,10 @@ public partial struct BulletMovementSystem : ISystem
             length = _weaponProperties.length,
             time = (float)SystemAPI.Time.ElapsedTime,
             deltaTime = SystemAPI.Time.DeltaTime,
-            localTransformType = state.GetComponentTypeHandle<LocalTransform>(),
+            localTransformType = _ltComponentTypeHandle,
             entityTypeHandle = _entityTypeHandle,
             currentTime = curTime,
-            bulletInfoTypeHandle = state.GetComponentTypeHandle<BulletInfo>(),
+            bulletInfoTypeHandle = _bulletInfoComponentTypeHandle,
             expired = _weaponProperties.timeLife,
             zombieDamageMapQueue = _takeDamageQueue.AsParallelWriter(),
         };
