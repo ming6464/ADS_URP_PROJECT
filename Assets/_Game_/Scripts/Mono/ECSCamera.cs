@@ -96,7 +96,6 @@ public class ECSCamera : MonoBehaviour
         int layer = -1;
         if (_curCameraType.Equals(CameraType.FirstPersonCamera))
         {
-            Debug.Log("m _ First Cam ");
             layer = ~ characterLayer;
         }
 

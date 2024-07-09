@@ -7953,7 +7953,7 @@ GameObject:
   - component: {fileID: 832985594}
   - component: {fileID: 832985595}
   m_Layer: 0
-  m_Name: ZombieSystem
+  m_Name: ZombieSpawn
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7988,7 +7988,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   data: {fileID: 11400000, guid: d8be5c147f056f34fb5c6fd108543aaa, type: 2}
-  spawnDataArr: 000000000100000002000000
+  spawnDataArr: 00000000010000000200000003000000
   timeDelaySpawn: 0.08
   spawnInfinity: 0
   allowRespawn: 1
