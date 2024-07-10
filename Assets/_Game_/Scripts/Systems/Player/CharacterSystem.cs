@@ -1,10 +1,12 @@
 ﻿using System.Collections.Generic;
+using Rukhanka;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
 namespace _Game_.Scripts.Systems.Player
 {
@@ -89,6 +91,7 @@ namespace _Game_.Scripts.Systems.Player
             Rota(ref state);
             Move(ref state);
         }
+        
 
         private void HandleAnimation(ref SystemState state)
         {
@@ -226,7 +229,6 @@ namespace _Game_.Scripts.Systems.Player
         {
             EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
             _characterDieQueue.Clear();
-            float time = (float) SystemAPI.Time.ElapsedTime;
             _entityTypeHandle.Update(ref state);
             _takeDamageTypeHandle.Update(ref state);
             _characterInfoTypeHandle.Update(ref state);
@@ -248,7 +250,7 @@ namespace _Game_.Scripts.Systems.Player
             {
                 ecb.AddComponent(queue, new SetAnimationSP()
                 {
-                    state = StateID.Wait,
+                    state = StateID.Die,
                     timeDelay = 4,
                 });
                 
@@ -305,7 +307,7 @@ namespace _Game_.Scripts.Systems.Player
                 foreach (var enemyPos in targetNears)
                 {
                     var distance = math.distance(enemyPos.position, characterPos);
-                    if (distance < disNearest && MathExt.CalculateAngle(enemyPos.position - characterPos, math.forward()) < playerProperty.rotaAngleMax)
+                    if (distance < disNearest)
                     {
                         nearestEnemyPosition = enemyPos.position;
                         disNearest = distance;

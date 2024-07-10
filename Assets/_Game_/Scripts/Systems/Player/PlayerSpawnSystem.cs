@@ -25,7 +25,7 @@ public partial struct PlayerSpawnSystem : ISystem
     {
         state.RequireForUpdate<PlayerProperty>();
         _enQueryCharacterAlive =
-            SystemAPI.QueryBuilder().WithAll<CharacterInfo,LocalTransform>().WithNone<Disabled, SetActiveSP>().Build();
+            SystemAPI.QueryBuilder().WithAll<CharacterInfo,LocalTransform>().WithNone<Disabled, SetActiveSP,AddToBuffer>().Build();
     }
 
     public void OnUpdate(ref SystemState state)

@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Globalization;
 using Unity.Entities;
 using UnityEngine;
 
@@ -13,7 +14,7 @@ public class ItemAuthoring : MonoBehaviour
     public TextMesh textObj;
     public int idTextHp;
     public Transform[] spawnPoints;
-    
+
     private void OnValidate()
     {
         if (textObj)

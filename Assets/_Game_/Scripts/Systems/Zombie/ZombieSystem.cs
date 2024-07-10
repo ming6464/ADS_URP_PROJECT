@@ -1,11 +1,14 @@
-﻿using Unity.Burst;
+﻿using Rukhanka;
+using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
 
-[UpdateInGroup(typeof(SimulationSystemGroup)),UpdateBefore(typeof(AnimationSystem))]
+[UpdateInGroup(typeof(SimulationSystemGroup)), UpdateBefore(typeof(AnimationStateSystem))]
 [BurstCompile]
 public partial struct ZombieSystem : ISystem
 {
@@ -15,7 +18,9 @@ public partial struct ZombieSystem : ISystem
     private Entity _entityPlayerInfo;
     private EntityTypeHandle _entityTypeHandle;
     private EntityQuery _enQueryZombie;
+    private EntityQuery _enQueryZombieNormal;
     private EntityQuery _enQueryZombieBoss;
+    private EntityQuery _enQueryZombieNew;
     private EntityManager _entityManager;
     private NativeQueue<TakeDamageItem> _takeDamageQueue;
     private NativeList<CharacterSetTakeDamage> _characterSetTakeDamages;
@@ -24,14 +29,19 @@ public partial struct ZombieSystem : ISystem
     private ComponentTypeHandle<ZombieRuntime> _zombieRunTimeTypeHandle;
     private ComponentTypeHandle<ZombieInfo> _zombieInfoTypeHandle;
     private ComponentTypeHandle<LocalTransform> _ltTypeHandle;
-    
-    
+    private uint _bossOgreAttackHash;
+    private uint _finishAttackHash;
+    private LayerStoreComponent _layerStore;
+    private CollisionFilter _collisionFilter;
+    private PhysicsWorldSingleton _physicsWorld;
+
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         RequireNecessaryComponents(ref state);
         Init(ref state);
     }
+
     [BurstCompile]
     private void Init(ref SystemState state)
     {
@@ -39,39 +49,132 @@ public partial struct ZombieSystem : ISystem
         _zombieRunTimeTypeHandle = state.GetComponentTypeHandle<ZombieRuntime>();
         _zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>();
         _ltTypeHandle = state.GetComponentTypeHandle<LocalTransform>();
+        _enQueryZombieNew = SystemAPI.QueryBuilder().WithAll<ZombieInfo, New>().WithNone<Disabled, AddToBuffer>()
+            .Build();
         _enQueryZombie =
-            SystemAPI.QueryBuilder().WithAll<ZombieInfo,LocalTransform,ZombieRuntime>().WithNone<Disabled, SetActiveSP, New>().Build();
+            SystemAPI.QueryBuilder().WithAll<ZombieInfo, LocalTransform>()
+                .WithNone<Disabled, AddToBuffer, New, SetAnimationSP>().Build();
+        _enQueryZombieNormal =
+            SystemAPI.QueryBuilder().WithAll<ZombieInfo, LocalTransform>()
+                .WithNone<Disabled, AddToBuffer, New, SetAnimationSP, BossInfo>().Build();
         _enQueryZombieBoss =
-            SystemAPI.QueryBuilder().WithAll<ZombieInfo,BossInfo,LocalTransform>().WithNone<Disabled, AddToBuffer, New>().Build();
+            SystemAPI.QueryBuilder().WithAll<BossInfo, LocalTransform>()
+                .WithNone<Disabled, AddToBuffer, New, SetAnimationSP>().Build();
         _takeDamageQueue = new NativeQueue<TakeDamageItem>(Allocator.Persistent);
         _characterSetTakeDamages = new NativeList<CharacterSetTakeDamage>(Allocator.Persistent);
         _characterLtws = new NativeList<float3>(Allocator.Persistent);
+        _bossOgreAttackHash = FixedStringExtensions.CalculateHash32("BossOgreAttack");
+        _finishAttackHash = FixedStringExtensions.CalculateHash32("FinishAttack");
     }
+
     [BurstCompile]
     private void RequireNecessaryComponents(ref SystemState state)
     {
+        state.RequireForUpdate<LayerStoreComponent>();
+        state.RequireForUpdate<PhysicsWorldSingleton>();
         state.RequireForUpdate<PlayerInfo>();
         state.RequireForUpdate<ZombieProperty>();
         state.RequireForUpdate<ActiveZoneProperty>();
         state.RequireForUpdate<ZombieInfo>();
     }
+
     [BurstCompile]
     public void OnDestroy(ref SystemState state)
     {
         if (_characterSetTakeDamages.IsCreated) _characterSetTakeDamages.Dispose();
         if (_takeDamageQueue.IsCreated) _takeDamageQueue.Dispose();
         if (_characterLtws.IsCreated) _characterLtws.Dispose();
-
     }
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
         CheckAndInit(ref state);
+        SetUpNewZombie(ref state);
         Move(ref state);
         CheckAttackPlayer(ref state);
         CheckZombieToDeadZone(ref state);
+        CheckAnimationEvent(ref state);
     }
+
+    private void SetUpNewZombie(ref SystemState state)
+    {
+        _ltTypeHandle.Update(ref state);
+        _zombieInfoTypeHandle.Update(ref state);
+        var job = new SetUpNewZombieJOB()
+        {
+            ltTypeHandle = _ltTypeHandle,
+            zombieInfoTypeHandle = _zombieInfoTypeHandle,
+        };
+        state.Dependency = job.ScheduleParallel(_enQueryZombieNew, state.Dependency);
+        state.Dependency.Complete();
+    }
+
+    private void CheckAnimationEvent(ref SystemState state)
+    {
+        _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+        // Check event boss
+        foreach (var (zombieInfo, bossInfo, entity) in SystemAPI.Query<RefRO<ZombieInfo>, RefRO<BossInfo>>()
+                     .WithEntityAccess().WithNone<Disabled, AddToBuffer>())
+        {
+            if (_entityManager.HasBuffer<AnimationEventComponent>(entity))
+            {
+                HandleEvent(ref state, ref ecb, entity, zombieInfo.ValueRO, bossInfo.ValueRO);
+            }
+        }
+
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
+    }
+
+    private void HandleEvent(ref SystemState state, ref EntityCommandBuffer ecb, Entity entity, ZombieInfo zombieInfo,
+        BossInfo bossInfo)
+    {
+        NativeList<ColliderCastHit> hits = new NativeList<ColliderCastHit>(Allocator.TempJob);
+        foreach (var b in _entityManager.GetBuffer<AnimationEventComponent>(entity))
+        {
+            var stringHash = b.stringParamHash;
+            if (stringHash.CompareTo(_bossOgreAttackHash) == 0)
+            {
+                var entityNew = _entityManager.CreateEntity();
+                var lt = _entityManager.GetComponentData<LocalToWorld>(entity);
+                var attackPosition = math.transform(lt.Value, zombieInfo.offsetAttackPosition);
+                ecb.AddComponent(entityNew, new EffectComponent()
+                {
+                    position = attackPosition,
+                    rotation = lt.Rotation,
+                    effectID = EffectID.GroundCrack
+                });
+                if (_physicsWorld.SphereCastAll(attackPosition, zombieInfo.radiusDamage, float3.zero, 0, ref hits,
+                        _collisionFilter))
+                {
+                    foreach (var hit in hits)
+                    {
+                        TakeDamage takeDamage = new TakeDamage();
+                        if (_entityManager.HasComponent<TakeDamage>(hit.Entity))
+                        {
+                            takeDamage = _entityManager.GetComponentData<TakeDamage>(hit.Entity);
+                        }
+
+                        takeDamage.value += zombieInfo.damage;
+                        ecb.AddComponent(hit.Entity, takeDamage);
+                    }
+                }
+            }
+            else if (stringHash.CompareTo(_finishAttackHash) == 0)
+            {
+                ecb.AddComponent(entity, new SetAnimationSP()
+                {
+                    state = StateID.Idle,
+                    timeDelay = 0,
+                });
+            }
+        }
+
+        hits.Dispose();
+    }
+
     [BurstCompile]
     private void CheckAndInit(ref SystemState state)
     {
@@ -83,16 +186,24 @@ public partial struct ZombieSystem : ISystem
             _pointZoneMax = zone.pointRangeMax;
             _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
             _entityManager = state.EntityManager;
+            _layerStore = SystemAPI.GetSingleton<LayerStoreComponent>();
+            _collisionFilter = new CollisionFilter()
+            {
+                BelongsTo = _layerStore.enemyLayer,
+                CollidesWith = _layerStore.characterLayer,
+                GroupIndex = 0
+            };
         }
     }
+
     [BurstCompile]
     private void CheckAttackPlayer(ref SystemState state)
     {
-        var ecb = new EntityCommandBuffer(Allocator.TempJob);
         _takeDamageQueue.Clear();
         _characterSetTakeDamages.Clear();
 
-        foreach (var (ltw, entity) in SystemAPI.Query<RefRO<LocalToWorld>>().WithEntityAccess().WithAll<CharacterInfo>().WithNone<Disabled,SetActiveSP,New>())
+        foreach (var (ltw, entity) in SystemAPI.Query<RefRO<LocalToWorld>>().WithEntityAccess().WithAll<CharacterInfo>()
+                     .WithNone<Disabled, AddToBuffer, SetActiveSP>())
         {
             _characterSetTakeDamages.Add(new CharacterSetTakeDamage()
             {
@@ -101,27 +212,28 @@ public partial struct ZombieSystem : ISystem
             });
         }
 
+        if (_characterSetTakeDamages.Length == 0) return;
+        var ecb = new EntityCommandBuffer(Allocator.TempJob);
         var playerPosition = SystemAPI.GetComponentRO<LocalToWorld>(_entityPlayerInfo).ValueRO.Position;
         _ltwTypeHandle.Update(ref state);
         _zombieInfoTypeHandle.Update(ref state);
         _zombieRunTimeTypeHandle.Update(ref state);
-        
+        _entityTypeHandle.Update(ref state);
+
         var jobBoss = new CheckZombieBossAttackPlayerJOB()
         {
-            characterSetTakeDamages = _characterSetTakeDamages,
+            playerPosition = playerPosition,
             ecb = ecb.AsParallelWriter(),
             entityTypeHandle = _entityTypeHandle,
             localToWorldTypeHandle = _ltwTypeHandle,
             time = (float)SystemAPI.Time.ElapsedTime,
-            timeDelay = 3,
+            timeDelay = 2.2f,
             zombieInfoTypeHandle = _zombieInfoTypeHandle,
             zombieRuntimeTypeHandle = _zombieRunTimeTypeHandle
         };
         state.Dependency = jobBoss.ScheduleParallel(_enQueryZombieBoss, state.Dependency);
         state.Dependency.Complete();
-        _ltwTypeHandle.Update(ref state);
-        _zombieInfoTypeHandle.Update(ref state);
-        _zombieRunTimeTypeHandle.Update(ref state);
+
         var job = new CheckAttackPlayerJOB()
         {
             characterSetTakeDamages = _characterSetTakeDamages,
@@ -134,12 +246,12 @@ public partial struct ZombieSystem : ISystem
             distanceCheck = 10,
         };
 
-        
-        state.Dependency = job.ScheduleParallel(_enQueryZombie, state.Dependency);
+        state.Dependency = job.ScheduleParallel(_enQueryZombieNormal, state.Dependency);
         state.Dependency.Complete();
+
         NativeHashMap<int, float> characterTakeDamageMap =
             new NativeHashMap<int, float>(_takeDamageQueue.Count, Allocator.Temp);
-        while(_takeDamageQueue.TryDequeue(out var queue))
+        while (_takeDamageQueue.TryDequeue(out var queue))
         {
             if (characterTakeDamageMap.ContainsKey(queue.index))
             {
@@ -147,48 +259,59 @@ public partial struct ZombieSystem : ISystem
             }
             else
             {
-                characterTakeDamageMap.Add(queue.index,queue.damage);
+                characterTakeDamageMap.Add(queue.index, queue.damage);
             }
         }
+
         foreach (var map in characterTakeDamageMap)
         {
-            if(map.Value == 0) continue;
+            if (map.Value == 0) continue;
             Entity entity = _characterSetTakeDamages[map.Key].entity;
-            ecb.AddComponent(entity,new TakeDamage()
+            ecb.AddComponent(entity, new TakeDamage()
             {
                 value = map.Value,
             });
         }
+
         characterTakeDamageMap.Dispose();
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
-    
+
+
     [BurstCompile]
     private void Move(ref SystemState state)
     {
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         UpdateCharacterList(ref state);
         float deltaTime = SystemAPI.Time.DeltaTime;
         _zombieInfoTypeHandle.Update(ref state);
         _ltwTypeHandle.Update(ref state);
         _ltTypeHandle.Update(ref state);
+        _entityTypeHandle.Update(ref state);
+        _zombieRunTimeTypeHandle.Update(ref state);
         ZombieMovementJOB job = new ZombieMovementJOB()
         {
             deltaTime = deltaTime,
             ltTypeHandle = _ltTypeHandle,
             zombieInfoTypeHandle = _zombieInfoTypeHandle,
             characterLtws = _characterLtws,
-            ltwTypeHandle = _ltwTypeHandle
+            ltwTypeHandle = _ltwTypeHandle,
+            entityTypeHandle = _entityTypeHandle,
+            zombieRunTimeTypeHandle = _zombieRunTimeTypeHandle,
+            ecb = ecb.AsParallelWriter(),
         };
         state.Dependency = job.ScheduleParallel(_enQueryZombie, state.Dependency);
         state.Dependency.Complete();
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
     }
 
     private void UpdateCharacterList(ref SystemState state)
     {
         _characterLtws.Clear();
         foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAll<CharacterInfo>()
-                     .WithNone<Disabled, SetActiveSP,AddToBuffer>())
+                     .WithNone<Disabled, SetActiveSP, AddToBuffer>())
         {
             _characterLtws.Add(ltw.ValueRO.Position);
         }
@@ -216,61 +339,71 @@ public partial struct ZombieSystem : ISystem
         ecb.Dispose();
     }
 
-    
+
     [BurstCompile]
-partial struct ZombieMovementJOB : IJobChunk
-{
-    public ComponentTypeHandle<LocalTransform> ltTypeHandle;
-    [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwTypeHandle;
-    [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
-    [ReadOnly] public float deltaTime;
-    [ReadOnly] public NativeList<float3> characterLtws;
-
-    public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
-        in v128 chunkEnabledMask)
+    partial struct ZombieMovementJOB : IJobChunk
     {
-        var lts = chunk.GetNativeArray(ref ltTypeHandle);
-        var ltws = chunk.GetNativeArray(ref ltwTypeHandle);
-        var zombieInfos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
-        for (int i = 0; i < chunk.Count; i++)
+        public ComponentTypeHandle<LocalTransform> ltTypeHandle;
+        public EntityCommandBuffer.ParallelWriter ecb;
+        public EntityTypeHandle entityTypeHandle;
+        [ReadOnly] public ComponentTypeHandle<ZombieRuntime> zombieRunTimeTypeHandle;
+        [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwTypeHandle;
+        [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
+        [ReadOnly] public float deltaTime;
+        [ReadOnly] public NativeList<float3> characterLtws;
+
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
+            in v128 chunkEnabledMask)
         {
-            var ltw = ltws[i];
-            var lt = lts[i];
-            var info = zombieInfos[i];
-            var direct = GetDirect(ltw.Position, info.directNormal, info.chasingRange);
-
-            lt.Position += direct * info.speed * deltaTime;
-            lt.Rotation = quaternion.LookRotationSafe(direct, math.up());
-            lts[i] = lt;
-        }
-    }
-
-    private float3 GetDirect(float3 position, float3 defaultDirect, float chasingRange)
-    {
-        float3 nearestPosition = default;
-        float distanceNearest = float.MaxValue;
-
-        foreach (var characterLtw in characterLtws)
-        {
-            float distance = math.distance(characterLtw, position);
-            if (distance <= chasingRange && distance < distanceNearest)
+            var lts = chunk.GetNativeArray(ref ltTypeHandle);
+            var ltws = chunk.GetNativeArray(ref ltwTypeHandle);
+            var zombieRunTimes = chunk.GetNativeArray(ref zombieRunTimeTypeHandle);
+            var zombieInfos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
+            var entities = chunk.GetNativeArray(entityTypeHandle);
+            for (int i = 0; i < chunk.Count; i++)
             {
-                distanceNearest = distance;
-                nearestPosition = characterLtw;
+                var ltw = ltws[i];
+                var lt = lts[i];
+                var info = zombieInfos[i];
+                var direct = GetDirect(ltw.Position, info.directNormal, info.chasingRange);
+
+                lt.Position += direct * info.speed * deltaTime;
+                lt.Rotation = MathExt.MoveTowards(lt.Rotation, quaternion.LookRotationSafe(direct, math.up()),
+                    250 * deltaTime);
+                lts[i] = lt;
+                if (zombieRunTimes[i].latestAnimState != StateID.Run)
+                {
+                    ecb.AddComponent(unfilteredChunkIndex, entities[i], new SetAnimationSP()
+                    {
+                        state = StateID.Run,
+                    });
+                }
             }
         }
 
-        if (distanceNearest < float.MaxValue)
+        private float3 GetDirect(float3 position, float3 defaultDirect, float chasingRange)
         {
-            return math.all(position == nearestPosition) ? float3.zero : math.normalize(nearestPosition - position);
+            float3 nearestPosition = default;
+            float distanceNearest = float.MaxValue;
+
+            foreach (var characterLtw in characterLtws)
+            {
+                float distance = math.distance(characterLtw, position);
+                if (distance <= chasingRange && distance < distanceNearest)
+                {
+                    distanceNearest = distance;
+                    nearestPosition = characterLtw;
+                }
+            }
+
+            if (distanceNearest < float.MaxValue)
+            {
+                return math.all(position == nearestPosition) ? float3.zero : math.normalize(nearestPosition - position);
+            }
+
+            return defaultDirect;
         }
-
-        return defaultDirect;
     }
-
-}
-
-    
 
 
     [BurstCompile]
@@ -300,8 +433,8 @@ partial struct ZombieMovementJOB : IJobChunk
                 {
                     state = DisableID.Disable,
                 });
-                
-                
+
+
                 ecb.AddComponent(unfilteredChunkIndex, entities[i], new AddToBuffer()
                 {
                     id = zombieInfo.id,
@@ -318,7 +451,7 @@ partial struct ZombieMovementJOB : IJobChunk
             }
         }
     }
-    
+
     [BurstCompile]
     partial struct CheckAttackPlayerJOB : IJobChunk
     {
@@ -330,8 +463,9 @@ partial struct ZombieMovementJOB : IJobChunk
         [ReadOnly] public float time;
         [ReadOnly] public float3 playerPosition;
         [ReadOnly] public float distanceCheck;
-         
-        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
+            in v128 chunkEnabledMask)
         {
             var zombieInfos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
             var ltws = chunk.GetNativeArray(ref localToWorldTypeHandle);
@@ -341,11 +475,11 @@ partial struct ZombieMovementJOB : IJobChunk
                 var info = zombieInfos[i];
                 var ltw = ltws[i];
                 var runtime = zombieRuntimes[i];
-                
-                if( time - runtime.latestTimeAttack < info.delayAttack) continue;
-                
-                if(math.distance(playerPosition,ltw.Position) > distanceCheck) continue;
-                
+
+                if (time - runtime.latestTimeAttack < info.delayAttack) continue;
+
+                if (math.distance(playerPosition, ltw.Position) > distanceCheck) continue;
+
                 bool checkAttack = false;
                 for (int j = 0; j < characterSetTakeDamages.Length; j++)
                 {
@@ -360,18 +494,39 @@ partial struct ZombieMovementJOB : IJobChunk
                         checkAttack = true;
                     }
                 }
-                
+
                 if (checkAttack)
                 {
                     runtime.latestTimeAttack = time;
                     zombieRuntimes[i] = runtime;
                 }
+            }
+        }
+    }
+    
+    [BurstCompile]
+    partial struct SetUpNewZombieJOB : IJobChunk
+    {
+        public ComponentTypeHandle<LocalTransform> ltTypeHandle;
+        [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+        {
+            var lts = chunk.GetNativeArray(ref ltTypeHandle);
+            var zombieInfos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
             
+            for (int i = 0; i < chunk.Count; i++)
+            {
+                var info = zombieInfos[i];
+                var lt = lts[i];
+
+                lt.Rotation = quaternion.LookRotationSafe(info.directNormal, math.up());
+                lts[i] = lt;
             }
             
         }
     }
     
+
     [BurstCompile]
     partial struct CheckZombieBossAttackPlayerJOB : IJobChunk
     {
@@ -380,10 +535,12 @@ partial struct ZombieMovementJOB : IJobChunk
         public EntityTypeHandle entityTypeHandle;
         [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
         [ReadOnly] public ComponentTypeHandle<LocalToWorld> localToWorldTypeHandle;
-        [ReadOnly] public NativeList<CharacterSetTakeDamage> characterSetTakeDamages;
+        [ReadOnly] public float3 playerPosition;
         [ReadOnly] public float timeDelay;
         [ReadOnly] public float time;
-        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
+            in v128 chunkEnabledMask)
         {
             var zombieInfos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
             var ltws = chunk.GetNativeArray(ref localToWorldTypeHandle);
@@ -394,37 +551,53 @@ partial struct ZombieMovementJOB : IJobChunk
                 var info = zombieInfos[i];
                 var ltw = ltws[i];
                 var runtime = zombieRuntimes[i];
-                
-                if( time - runtime.latestTimeAttack < info.delayAttack) continue;
-                
-                foreach (var character in characterSetTakeDamages)
+
+
+                var distance = info.attackRange - math.distance(playerPosition, ltw.Position);
+                if (distance >= 0)
                 {
-                    if (math.distance(character.position, ltw.Position) <= info.attackRange)
+                    var timeCheck = time - runtime.latestTimeAttack;
+                    if (timeCheck < info.delayAttack)
                     {
-                        ecb.AddComponent(unfilteredChunkIndex,entities[i],new SetAnimationSP()
+                        if (runtime.latestAnimState != StateID.Idle)
                         {
-                            state = StateID.Attack,
-                            timeDelay = timeDelay,
-                        });
-                        runtime.latestTimeAttack = time + timeDelay;
-                        zombieRuntimes[i] = runtime;
-                        break;
+                            ecb.AddComponent(unfilteredChunkIndex, entities[i], new SetAnimationSP()
+                            {
+                                state = StateID.Idle,
+                                timeDelay = info.delayAttack - timeCheck,
+                            });
+                        }
+
+                        return;
                     }
+
+                    if (MathExt.CalculateAngle(ltw.Forward, playerPosition - ltw.Position) > 45)
+                    {
+                        return;
+                    }
+
+                    ecb.AddComponent(unfilteredChunkIndex, entities[i], new SetAnimationSP()
+                    {
+                        state = StateID.Attack,
+                        timeDelay = 999,
+                    });
+                    runtime.latestTimeAttack = time + timeDelay;
+                    zombieRuntimes[i] = runtime;
+                    break;
                 }
             }
         }
     }
-    
+
     private struct CharacterSetTakeDamage
     {
         public float3 position;
         public Entity entity;
     }
-    
+
     private struct TakeDamageItem
     {
         public int index;
         public float damage;
     }
-    
 }

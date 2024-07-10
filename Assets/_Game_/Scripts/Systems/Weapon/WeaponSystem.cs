@@ -190,7 +190,11 @@ public partial struct WeaponSystem : ISystem
         }
         
         var buffer = _entityManager.GetBuffer<BufferCharacterNew>(_entityPlayer);
-        if(buffer.Length == 0) return;
+        if (buffer.Length == 0)
+        {
+            ecb.Dispose();
+            return;
+        }
         foreach (var b in buffer)
         {
             Entity weaponEntity = _entityManager.Instantiate(_weaponEntityInstantiate);

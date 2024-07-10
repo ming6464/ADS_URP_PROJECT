@@ -1,5 +1,6 @@
 ﻿
 using System;
+using Unity.Mathematics;
 using UnityEngine;
 
 
@@ -20,4 +21,7 @@ public struct Zombie
     public float attackRange;
     public float delayAttack;
     public float chasingRange;
+    public float radiusDamage;
+    public float3 offsetAttackPosition;
 }
+

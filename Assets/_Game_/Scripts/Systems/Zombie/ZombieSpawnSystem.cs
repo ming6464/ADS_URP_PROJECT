@@ -1,4 +1,5 @@
-﻿using NUnit.Framework.Internal;
+﻿using System.Collections.Generic;
+using NUnit.Framework.Internal;
 using Rukhanka;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -24,13 +25,14 @@ public partial struct ZombieSpawnSystem : ISystem
     private EntityTypeHandle _entityTypeHandle;
     private NativeArray<BufferZombieStore> _zombieStores;
     private NativeArray<BufferZombieNormalSpawnID> _zombieNormalSpawnIds;
-    private NativeList<BufferZombieBossSpawn> _zombieBossSpawns;
+    private NativeArray<BufferZombieBossSpawn> _zombieBossSpawns;
     private NativeArray<BufferZombieSpawnRange> _zombieSpawnRanges;
     private EntityManager _entityManager;
     private EntityQuery _enQueryZombieNotUnique;
     private EntityQuery _enQueryZombieNew;
     private int _totalSpawnCount;
     private ComponentTypeHandle<PhysicsCollider> _physicsColliderTypeHandle;
+    private int _startIndexSetSpawnBoss;
     
     #region OnCreate
 
@@ -127,15 +129,22 @@ public partial struct ZombieSpawnSystem : ISystem
         
         //Get data
         _zombieNormalSpawnIds = _entityManager.GetBuffer<BufferZombieNormalSpawnID>(_zombieProperties.entity).ToNativeArray(Allocator.Persistent);
-        var nativeArr = _entityManager.GetBuffer<BufferZombieBossSpawn>(_zombieProperties.entity)
+        _zombieBossSpawns = _entityManager.GetBuffer<BufferZombieBossSpawn>(_zombieProperties.entity)
             .ToNativeArray(Allocator.Persistent);
-        _zombieBossSpawns = new NativeList<BufferZombieBossSpawn>(Allocator.Persistent);
-        _zombieBossSpawns.AddRange(nativeArr);
-        nativeArr.Dispose();
         _zombieSpawnRanges = _entityManager.GetBuffer<BufferZombieSpawnRange>(_zombieProperties.entity)
             .ToNativeArray(Allocator.Persistent);
         _zombieStores = SystemAPI.GetSingletonBuffer<BufferZombieStore>().ToNativeArray(Allocator.Persistent);
+        _zombieBossSpawns.Sort(new AscendingComparer());
     }
+    
+    private struct AscendingComparer : IComparer<BufferZombieBossSpawn>
+    {
+        public int Compare(BufferZombieBossSpawn x, BufferZombieBossSpawn y)
+        {
+            return x.timeDelay.CompareTo(y.timeDelay);
+        }
+    }
+    
     
     [BurstCompile]
     private ZombieInfo GetZombieInfo(BufferZombieStore data,float3 directNormal)
@@ -150,6 +159,8 @@ public partial struct ZombieSpawnSystem : ISystem
             delayAttack = data.delayAttack,
             directNormal = directNormal,
             chasingRange = data.chasingRange,
+            radiusDamage = data.radiusDamage,
+            offsetAttackPosition = data.offsetAttackPosition,
         };
     }
     
@@ -177,35 +188,36 @@ public partial struct ZombieSpawnSystem : ISystem
     [BurstCompile]
     private void CheckAndSpawnBossZombie(ref SystemState state)
     {
-        return;
-        if (!_zombieBossSpawns.IsCreated) return;
+        if(!_zombieBossSpawns.IsCreated) return;
         float time = (float) SystemAPI.Time.ElapsedTime;
         var zomRunTime = new ZombieRuntime()
         {
-            latestTimeAttack = (float)SystemAPI.Time.ElapsedTime,
+            latestTimeAttack = time,
         };
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
-        var list = new NativeList<int>(Allocator.Temp);
-        for(int i = 0; i < _zombieBossSpawns.Length; i ++)
+        for(int i = _startIndexSetSpawnBoss; i < _zombieBossSpawns.Length; i ++)
         {
             var boss = _zombieBossSpawns[i];
             if(boss.timeDelay > time)continue;
+            _startIndexSetSpawnBoss = i + 1;
             _localTransformDefault.Position = boss.position;
+            
             BufferZombieStore zombieDataRandom = GetZombieData(boss.id);
+            var zombieInfo = GetZombieInfo(zombieDataRandom, boss.directNormal);
             Entity entityNew = ecb.Instantiate(zombieDataRandom.entity);
             ecb.AddComponent<NotUnique>(entityNew);
             ecb.AddComponent(entityNew,_localTransformDefault);
-            list.Add(i);
             ecb.AddComponent(entityNew, zomRunTime);
-            ecb.AddComponent(entityNew,GetZombieInfo(zombieDataRandom,boss.directNormal));
+            ecb.AddComponent(entityNew,zombieInfo);
             ecb.AddComponent<New>(entityNew);
             ecb.AddComponent(entityNew,new BossInfo());
-            _zombieBossSpawns.Clear();
-            break;
         }
         ecb.Playback(_entityManager);
         ecb.Dispose();
-        list.Dispose();
+        if (_startIndexSetSpawnBoss >= _zombieBossSpawns.Length)
+        {
+            _zombieBossSpawns.Dispose();
+        }
     }
 
     [BurstCompile]
@@ -222,7 +234,7 @@ public partial struct ZombieSpawnSystem : ISystem
 
             if (!_zombieSpawner.spawnInfinity && numberZombieSet >= _zombieSpawner.totalNumber)return;
             int numberZombieCanSpawn = _zombieSpawner.spawnInfinity ? _numberSpawnPerFrame : (math.min(_zombieSpawner.totalNumber - numberZombieSet,_numberSpawnPerFrame));
-            int lengthRange = _zombieSpawnRanges.Length;
+            int lengthRange = math.min(_zombieSpawnRanges.Length,numberZombieCanSpawn);
             int numberSpawnPerRange = numberZombieCanSpawn / lengthRange;
             EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
             for (int i = 0; i < lengthRange; i++)

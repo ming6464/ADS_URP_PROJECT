@@ -9,7 +9,7 @@ using UnityEngine;
 using Random = Unity.Mathematics.Random;
 using RaycastHit = Unity.Physics.RaycastHit;
 
-[UpdateInGroup(typeof(SimulationSystemGroup)),UpdateBefore(typeof(AnimationSystem))]
+[UpdateInGroup(typeof(SimulationSystemGroup)),UpdateBefore(typeof(AnimationStateSystem))]
 [BurstCompile]
 public partial struct BulletMovementSystem : ISystem
 {
@@ -101,6 +101,7 @@ public partial struct BulletMovementSystem : ISystem
             expired = _weaponProperties.timeLife,
             zombieDamageMapQueue = _takeDamageQueue.AsParallelWriter(),
         };
+        
         state.Dependency = jobChunk.Schedule(_enQueryBulletInfoAlive, state.Dependency);
         state.Dependency.Complete();
         
@@ -120,9 +121,6 @@ public partial struct BulletMovementSystem : ISystem
                     _takeDamageMap.Add(item.entity,damage);
                 }
             }
-            
-            
-            
             foreach (var map in _takeDamageMap)
             {
                 ecb.AddComponent(map.Key,new TakeDamage()
@@ -131,6 +129,7 @@ public partial struct BulletMovementSystem : ISystem
                 });
             }
         }
+        
         _takeDamageQueue.Clear();
         _takeDamageMap.Clear();
         ecb.Playback(_entityManager);
@@ -166,7 +165,10 @@ public partial struct BulletMovementSystem : ISystem
                 state = DisableID.Disable,
             };
 
-            var eff = new EffectComponent();
+            var eff = new EffectComponent()
+            {
+                effectID = EffectID.HitFlash,
+            };
             var ltHide = new LocalTransform()
             {
                 Scale = 1,
@@ -180,7 +182,8 @@ public partial struct BulletMovementSystem : ISystem
                 var bulletInfo = bulletInfos[i];
                 if ((currentTime - bulletInfo.startTime) >= expired)
                 {
-                    ecb.SetComponent(unfilteredChunkIndex,entity,ltHide);
+                    ltArr[i] = ltHide;
+                    // ecb.SetComponent(unfilteredChunkIndex,entity,ltHide);
                     ecb.AddComponent<AddToBuffer>(unfilteredChunkIndex,entity);
                     ecb.AddComponent(unfilteredChunkIndex,entity,setActiveSP);
                     continue;

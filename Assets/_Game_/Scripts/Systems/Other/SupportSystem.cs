@@ -9,7 +9,7 @@ using UnityEngine;
 
 //
 [UpdateInGroup(typeof(SimulationSystemGroup))]
-public partial class AnimationSystem : SystemBase
+public partial class AnimationStateSystem : SystemBase
 {
     private readonly FastAnimatorParameter _dieAnimatorParameter = new("Die");
     private readonly FastAnimatorParameter _runAnimatorParameter = new("Run");
@@ -48,6 +48,7 @@ public partial class AnimationSystem : SystemBase
             ecb = ecb.AsParallelWriter(),
             timeDelta = (float)SystemAPI.Time.DeltaTime,
             dieAnimatorParameter = _dieAnimatorParameter,
+            
         };
         Dependency = characterAnimJob.ScheduleParallel(Dependency);
         Dependency.Complete();
@@ -65,7 +66,8 @@ public partial class AnimationSystem : SystemBase
             enemyLayer = _layerStoreComponent.enemyLayer,
             enemyDieLayer = _layerStoreComponent.enemyDieLayer,
             attackAnimatorParameter = _attackAnimatorParameter,
-            ecb = ecb.AsParallelWriter()
+            ecb = ecb.AsParallelWriter(),
+            runAnimatorParameter = _runAnimatorParameter
         };
         Dependency = zombieAnimatorJob.ScheduleParallel(Dependency);
         Dependency.Complete();
@@ -82,39 +84,48 @@ public partial class AnimationSystem : SystemBase
         [ReadOnly] public FastAnimatorParameter runAnimatorParameter;
         [ReadOnly] public FastAnimatorParameter dieAnimatorParameter;
 
-        void Execute(in CharacterInfo characterInfo, ref SetAnimationSP setActiveSp, Entity entity,
+        void Execute(in CharacterInfo characterInfo, ref SetAnimationSP setAnimation, Entity entity,
             [EntityIndexInQuery] int indexQuery, AnimatorParametersAspect parametersAspect)
         {
-            setActiveSp.timeDelay -= timeDelta;
-            switch (setActiveSp.state)
+            setAnimation.timeDelay -= timeDelta;
+            switch (setAnimation.state)
             {
                 case StateID.Enable:
                     parametersAspect.SetBoolParameter(dieAnimatorParameter, false);
-                    ecb.RemoveComponent<SetAnimationSP>(indexQuery, entity);
+                    setAnimation.state = StateID.WaitRemove;
                     break;
                 case StateID.None:
                     parametersAspect.SetBoolParameter(runAnimatorParameter, false);
-                    ecb.RemoveComponent<SetAnimationSP>(indexQuery, entity);
+                    setAnimation.state = StateID.WaitRemove;
                     break;
                 case StateID.Run:
                     parametersAspect.SetBoolParameter(runAnimatorParameter, true);
-                    ecb.RemoveComponent<SetAnimationSP>(indexQuery, entity);
+                    setAnimation.state = StateID.WaitRemove;
                     break;
-                case StateID.Wait:
+                case StateID.Die:
                     parametersAspect.SetBoolParameter(dieAnimatorParameter, true);
-                    setActiveSp.state = StateID.WaitAnimation;
+                    setAnimation.state = StateID.WaitToPool;
                     break;
-                case StateID.WaitAnimation:
-                    if (setActiveSp.timeDelay <= 0)
+                case StateID.WaitToPool:
+                    if (setAnimation.timeDelay <= 0)
                     {
-                        ecb.RemoveComponent<SetAnimationSP>(indexQuery,entity);
+                        setAnimation.state = StateID.WaitRemove;
                         ecb.AddComponent(indexQuery, entity, new SetActiveSP()
                         {
                             state = DisableID.Disable,
                         });
                     }
                     break;
+                case StateID.Idle:
+                    setAnimation.state = StateID.WaitRemove;
+                    break;
             }
+
+            if (setAnimation is { state: StateID.WaitRemove, timeDelay: <= 0 })
+            {
+                ecb.RemoveComponent<SetAnimationSP>(indexQuery,entity);
+            }
+            
         }
     }
 
@@ -124,34 +135,37 @@ public partial class AnimationSystem : SystemBase
         public EntityCommandBuffer.ParallelWriter ecb;
         [ReadOnly] public FastAnimatorParameter dieAnimatorParameter;
         [ReadOnly] public FastAnimatorParameter attackAnimatorParameter;
+        [ReadOnly] public FastAnimatorParameter runAnimatorParameter;
         [ReadOnly] public float timeDelta;
         [ReadOnly] public uint enemyLayer;
         [ReadOnly] public uint enemyDieLayer;
 
-        void Execute(in ZombieInfo zombieInfo, ref SetAnimationSP setAnimation,Entity entity,[EntityIndexInQuery]int indexQuery  , AnimatorParametersAspect parametersAspect,
+        void Execute(in ZombieInfo zombieInfo,ref ZombieRuntime runtime, ref SetAnimationSP setAnimation,Entity entity,[EntityIndexInQuery]int indexQuery  , AnimatorParametersAspect parametersAspect,
             ref PhysicsCollider physicsCollider)
         {
             setAnimation.timeDelay -= timeDelta;
             var colliderFilter = physicsCollider.Value.Value.GetCollisionFilter();
+            runtime.latestAnimState = setAnimation.state;
             switch (setAnimation.state)
             {
                 case StateID.Enable:
                     parametersAspect.SetBoolParameter(dieAnimatorParameter, false);
-                    // parametersAspect.SetBoolParameter(attackAnimatorParameter, false);
+                    parametersAspect.SetBoolParameter(attackAnimatorParameter, false);
+                    parametersAspect.SetBoolParameter(runAnimatorParameter, false);
                     colliderFilter.BelongsTo = enemyLayer;
                     physicsCollider.Value.Value.SetCollisionFilter(colliderFilter);
-                    ecb.RemoveComponent<SetAnimationSP>(indexQuery,entity);
+                    setAnimation.state = StateID.WaitRemove;
                     break;
-                case StateID.Wait:
+                case StateID.Die:
                     parametersAspect.SetBoolParameter(dieAnimatorParameter, true);
-                    setAnimation.state = StateID.WaitAnimation;
+                    setAnimation.state = StateID.WaitToPool;
                     colliderFilter.BelongsTo = enemyDieLayer;
                     physicsCollider.Value.Value.SetCollisionFilter(colliderFilter);
                     break;
-                case StateID.WaitAnimation:
+                case StateID.WaitToPool:
                     if (setAnimation.timeDelay <= 0)
                     {
-                        ecb.RemoveComponent<SetAnimationSP>(indexQuery,entity);
+                        setAnimation.state = StateID.WaitRemove;
                         ecb.AddComponent(indexQuery, entity, new SetActiveSP()
                         {
                             state = DisableID.Disable,
@@ -162,11 +176,27 @@ public partial class AnimationSystem : SystemBase
                     parametersAspect.SetBoolParameter(attackAnimatorParameter, true);
                     if (setAnimation.timeDelay <= 0)
                     {
-                        ecb.RemoveComponent<SetAnimationSP>(indexQuery,entity);
+                        setAnimation.state = StateID.WaitRemove;
                         parametersAspect.SetBoolParameter(attackAnimatorParameter, false);
                     }
                     break;
+                case StateID.Run:
+                    parametersAspect.SetBoolParameter(runAnimatorParameter,true);
+                    setAnimation.state = StateID.WaitRemove;
+                    break;
+                case StateID.Idle:
+                    parametersAspect.SetBoolParameter(dieAnimatorParameter, false);
+                    parametersAspect.SetBoolParameter(attackAnimatorParameter, false);
+                    parametersAspect.SetBoolParameter(runAnimatorParameter, false);
+                    setAnimation.state = StateID.WaitRemove;
+                    break;
             }
+            
+            if (setAnimation is { state: StateID.WaitRemove, timeDelay: <= 0 })
+            {
+                ecb.RemoveComponent<SetAnimationSP>(indexQuery,entity);
+            }
+
         }
     }
 }
@@ -693,7 +723,7 @@ public partial class UpdateHybrid : SystemBase
     // Camera {
     public delegate void EventCamera(Vector3 positionWorld, Quaternion rotationWorld, CameraType type);
 
-    public delegate void EventHitFlashEffect(Vector3 position, Quaternion rotation);
+    public delegate void EventHitFlashEffect(Vector3 position, Quaternion rotation,EffectID effectID);
 
     public delegate void EventChangText(int idText, int value);
 
@@ -703,8 +733,6 @@ public partial class UpdateHybrid : SystemBase
     //Effect {
 
     public EventHitFlashEffect UpdateHitFlashEff;
-    private NativeQueue<LocalTransform> _hitFlashQueue;
-    private EntityQuery _enQueryEffect;
     //Effect }
 
     //Change text {
@@ -717,16 +745,9 @@ public partial class UpdateHybrid : SystemBase
     {
         base.OnStartRunning();
         RequireForUpdate<CameraComponent>();
-        _hitFlashQueue = new NativeQueue<LocalTransform>(Allocator.Persistent);
-        _enQueryEffect = SystemAPI.QueryBuilder().WithAll<EffectComponent>().Build();
         _effectTypeHandle = GetComponentTypeHandle<EffectComponent>();
     }
 
-    protected override void OnStopRunning()
-    {
-        base.OnStopRunning();
-        _hitFlashQueue.Dispose();
-    }
 
     protected override void OnUpdate()
     {
@@ -759,23 +780,15 @@ public partial class UpdateHybrid : SystemBase
 
     private void UpdateEffectEvent()
     {
-        _hitFlashQueue.Clear();
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+        // return;
         _effectTypeHandle.Update(this);
-        var hitFlashEff = new HandleHitFlashEffectEventJOB()
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+        Entities.ForEach((EffectComponent eff,Entity entity) =>
         {
-            effTypeHandle = _effectTypeHandle,
-            hitFlashQueue = _hitFlashQueue.AsParallelWriter(),
-            entityTypeHandle = GetEntityTypeHandle(),
-            ecb = ecb.AsParallelWriter(),
-        };
-        Dependency = hitFlashEff.ScheduleParallel(_enQueryEffect, Dependency);
+            UpdateHitFlashEff?.Invoke(eff.position, eff.rotation, eff.effectID);
+            ecb.RemoveComponent<EffectComponent>(entity);
+        }).WithoutBurst().Run();
         Dependency.Complete();
-        while (_hitFlashQueue.TryDequeue(out var lt))
-        {
-            UpdateHitFlashEff?.Invoke(lt.Position, lt.Rotation);
-        }
-
         ecb.Playback(EntityManager);
         ecb.Dispose();
     }
@@ -791,29 +804,8 @@ public partial class UpdateHybrid : SystemBase
 
 
     //JOB
-    partial struct HandleHitFlashEffectEventJOB : IJobChunk
-    {
-        public EntityCommandBuffer.ParallelWriter ecb;
-        public EntityTypeHandle entityTypeHandle;
-        [WriteOnly] public NativeQueue<LocalTransform>.ParallelWriter hitFlashQueue;
-        [ReadOnly] public ComponentTypeHandle<EffectComponent> effTypeHandle;
-
-        public void Execute(in ArchetypeChunk chunk, int indexQuery, bool useEnabledMask, in v128 chunkEnabledMask)
-        {
-            var effs = chunk.GetNativeArray(ref effTypeHandle);
-            var entities = chunk.GetNativeArray(entityTypeHandle);
-            LocalTransform lt;
-            for (int i = 0; i < chunk.Count; i++)
-            {
-                lt = new LocalTransform()
-                {
-                    Position = effs[i].position,
-                    Rotation = effs[i].rotation,
-                };
-                hitFlashQueue.Enqueue(lt);
-                ecb.RemoveComponent<EffectComponent>(indexQuery, entities[i]);
-            }
-        }
-    }
     //JOB
+    
+    //
+    //
 }

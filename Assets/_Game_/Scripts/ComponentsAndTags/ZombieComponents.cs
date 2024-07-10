@@ -55,6 +55,8 @@ public struct ZombieInfo : IComponentData
     public float delayAttack;
     public float chasingRange;
     public float3 directNormal;
+    public float radiusDamage;
+    public float3 offsetAttackPosition;
 }
 
 public struct BossInfo : IComponentData
@@ -65,6 +67,7 @@ public struct BossInfo : IComponentData
 public struct ZombieRuntime : IComponentData
 {
     public float latestTimeAttack;
+    public StateID latestAnimState;
 }
 
 public struct BufferZombieStore : IBufferElementData
@@ -77,6 +80,8 @@ public struct BufferZombieStore : IBufferElementData
     public float attackRange;
     public float delayAttack;
     public float chasingRange;
+    public float radiusDamage;
+    public float3 offsetAttackPosition;
     //
 }
 

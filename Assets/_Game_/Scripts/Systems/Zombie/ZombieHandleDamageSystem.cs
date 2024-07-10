@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace _Game.Scripts.Systems.Zombie
 {
-    [UpdateInGroup(typeof(SimulationSystemGroup)),UpdateAfter(typeof(BulletMovementSystem)),UpdateBefore(typeof(AnimationSystem))]
+    [UpdateInGroup(typeof(SimulationSystemGroup)),UpdateAfter(typeof(BulletMovementSystem)),UpdateBefore(typeof(AnimationStateSystem))]
     public partial struct ZombieHandleDamageSystem : ISystem
     {
         private EntityTypeHandle _entityTypeHandle;
@@ -29,6 +29,7 @@ namespace _Game.Scripts.Systems.Zombie
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            
             EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
             HandleTakeDamage(ref state,ref ecb);
             state.Dependency.Complete();
@@ -69,7 +70,7 @@ namespace _Game.Scripts.Systems.Zombie
                 var entities = chunk.GetNativeArray(entityTypeHandle);
                 var setActive = new SetAnimationSP()
                 {
-                    state = StateID.Wait,
+                    state = StateID.Die,
                     timeDelay = timeDelay,
                 };
                 var addToBuffer = new AddToBuffer();

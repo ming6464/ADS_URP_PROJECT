@@ -22,6 +22,11 @@ MonoBehaviour:
     attackRange: 1
     delayAttack: 0.5
     chasingRange: 2
+    radiusDamage: 0
+    offsetAttackPosition:
+      x: 0
+      y: 0
+      z: 0
   - id: 1
     prefab: {fileID: 3271673093327854511, guid: 0ce127a5e151d014c80c11d56c6c2c12,
       type: 3}
@@ -31,6 +36,11 @@ MonoBehaviour:
     attackRange: 0.5
     delayAttack: 0.5
     chasingRange: 2
+    radiusDamage: 0
+    offsetAttackPosition:
+      x: 0
+      y: 0
+      z: 0
   - id: 2
     prefab: {fileID: 4218027828009085709, guid: 5bdc1fcf43ae4244c9adb071e3dbe86c,
       type: 3}
@@ -40,12 +50,22 @@ MonoBehaviour:
     attackRange: 0.5
     delayAttack: 0.5
     chasingRange: 1.5
+    radiusDamage: 0
+    offsetAttackPosition:
+      x: 0
+      y: 0
+      z: 0
   - id: 3
     prefab: {fileID: 8005553429579729171, guid: df3e92f724aae794bb9225cefd668ccd,
       type: 3}
     hp: 500000000
-    speed: 3.8
-    damage: 0
-    attackRange: 1.5
-    delayAttack: 0.5
-    chasingRange: 4
+    speed: 2.5
+    damage: 10
+    attackRange: 2.5
+    delayAttack: 1.5
+    chasingRange: 8
+    radiusDamage: 2
+    offsetAttackPosition:
+      x: 0
+      y: 0.2
+      z: 2.2

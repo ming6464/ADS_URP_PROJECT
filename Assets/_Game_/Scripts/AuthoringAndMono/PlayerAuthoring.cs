@@ -25,9 +25,7 @@ public class PlayerAuthoring : MonoBehaviour
     public int idWeaponDefault;
     //
     public float divisionAngle;
-    
-    
-    
+
     class AuthoringBaker : Baker<PlayerAuthoring>
     {
         public override void Bake(PlayerAuthoring authoring)

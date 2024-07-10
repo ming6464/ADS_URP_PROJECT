@@ -1,4 +1,5 @@
-﻿using _Game_.Scripts.Data;
+﻿using System;
+using _Game_.Scripts.Data;
 using Unity.Entities;
 using UnityEngine;
 
@@ -11,6 +12,8 @@ namespace _Game_.Scripts.AuthoringAndMono
         public ObstacleSO obstacleSo;
         private class DataAuthoringBaker : Baker<DataAuthoring>
         {
+            
+            
             public override void Bake(DataAuthoring authoring)
             {
                 var entity = GetEntity(TransformUsageFlags.None);
@@ -37,7 +40,7 @@ namespace _Game_.Scripts.AuthoringAndMono
                     });
                 }
                 //
-                
+
                 // Add buffer zombie
                 foreach (var zombie in authoring.zombieSo.zombies)
                 {
@@ -51,6 +54,8 @@ namespace _Game_.Scripts.AuthoringAndMono
                         attackRange = zombie.attackRange,
                         delayAttack = zombie.delayAttack,
                         chasingRange = zombie.chasingRange,
+                        radiusDamage = zombie.radiusDamage,
+                        offsetAttackPosition = zombie.offsetAttackPosition,
                     });
                 }
                 //

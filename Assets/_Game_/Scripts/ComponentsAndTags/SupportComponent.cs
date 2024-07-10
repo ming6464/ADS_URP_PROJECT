@@ -28,6 +28,7 @@ public struct LayerStoreComponent : IComponentData
 
 public struct EffectComponent : IComponentData
 {
+    public EffectID effectID;
     public float3 position;
     public quaternion rotation;
 }
@@ -45,6 +46,13 @@ public struct SetAnimationSP : IComponentData
 }
 
 //Enum
+
+public enum EffectID
+{
+    HitFlash,
+    GroundCrack
+}
+
 public enum DisableID
 {
     Disable,
@@ -59,11 +67,13 @@ public enum DisableID
 public enum StateID
 {
     None,
-    Wait,
-    WaitAnimation,
+    Die,
+    WaitToPool,
     Enable,
     Run,
-    Attack
+    Attack,
+    Idle,
+    WaitRemove
 }
 
 public enum CameraType
