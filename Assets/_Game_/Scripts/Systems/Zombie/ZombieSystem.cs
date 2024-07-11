@@ -6,7 +6,6 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
-using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup)), UpdateBefore(typeof(AnimationStateSystem))]
 [BurstCompile]
@@ -97,6 +96,7 @@ public partial struct ZombieSystem : ISystem
         CheckAnimationEvent(ref state);
     }
 
+    [BurstCompile]
     private void SetUpNewZombie(ref SystemState state)
     {
         _ltTypeHandle.Update(ref state);
@@ -109,7 +109,30 @@ public partial struct ZombieSystem : ISystem
         state.Dependency = job.ScheduleParallel(_enQueryZombieNew, state.Dependency);
         state.Dependency.Complete();
     }
+    [BurstCompile]
+    private void CheckAndInit(ref SystemState state)
+    {
+        if (!_init)
+        {
+            _init = true;
+            var zone = SystemAPI.GetSingleton<ActiveZoneProperty>();
+            _pointZoneMin = zone.pointRangeMin;
+            _pointZoneMax = zone.pointRangeMax;
+            _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
+            _entityManager = state.EntityManager;
+            _layerStore = SystemAPI.GetSingleton<LayerStoreComponent>();
+            _collisionFilter = new CollisionFilter()
+            {
+                BelongsTo = _layerStore.enemyLayer,
+                CollidesWith = _layerStore.characterLayer,
+                GroupIndex = 0
+            };
+        }
+    }
 
+    #region Animation Event
+
+    [BurstCompile]
     private void CheckAnimationEvent(ref SystemState state)
     {
         _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
@@ -175,26 +198,9 @@ public partial struct ZombieSystem : ISystem
         hits.Dispose();
     }
 
-    [BurstCompile]
-    private void CheckAndInit(ref SystemState state)
-    {
-        if (!_init)
-        {
-            _init = true;
-            var zone = SystemAPI.GetSingleton<ActiveZoneProperty>();
-            _pointZoneMin = zone.pointRangeMin;
-            _pointZoneMax = zone.pointRangeMax;
-            _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
-            _entityManager = state.EntityManager;
-            _layerStore = SystemAPI.GetSingleton<LayerStoreComponent>();
-            _collisionFilter = new CollisionFilter()
-            {
-                BelongsTo = _layerStore.enemyLayer,
-                CollidesWith = _layerStore.characterLayer,
-                GroupIndex = 0
-            };
-        }
-    }
+    #endregion
+    
+    #region Attack Character
 
     [BurstCompile]
     private void CheckAttackPlayer(ref SystemState state)
@@ -215,40 +221,19 @@ public partial struct ZombieSystem : ISystem
         if (_characterSetTakeDamages.Length == 0) return;
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
         var playerPosition = SystemAPI.GetComponentRO<LocalToWorld>(_entityPlayerInfo).ValueRO.Position;
-        _ltwTypeHandle.Update(ref state);
-        _zombieInfoTypeHandle.Update(ref state);
-        _zombieRunTimeTypeHandle.Update(ref state);
-        _entityTypeHandle.Update(ref state);
 
-        var jobBoss = new CheckZombieBossAttackPlayerJOB()
-        {
-            playerPosition = playerPosition,
-            ecb = ecb.AsParallelWriter(),
-            entityTypeHandle = _entityTypeHandle,
-            localToWorldTypeHandle = _ltwTypeHandle,
-            time = (float)SystemAPI.Time.ElapsedTime,
-            timeDelay = 2.2f,
-            zombieInfoTypeHandle = _zombieInfoTypeHandle,
-            zombieRuntimeTypeHandle = _zombieRunTimeTypeHandle
-        };
-        state.Dependency = jobBoss.ScheduleParallel(_enQueryZombieBoss, state.Dependency);
-        state.Dependency.Complete();
+        BossAttack(ref state,ref ecb, playerPosition);
 
-        var job = new CheckAttackPlayerJOB()
-        {
-            characterSetTakeDamages = _characterSetTakeDamages,
-            localToWorldTypeHandle = _ltwTypeHandle,
-            time = (float)SystemAPI.Time.ElapsedTime,
-            zombieInfoTypeHandle = _zombieInfoTypeHandle,
-            zombieRuntimeTypeHandle = _zombieRunTimeTypeHandle,
-            takeDamageQueues = _takeDamageQueue.AsParallelWriter(),
-            playerPosition = playerPosition,
-            distanceCheck = 10,
-        };
+        ZombieNormalAttack(ref state, ref _takeDamageQueue,playerPosition);
 
-        state.Dependency = job.ScheduleParallel(_enQueryZombieNormal, state.Dependency);
-        state.Dependency.Complete();
-
+        HandleAttackedCharacter(ref state,ref ecb,_takeDamageQueue);
+        
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
+    }
+    [BurstCompile]
+    private void HandleAttackedCharacter(ref SystemState state, ref EntityCommandBuffer ecb, NativeQueue<TakeDamageItem> takeDamageQueue)
+    {
         NativeHashMap<int, float> characterTakeDamageMap =
             new NativeHashMap<int, float>(_takeDamageQueue.Count, Allocator.Temp);
         while (_takeDamageQueue.TryDequeue(out var queue))
@@ -272,18 +257,58 @@ public partial struct ZombieSystem : ISystem
                 value = map.Value,
             });
         }
-
         characterTakeDamageMap.Dispose();
-        ecb.Playback(_entityManager);
-        ecb.Dispose();
+    }
+    [BurstCompile]
+    private void ZombieNormalAttack(ref SystemState state, ref NativeQueue<TakeDamageItem> takeDamageQueue, float3 playerPosition)
+    {
+        var job = new CheckAttackPlayerJOB()
+        {
+            characterSetTakeDamages = _characterSetTakeDamages,
+            localToWorldTypeHandle = _ltwTypeHandle,
+            time = (float)SystemAPI.Time.ElapsedTime,
+            zombieInfoTypeHandle = _zombieInfoTypeHandle,
+            zombieRuntimeTypeHandle = _zombieRunTimeTypeHandle,
+            takeDamageQueues = takeDamageQueue.AsParallelWriter(),
+            playerPosition = playerPosition,
+            distanceCheck = 10,
+        };
+
+        state.Dependency = job.ScheduleParallel(_enQueryZombieNormal, state.Dependency);
+        state.Dependency.Complete();
+    }
+    [BurstCompile]
+    private void BossAttack(ref SystemState state, ref EntityCommandBuffer ecb, float3 playerPosition)
+    {
+        _ltwTypeHandle.Update(ref state);
+        _zombieInfoTypeHandle.Update(ref state);
+        _zombieRunTimeTypeHandle.Update(ref state);
+        _entityTypeHandle.Update(ref state);
+
+        var jobBoss = new CheckZombieBossAttackPlayerJOB()
+        {
+            playerPosition = playerPosition,
+            ecb = ecb.AsParallelWriter(),
+            entityTypeHandle = _entityTypeHandle,
+            localToWorldTypeHandle = _ltwTypeHandle,
+            time = (float)SystemAPI.Time.ElapsedTime,
+            timeDelay = 2.2f,
+            zombieInfoTypeHandle = _zombieInfoTypeHandle,
+            zombieRuntimeTypeHandle = _zombieRunTimeTypeHandle
+        };
+        state.Dependency = jobBoss.ScheduleParallel(_enQueryZombieBoss, state.Dependency);
+        state.Dependency.Complete();
     }
 
+    #endregion
+
+    #region MOVE
 
     [BurstCompile]
     private void Move(ref SystemState state)
     {
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
-        UpdateCharacterList(ref state);
+        UpdateCharacterLTWList(ref state);
         float deltaTime = SystemAPI.Time.DeltaTime;
         _zombieInfoTypeHandle.Update(ref state);
         _ltwTypeHandle.Update(ref state);
@@ -306,8 +331,8 @@ public partial struct ZombieSystem : ISystem
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
-
-    private void UpdateCharacterList(ref SystemState state)
+    [BurstCompile]
+    private void UpdateCharacterLTWList(ref SystemState state)
     {
         _characterLtws.Clear();
         foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAll<CharacterInfo>()
@@ -317,6 +342,9 @@ public partial struct ZombieSystem : ISystem
         }
     }
 
+
+    #endregion
+    
     [BurstCompile]
     private void CheckZombieToDeadZone(ref SystemState state)
     {
@@ -339,6 +367,7 @@ public partial struct ZombieSystem : ISystem
         ecb.Dispose();
     }
 
+    #region JOB
 
     [BurstCompile]
     partial struct ZombieMovementJOB : IJobChunk
@@ -588,6 +617,10 @@ public partial struct ZombieSystem : ISystem
             }
         }
     }
+
+    #endregion
+
+    
 
     private struct CharacterSetTakeDamage
     {

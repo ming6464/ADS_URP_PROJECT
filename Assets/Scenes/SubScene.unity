@@ -6115,7 +6115,7 @@ MonoBehaviour:
   timeLife: 1
   damageRangeRatio:
     x: 1
-    y: 1
+    y: 1.5
   timeRange:
     x: 1
     y: 30
@@ -7626,7 +7626,7 @@ MonoBehaviour:
     pointRange2: {fileID: 496664265}
     pointDir1: {fileID: 1398424327}
     pointDir2: {fileID: 1104236741}
-  totalNumber: 1200
+  totalNumber: 0
   cooldown: 0.1
   spawnAmountRange:
     x: 5
@@ -7638,7 +7638,27 @@ MonoBehaviour:
   allowRespawn: 1
   spawnBosses:
   - id: 3
-    timeDelay: 1
+    timeDelay: 0
+    spawnPos: {fileID: 1269660415}
+    pointDir1: {fileID: 1269660415}
+    pointDir2: {fileID: 149550905}
+  - id: 3
+    timeDelay: 2
+    spawnPos: {fileID: 1269660415}
+    pointDir1: {fileID: 1269660415}
+    pointDir2: {fileID: 149550905}
+  - id: 3
+    timeDelay: 0
+    spawnPos: {fileID: 1269660415}
+    pointDir1: {fileID: 1269660415}
+    pointDir2: {fileID: 149550905}
+  - id: 3
+    timeDelay: 3
+    spawnPos: {fileID: 1269660415}
+    pointDir1: {fileID: 1269660415}
+    pointDir2: {fileID: 149550905}
+  - id: 3
+    timeDelay: 5
     spawnPos: {fileID: 1269660415}
     pointDir1: {fileID: 1269660415}
     pointDir2: {fileID: 149550905}
