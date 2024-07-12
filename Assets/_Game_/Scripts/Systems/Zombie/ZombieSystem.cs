@@ -3,23 +3,22 @@ using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
+using Random = Unity.Mathematics.Random;
 
 [UpdateInGroup(typeof(SimulationSystemGroup)), UpdateBefore(typeof(AnimationStateSystem))]
 [BurstCompile]
 public partial struct ZombieSystem : ISystem
 {
+    private bool _init;
     private float3 _pointZoneMin;
     private float3 _pointZoneMax;
-    private bool _init;
     private Entity _entityPlayerInfo;
     private EntityTypeHandle _entityTypeHandle;
-    private EntityQuery _enQueryZombie;
-    private EntityQuery _enQueryZombieNormal;
-    private EntityQuery _enQueryZombieBoss;
-    private EntityQuery _enQueryZombieNew;
     private EntityManager _entityManager;
     private NativeQueue<TakeDamageItem> _takeDamageQueue;
     private NativeList<CharacterSetTakeDamage> _characterSetTakeDamages;
@@ -28,11 +27,20 @@ public partial struct ZombieSystem : ISystem
     private ComponentTypeHandle<ZombieRuntime> _zombieRunTimeTypeHandle;
     private ComponentTypeHandle<ZombieInfo> _zombieInfoTypeHandle;
     private ComponentTypeHandle<LocalTransform> _ltTypeHandle;
-    private uint _bossOgreAttackHash;
-    private uint _finishAttackHash;
     private LayerStoreComponent _layerStore;
     private CollisionFilter _collisionFilter;
     private PhysicsWorldSingleton _physicsWorld;
+    private ZombieProperty _zombieProperty;
+
+    // Query
+    private EntityQuery _enQueryZombie;
+    private EntityQuery _enQueryZombieNormal;
+    private EntityQuery _enQueryZombieBoss;
+    private EntityQuery _enQueryZombieNew;
+
+    // HASH
+    private uint _bossOgreAttackHash;
+    private uint _finishAttackHash;
 
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -91,9 +99,43 @@ public partial struct ZombieSystem : ISystem
         CheckAndInit(ref state);
         SetUpNewZombie(ref state);
         Move(ref state);
+        AvoidFlock(ref state);
         CheckAttackPlayer(ref state);
         CheckDeadZone(ref state);
         CheckAnimationEvent(ref state);
+    }
+
+    [BurstCompile]
+    private void AvoidFlock(ref SystemState state)
+    {
+        return;
+        if(!_zombieProperty.comparePriorities) return;
+        var avoidDatas = new NativeList<AvoidData>(Allocator.TempJob);
+
+        foreach (var (ìnfo, lt,entity) in SystemAPI.Query<RefRO<ZombieInfo>, RefRO<LocalTransform>>().WithEntityAccess().WithNone<Disabled,SetActiveSP,AddToBuffer>())
+        {
+            avoidDatas.Add(new AvoidData()
+            {
+                entity = entity,
+                info = ìnfo.ValueRO,
+                lt = lt.ValueRO,
+            });
+        }
+
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
+        var job = new ZombieAvoidJOB()
+        {
+            avoidDatas = avoidDatas,
+            zombieProperty = _zombieProperty,
+            deltaTime = SystemAPI.Time.DeltaTime,
+            ecb = ecb.AsParallelWriter(),
+        };
+
+        state.Dependency = job.Schedule(avoidDatas.Length, 30);
+        state.Dependency.Complete();
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
+        avoidDatas.Dispose();
     }
 
     [BurstCompile]
@@ -109,6 +151,7 @@ public partial struct ZombieSystem : ISystem
         state.Dependency = job.ScheduleParallel(_enQueryZombieNew, state.Dependency);
         state.Dependency.Complete();
     }
+
     [BurstCompile]
     private void CheckAndInit(ref SystemState state)
     {
@@ -127,6 +170,7 @@ public partial struct ZombieSystem : ISystem
                 CollidesWith = _layerStore.characterLayer,
                 GroupIndex = 0
             };
+            _zombieProperty = SystemAPI.GetSingleton<ZombieProperty>();
         }
     }
 
@@ -199,7 +243,7 @@ public partial struct ZombieSystem : ISystem
     }
 
     #endregion
-    
+
     #region Attack Character
 
     [BurstCompile]
@@ -222,17 +266,19 @@ public partial struct ZombieSystem : ISystem
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
         var playerPosition = SystemAPI.GetComponentRO<LocalToWorld>(_entityPlayerInfo).ValueRO.Position;
 
-        BossAttack(ref state,ref ecb, playerPosition);
+        BossAttack(ref state, ref ecb, playerPosition);
 
-        ZombieNormalAttack(ref state, ref _takeDamageQueue,playerPosition);
+        ZombieNormalAttack(ref state, ref _takeDamageQueue, playerPosition);
 
-        HandleAttackedCharacter(ref state,ref ecb,_takeDamageQueue);
-        
+        HandleAttackedCharacter(ref state, ref ecb, _takeDamageQueue);
+
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
+
     [BurstCompile]
-    private void HandleAttackedCharacter(ref SystemState state, ref EntityCommandBuffer ecb, NativeQueue<TakeDamageItem> takeDamageQueue)
+    private void HandleAttackedCharacter(ref SystemState state, ref EntityCommandBuffer ecb,
+        NativeQueue<TakeDamageItem> takeDamageQueue)
     {
         NativeHashMap<int, float> characterTakeDamageMap =
             new NativeHashMap<int, float>(_takeDamageQueue.Count, Allocator.Temp);
@@ -257,10 +303,13 @@ public partial struct ZombieSystem : ISystem
                 value = map.Value,
             });
         }
+
         characterTakeDamageMap.Dispose();
     }
+
     [BurstCompile]
-    private void ZombieNormalAttack(ref SystemState state, ref NativeQueue<TakeDamageItem> takeDamageQueue, float3 playerPosition)
+    private void ZombieNormalAttack(ref SystemState state, ref NativeQueue<TakeDamageItem> takeDamageQueue,
+        float3 playerPosition)
     {
         var job = new CheckAttackPlayerJOB()
         {
@@ -277,6 +326,7 @@ public partial struct ZombieSystem : ISystem
         state.Dependency = job.ScheduleParallel(_enQueryZombieNormal, state.Dependency);
         state.Dependency.Complete();
     }
+
     [BurstCompile]
     private void BossAttack(ref SystemState state, ref EntityCommandBuffer ecb, float3 playerPosition)
     {
@@ -321,7 +371,6 @@ public partial struct ZombieSystem : ISystem
             ltTypeHandle = _ltTypeHandle,
             zombieInfoTypeHandle = _zombieInfoTypeHandle,
             characterLtws = _characterLtws,
-            ltwTypeHandle = _ltwTypeHandle,
             entityTypeHandle = _entityTypeHandle,
             zombieRunTimeTypeHandle = _zombieRunTimeTypeHandle,
             ecb = ecb.AsParallelWriter(),
@@ -331,6 +380,7 @@ public partial struct ZombieSystem : ISystem
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
+
     [BurstCompile]
     private void UpdateCharacterLTWList(ref SystemState state)
     {
@@ -342,9 +392,8 @@ public partial struct ZombieSystem : ISystem
         }
     }
 
-
     #endregion
-    
+
     [BurstCompile]
     private void CheckDeadZone(ref SystemState state)
     {
@@ -376,29 +425,31 @@ public partial struct ZombieSystem : ISystem
         public EntityCommandBuffer.ParallelWriter ecb;
         public EntityTypeHandle entityTypeHandle;
         [ReadOnly] public ComponentTypeHandle<ZombieRuntime> zombieRunTimeTypeHandle;
-        [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwTypeHandle;
         [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
         [ReadOnly] public float deltaTime;
         [ReadOnly] public NativeList<float3> characterLtws;
+
 
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
             in v128 chunkEnabledMask)
         {
             var lts = chunk.GetNativeArray(ref ltTypeHandle);
-            var ltws = chunk.GetNativeArray(ref ltwTypeHandle);
             var zombieRunTimes = chunk.GetNativeArray(ref zombieRunTimeTypeHandle);
             var zombieInfos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
             var entities = chunk.GetNativeArray(entityTypeHandle);
             for (int i = 0; i < chunk.Count; i++)
             {
-                var ltw = ltws[i];
                 var lt = lts[i];
                 var info = zombieInfos[i];
-                var direct = GetDirect(ltw.Position, info.directNormal, info.chasingRange);
+                var direct = GetDirect(lt.Position, info.directNormal, info.chasingRange);
 
-                lt.Position += direct * info.speed * deltaTime;
                 lt.Rotation = MathExt.MoveTowards(lt.Rotation, quaternion.LookRotationSafe(direct, math.up()),
                     250 * deltaTime);
+
+                var positionNext = lt.Position + direct * info.speed * deltaTime;
+                lt.Position = positionNext;
+
+
                 lts[i] = lt;
                 if (zombieRunTimes[i].latestAnimState != StateID.Run)
                 {
@@ -432,6 +483,57 @@ public partial struct ZombieSystem : ISystem
 
             return defaultDirect;
         }
+    }
+    
+    
+    [BurstCompile]
+    partial struct ZombieAvoidJOB : IJobParallelFor
+    {
+        public EntityCommandBuffer.ParallelWriter ecb;
+        [ReadOnly] public ZombieProperty zombieProperty;
+        [ReadOnly] public NativeArray<AvoidData> avoidDatas;
+        [ReadOnly] public float deltaTime;
+        public void Execute(int index)
+        {
+            var distance = 0f;
+            var overlappingDistance = 0f;
+            var directPushed = float3.zero;
+            var avoidData = avoidDatas[index];
+            bool check = false;
+            foreach (var dataSet in avoidDatas)
+            {
+                if (dataSet.info.priority >= avoidData.info.priority) continue;
+                // if (dataSet.lt.Position.z < avoidData.lt.Position.z) continue;
+                distance = math.distance(dataSet.lt.Position, avoidData.lt.Position);
+                overlappingDistance = (dataSet.info.radius + avoidData.info.radius) - distance;
+                if (overlappingDistance <= zombieProperty.minDistanceAvoid) continue;
+                directPushed += (avoidData.lt.Position - dataSet.lt.Position);
+                check = true;
+            }
+            
+            // if (check && directPushed.ComparisionEqual(float3.zero))
+            // {
+            //     directPushed = Random.CreateFromIndex((uint)index)
+            //         .NextFloat3(new float3(-1, -1, -1), new float3(1, 1, 1));
+            // }
+
+            if (!directPushed.ComparisionEqual(float3.zero))
+            {
+                directPushed = math.normalize(directPushed);
+                directPushed.y = 0;
+                var lt = avoidData.lt;
+                lt.Position += directPushed * deltaTime * zombieProperty.speedAvoid;
+                ecb.SetComponent(index,avoidData.entity,lt);
+            }
+        }
+    }
+    
+    
+    public struct AvoidData
+    {
+        public Entity entity;
+        public LocalTransform lt;
+        public ZombieInfo info;
     }
 
 
@@ -532,17 +634,19 @@ public partial struct ZombieSystem : ISystem
             }
         }
     }
-    
+
     [BurstCompile]
     partial struct SetUpNewZombieJOB : IJobChunk
     {
         public ComponentTypeHandle<LocalTransform> ltTypeHandle;
         [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
-        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
+            in v128 chunkEnabledMask)
         {
             var lts = chunk.GetNativeArray(ref ltTypeHandle);
             var zombieInfos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
-            
+
             for (int i = 0; i < chunk.Count; i++)
             {
                 var info = zombieInfos[i];
@@ -551,10 +655,9 @@ public partial struct ZombieSystem : ISystem
                 lt.Rotation = quaternion.LookRotationSafe(info.directNormal, math.up());
                 lts[i] = lt;
             }
-            
         }
     }
-    
+
 
     [BurstCompile]
     partial struct CheckZombieBossAttackPlayerJOB : IJobChunk
@@ -620,7 +723,6 @@ public partial struct ZombieSystem : ISystem
 
     #endregion
 
-    
 
     private struct CharacterSetTakeDamage
     {

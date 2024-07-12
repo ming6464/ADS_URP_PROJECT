@@ -33,6 +33,7 @@ public partial struct ZombieSpawnSystem : ISystem
     private int _totalSpawnCount;
     private ComponentTypeHandle<PhysicsCollider> _physicsColliderTypeHandle;
     private int _startIndexSetSpawnBoss;
+    private int _getZombieInfoCount;
     
     #region OnCreate
 
@@ -149,10 +150,12 @@ public partial struct ZombieSpawnSystem : ISystem
     [BurstCompile]
     private ZombieInfo GetZombieInfo(BufferZombieStore data,float3 directNormal)
     {
+        _getZombieInfoCount++;
         return new ZombieInfo()
         {
             id = data.id,
             hp = data.hp,
+            radius = data.radius,
             speed = data.speed,
             damage = data.damage,
             attackRange = data.attackRange,
@@ -161,6 +164,7 @@ public partial struct ZombieSpawnSystem : ISystem
             chasingRange = data.chasingRange,
             radiusDamage = data.radiusDamage,
             offsetAttackPosition = data.offsetAttackPosition,
+            priority = (int)data.priorityKey * 1000 + _getZombieInfoCount,
         };
     }
     
@@ -181,8 +185,16 @@ public partial struct ZombieSpawnSystem : ISystem
     [BurstCompile]
     private void CheckAndSpawnZombie(ref SystemState state)
     {
-        CheckAndSpawnNormalZombie(ref state);
-        CheckAndSpawnBossZombie(ref state);
+        if (_zombieSpawner.allowSpawnZombie)
+        {
+            CheckAndSpawnNormalZombie(ref state);
+        }
+
+        if (_zombieSpawner.allowSpawnBoss)
+        {
+            CheckAndSpawnBossZombie(ref state);
+        }
+        
     }
     
     [BurstCompile]
@@ -327,7 +339,11 @@ public partial struct ZombieSpawnSystem : ISystem
         var job = new HandleNewZombieJOB()
         {
             entityTypeHandle = _entityTypeHandle,
-            ecb = ecb.AsParallelWriter()
+            ecb = ecb.AsParallelWriter(),
+            playerPosition = float3.zero,
+            ltTypeHandle = state.GetComponentTypeHandle<LocalTransform>(),
+            zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>(),
+            
         };
         state.Dependency = job.ScheduleParallel(_enQueryZombieNew, state.Dependency);
         state.Dependency.Complete();
@@ -340,13 +356,22 @@ public partial struct ZombieSpawnSystem : ISystem
     {
         public EntityCommandBuffer.ParallelWriter ecb;
         public EntityTypeHandle entityTypeHandle;
+        [ReadOnly] public float3 playerPosition;
+        [ReadOnly] public ComponentTypeHandle<LocalTransform> ltTypeHandle;
+        public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
         
         public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
             var entities = chunk.GetNativeArray(entityTypeHandle);
+            // var infos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
+            // var lts = chunk.GetNativeArray(ref ltTypeHandle);
             for (int i = 0; i < chunk.Count; i++)
             {
                 ecb.RemoveComponent<New>(unfilteredChunkIndex,entities[i]);
+                // var info = infos[i];
+                // var lt = lts[i];
+                // info.priority = (int)(math.distance(lt.Position, playerPosition) * 1000);
+                // infos[i] = info;
             }
         }
     }

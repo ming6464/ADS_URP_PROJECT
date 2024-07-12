@@ -986,7 +986,6 @@ GameObject:
   - component: {fileID: 1579943680160541414}
   - component: {fileID: 5028601527431727818}
   - component: {fileID: 3651701808254791515}
-  - component: {fileID: 4162705085822575034}
   m_Layer: 7
   m_Name: Zom_Normal_Ogre
   m_TagString: Untagged
@@ -1102,18 +1101,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 2, y: 10, z: 2}
   m_Center: {x: 0, y: 1.91, z: 0}
---- !u!114 &4162705085822575034
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8005553429579729171}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8733ce61822d4ad08c5239122ff74c6e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &8335523756233163966
 GameObject:
   m_ObjectHideFlags: 0

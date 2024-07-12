@@ -47,7 +47,6 @@ public partial struct BulletMovementSystem : ISystem
     private void RequireNecessaryComponents(ref SystemState state)
     {
         state.RequireForUpdate<LayerStoreComponent>();
-        state.RequireForUpdate<EffectProperty>();
         state.RequireForUpdate<WeaponProperty>();
         state.RequireForUpdate<PhysicsWorldSingleton>();
     }

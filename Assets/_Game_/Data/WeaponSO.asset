@@ -20,7 +20,7 @@ MonoBehaviour:
       x: 0.478
       y: 0.849
       z: 0.582
-    damage: 40
+    damage: 20
     speed: 90
     cooldown: 0.08
     bulletPerShot: 2

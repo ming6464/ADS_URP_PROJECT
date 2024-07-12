@@ -13,9 +13,11 @@ public class ZombieSO : ScriptableObject
 [Serializable]
 public struct Zombie
 {
+    public PriorityKey priorityKey;
     public int id;
     public GameObject prefab;
     public float hp;
+    public float radius;
     public float speed;
     public float damage;
     public float attackRange;

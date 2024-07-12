@@ -51,8 +51,6 @@ public class Test_MoveBlendAnim : MonoBehaviour
         x = Mathf.MoveTowards(x,curMoveInput.x,Time.deltaTime * speed);
         y = Mathf.MoveTowards(y,curMoveInput.y,Time.deltaTime * speed);
         
-        Debug.Log(curMoveInput);
-        
         animX = mousePos.x;
         animY = mousePos.y;
 

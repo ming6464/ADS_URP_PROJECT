@@ -5,6 +5,9 @@ using Unity.Transforms;
 public struct ZombieProperty : IComponentData
 {
     public Entity entity;
+    public float speedAvoid;
+    public bool comparePriorities;
+    public float minDistanceAvoid;
 }
 
 public struct ZombieSpawner : IComponentData
@@ -15,6 +18,8 @@ public struct ZombieSpawner : IComponentData
     public int totalNumber;
     public float2 spawnAmountRange;
     public float2 timeRange;
+    public bool allowSpawnBoss;
+    public bool allowSpawnZombie;
 }
 
 public struct ZombieSpawnRuntime : IComponentData
@@ -47,6 +52,7 @@ public struct BufferZombieBossSpawn : IBufferElementData
 
 public struct ZombieInfo : IComponentData
 {
+    public int priority;
     public int id;
     public float hp;
     public float radius;
@@ -73,9 +79,11 @@ public struct ZombieRuntime : IComponentData
 
 public struct BufferZombieStore : IBufferElementData
 {
+    public PriorityKey priorityKey;
     public int id;
     public Entity entity;
     public float hp;
+    public float radius;
     public float speed;
     public float damage;
     public float attackRange;
@@ -123,4 +131,18 @@ public struct ActiveZoneProperty : IComponentData
 {
     public float3 pointRangeMin;
     public float3 pointRangeMax;
+}
+
+public enum PriorityKey
+{
+    First = 0,
+    Second = 1,
+    Third = 2,
+    Fourth = 3,
+    Fifth = 4,
+    Sixth = 5,
+    Seventh = 6,
+    Eighth = 7,
+    Ninth = 8,
+    Tenth = 9
 }

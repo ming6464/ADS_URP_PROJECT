@@ -8,15 +8,21 @@ public class ZombieAuthoring : MonoBehaviour
     [Header("Spawn Zombie Normal")]
     public int[] zombieNormalIds;
     public SpawnRange[] spawnRanges;
+    [Header("Spawn Zombie Boss")] 
+    public SpawnBoss[] spawnBosses;
+    [Header("Spawn Info")]
     public int totalNumber;
     public float cooldown;
     public float2 spawnAmountRange;
     public float2 timeRange;
     public bool spawnInfinity;
     public bool allowRespawn;
-    
-    [Header("Spawn Zombie Boss")] 
-    public SpawnBoss[] spawnBosses;
+    public bool allowSpawnZombie;
+    public bool allowSpawnBoss;
+    [Header("General Properties")] 
+    public float speedAvoid;
+    public bool comparePriorities;
+    public float minDistanceAvoid;
 }
 
 
@@ -30,6 +36,9 @@ class ZombieBaker : Baker<ZombieAuthoring>
         AddComponent(entity, new ZombieProperty
         {
             entity = entity,
+            speedAvoid = authoring.speedAvoid,
+            comparePriorities = authoring.comparePriorities,
+            minDistanceAvoid = authoring.minDistanceAvoid,
         });
         AddComponent(entity, new ZombieSpawner
         {
@@ -39,6 +48,8 @@ class ZombieBaker : Baker<ZombieAuthoring>
             totalNumber = authoring.totalNumber,
             spawnAmountRange = authoring.spawnAmountRange,
             timeRange = authoring.timeRange,
+            allowSpawnZombie = authoring.allowSpawnZombie,
+            allowSpawnBoss = authoring.allowSpawnBoss,
         });
         
         // Add buffer zombie normal id spawn

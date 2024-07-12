@@ -46,9 +46,11 @@ namespace _Game_.Scripts.AuthoringAndMono
                 {
                     zombieBuffer.Add(new BufferZombieStore()
                     {
+                        priorityKey = zombie.priorityKey,
                         id = zombie.id,
                         entity = GetEntity(zombie.prefab,TransformUsageFlags.Dynamic),
                         hp = zombie.hp,
+                        radius = zombie.radius,
                         speed = zombie.speed,
                         damage = zombie.damage,
                         attackRange = zombie.attackRange,
