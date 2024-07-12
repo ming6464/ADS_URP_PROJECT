@@ -52,6 +52,7 @@ public struct BufferZombieBossSpawn : IBufferElementData
 
 public struct ZombieInfo : IComponentData
 {
+    public PriorityKey priorityKey;
     public int priority;
     public int id;
     public float hp;

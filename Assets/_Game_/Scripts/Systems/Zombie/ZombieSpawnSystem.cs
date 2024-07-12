@@ -164,7 +164,8 @@ public partial struct ZombieSpawnSystem : ISystem
             chasingRange = data.chasingRange,
             radiusDamage = data.radiusDamage,
             offsetAttackPosition = data.offsetAttackPosition,
-            priority = (int)data.priorityKey * 1000 + _getZombieInfoCount,
+            priority = (int)data.priorityKey,
+            priorityKey = data.priorityKey,
         };
     }
     

@@ -104,12 +104,15 @@ public partial struct ZombieSystem : ISystem
         CheckDeadZone(ref state);
         CheckAnimationEvent(ref state);
     }
+    
 
     [BurstCompile]
     private void AvoidFlock(ref SystemState state)
     {
-        return;
         if(!_zombieProperty.comparePriorities) return;
+        
+        UpdatePriority(ref state);
+        
         var avoidDatas = new NativeList<AvoidData>(Allocator.TempJob);
 
         foreach (var (ìnfo, lt,entity) in SystemAPI.Query<RefRO<ZombieInfo>, RefRO<LocalTransform>>().WithEntityAccess().WithNone<Disabled,SetActiveSP,AddToBuffer>())
@@ -131,11 +134,28 @@ public partial struct ZombieSystem : ISystem
             ecb = ecb.AsParallelWriter(),
         };
 
-        state.Dependency = job.Schedule(avoidDatas.Length, 30);
+        state.Dependency = job.Schedule(avoidDatas.Length, (int)avoidDatas.Length / 100);
         state.Dependency.Complete();
         ecb.Playback(_entityManager);
         ecb.Dispose();
         avoidDatas.Dispose();
+    }
+    
+    [BurstCompile]
+    private void UpdatePriority(ref SystemState state)
+    {
+        var playerPosition = SystemAPI.GetComponentRO<LocalToWorld>(_entityPlayerInfo).ValueRO.Position;
+        _ltTypeHandle.Update(ref state);
+        _zombieInfoTypeHandle.Update(ref state);
+        var job = new UpdatePriorityJOB()
+        {
+            ltTypeHandle = _ltTypeHandle,
+            zombieInfoTypeHandle = _zombieInfoTypeHandle,
+            playerPos = playerPosition,
+        };
+
+        state.Dependency = job.ScheduleParallel(_enQueryZombie, state.Dependency);
+        state.Dependency.Complete();
     }
 
     [BurstCompile]
@@ -187,7 +207,7 @@ public partial struct ZombieSystem : ISystem
         {
             if (_entityManager.HasBuffer<AnimationEventComponent>(entity))
             {
-                HandleEvent(ref state, ref ecb, entity, zombieInfo.ValueRO, bossInfo.ValueRO);
+                HandleEvent(ref state, ref ecb, entity, zombieInfo.ValueRO);
             }
         }
 
@@ -195,8 +215,7 @@ public partial struct ZombieSystem : ISystem
         ecb.Dispose();
     }
 
-    private void HandleEvent(ref SystemState state, ref EntityCommandBuffer ecb, Entity entity, ZombieInfo zombieInfo,
-        BossInfo bossInfo)
+    private void HandleEvent(ref SystemState state, ref EntityCommandBuffer ecb, Entity entity, ZombieInfo zombieInfo)
     {
         NativeList<ColliderCastHit> hits = new NativeList<ColliderCastHit>(Allocator.TempJob);
         foreach (var b in _entityManager.GetBuffer<AnimationEventComponent>(entity))
@@ -441,13 +460,12 @@ public partial struct ZombieSystem : ISystem
             {
                 var lt = lts[i];
                 var info = zombieInfos[i];
-                var direct = GetDirect(lt.Position, info.directNormal, info.chasingRange);
+                var direct = GetDirect(lt.Position, info.directNormal, info.chasingRange, info.attackRange);
 
                 lt.Rotation = MathExt.MoveTowards(lt.Rotation, quaternion.LookRotationSafe(direct, math.up()),
                     250 * deltaTime);
 
-                var positionNext = lt.Position + direct * info.speed * deltaTime;
-                lt.Position = positionNext;
+                lt.Position += direct * info.speed * deltaTime;
 
 
                 lts[i] = lt;
@@ -461,7 +479,7 @@ public partial struct ZombieSystem : ISystem
             }
         }
 
-        private float3 GetDirect(float3 position, float3 defaultDirect, float chasingRange)
+        private float3 GetDirect(float3 position, float3 defaultDirect, float chasingRange, float attackRange)
         {
             float3 nearestPosition = default;
             float distanceNearest = float.MaxValue;
@@ -478,7 +496,19 @@ public partial struct ZombieSystem : ISystem
 
             if (distanceNearest < float.MaxValue)
             {
-                return math.all(position == nearestPosition) ? float3.zero : math.normalize(nearestPosition - position);
+                if (math.all(position == nearestPosition))
+                {
+                    return float3.zero;
+                }
+
+                var normalDir = math.normalize(nearestPosition - position);
+                
+                if (distanceNearest <= attackRange)
+                {
+                    normalDir *= 0.01f;
+                }
+
+                return normalDir;
             }
 
             return defaultDirect;
@@ -495,29 +525,26 @@ public partial struct ZombieSystem : ISystem
         [ReadOnly] public float deltaTime;
         public void Execute(int index)
         {
-            var distance = 0f;
-            var overlappingDistance = 0f;
             var directPushed = float3.zero;
             var avoidData = avoidDatas[index];
             bool check = false;
-            foreach (var dataSet in avoidDatas)
+            for(int i = 0;i < avoidDatas.Length; i++)
             {
-                if (dataSet.info.priority >= avoidData.info.priority) continue;
-                // if (dataSet.lt.Position.z < avoidData.lt.Position.z) continue;
-                distance = math.distance(dataSet.lt.Position, avoidData.lt.Position);
-                overlappingDistance = (dataSet.info.radius + avoidData.info.radius) - distance;
+                var dataSet = avoidDatas[i];
+                if (dataSet.info.priority > avoidData.info.priority || i == index) continue;
+                var distance = math.distance(dataSet.lt.Position, avoidData.lt.Position);
+                var overlappingDistance = (dataSet.info.radius + avoidData.info.radius) - distance;
                 if (overlappingDistance <= zombieProperty.minDistanceAvoid) continue;
                 directPushed += (avoidData.lt.Position - dataSet.lt.Position);
                 check = true;
             }
-            
-            // if (check && directPushed.ComparisionEqual(float3.zero))
-            // {
-            //     directPushed = Random.CreateFromIndex((uint)index)
-            //         .NextFloat3(new float3(-1, -1, -1), new float3(1, 1, 1));
-            // }
 
-            if (!directPushed.ComparisionEqual(float3.zero))
+            if (check)
+            {
+                Validate(ref directPushed,index);
+            }
+
+            if (!directPushed.Equals(float3.zero))
             {
                 directPushed = math.normalize(directPushed);
                 directPushed.y = 0;
@@ -526,16 +553,68 @@ public partial struct ZombieSystem : ISystem
                 ecb.SetComponent(index,avoidData.entity,lt);
             }
         }
-    }
-    
-    
-    public struct AvoidData
-    {
-        public Entity entity;
-        public LocalTransform lt;
-        public ZombieInfo info;
-    }
 
+        private void Validate(ref float3 directPushed, int index)
+        {
+            if (directPushed.Equals(float3.zero) || math.length(directPushed) < zombieProperty.minDistanceAvoid)
+            {
+                Random random = new Random((uint)(index + 1));
+                directPushed = new float3(random.NextFloat(-.3f, .3f), 0, random.NextFloat(-.3f, .3f));
+
+                int ik = 0;
+
+                while (directPushed is { z: 0, x: 0 })
+                {
+                    if (ik == 0)
+                    {
+                        directPushed.z = random.NextFloat(-.3f, .3f);
+                    }
+                    else if (ik == 1)
+                    {
+                        directPushed.x = random.NextFloat(-.3f, .3f);
+                    }
+                    else
+                    {
+                        directPushed.x = random.NextFloat(-.3f, .3f);
+                        directPushed.z = random.NextFloat(-.3f, .3f);
+                    }
+
+                    ik++;
+                    if (ik > 3)
+                    {
+                        ik = 0;
+                    }
+                }
+            } 
+        }
+    }
+    
+    [BurstCompile]
+    partial struct UpdatePriorityJOB : IJobChunk
+    {
+        [ReadOnly] public float3 playerPos;
+        public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
+        [ReadOnly] public ComponentTypeHandle<LocalTransform> ltTypeHandle;
+        
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+        {
+            var lts = chunk.GetNativeArray(ref ltTypeHandle);
+            var infos = chunk.GetNativeArray(ref zombieInfoTypeHandle);
+
+            for (int i = 0; i < chunk.Count; i++)
+            {
+                var info = infos[i];
+                var lt = lts[i];
+
+                info.priority = (int)(math.distance(lt.Position, playerPos) * 1000) + (int)info.priorityKey * 10000;
+
+                infos[i] = info;
+            }
+            
+        }
+    }
+    
+    
 
     [BurstCompile]
     partial struct CheckDeadZoneJOB : IJobChunk
@@ -735,4 +814,12 @@ public partial struct ZombieSystem : ISystem
         public int index;
         public float damage;
     }
+    
+    private struct AvoidData
+    {
+        public Entity entity;
+        public LocalTransform lt;
+        public ZombieInfo info;
+    }
+
 }

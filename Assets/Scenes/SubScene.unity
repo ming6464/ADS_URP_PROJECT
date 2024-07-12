@@ -3845,8 +3845,8 @@ Transform:
   m_GameObject: {fileID: 496664264}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.0926, y: 0, z: 148.5187}
-  m_LocalScale: {x: 0.43571556, y: 1, z: 0.53441304}
+  m_LocalPosition: {x: 3.1573, y: -0, z: 161.2784}
+  m_LocalScale: {x: 0.67095864, y: 1, z: 1.2276002}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 103636628}
@@ -5115,7 +5115,7 @@ MonoBehaviour:
   spawnPosition: {fileID: 809366256}
   playerPrefab: {fileID: 3836318472321978554, guid: fdd796aa3f41f594baea47b30420e4f8,
     type: 3}
-  hp: 20
+  hp: 999999
   speed: 3.2
   radius: 0.35
   rotaAngleMax: 120
@@ -7591,7 +7591,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 44bd12d5ee694480a10ab3fee341253c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  zombieNormalIds: 000000000000000000000000
+  zombieNormalIds: 000000000100000002000000
   spawnRanges:
   - pointRange1: {fileID: 1398424327}
     pointRange2: {fileID: 496664265}
@@ -7633,11 +7633,11 @@ MonoBehaviour:
     y: 15
   spawnInfinity: 0
   allowRespawn: 1
-  allowSpawnZombie: 0
+  allowSpawnZombie: 1
   allowSpawnBoss: 1
-  speedAvoid: 1
+  speedAvoid: 0.8
   comparePriorities: 1
-  minDistanceAvoid: 0.001
+  minDistanceAvoid: 0.05
 --- !u!114 &832985596
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11912,8 +11912,8 @@ Transform:
   m_GameObject: {fileID: 1398424326}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -5.5473, y: -0, z: 138.6816}
-  m_LocalScale: {x: 0.43571556, y: 1, z: 0.53441304}
+  m_LocalPosition: {x: -7.0674, y: -0, z: 138.6816}
+  m_LocalScale: {x: 0.67095864, y: 1, z: 1.2276002}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 103636628}
