@@ -92,7 +92,7 @@ public partial struct ZombieSystem : ISystem
         SetUpNewZombie(ref state);
         Move(ref state);
         CheckAttackPlayer(ref state);
-        CheckZombieToDeadZone(ref state);
+        CheckDeadZone(ref state);
         CheckAnimationEvent(ref state);
     }
 
@@ -346,7 +346,7 @@ public partial struct ZombieSystem : ISystem
     #endregion
     
     [BurstCompile]
-    private void CheckZombieToDeadZone(ref SystemState state)
+    private void CheckDeadZone(ref SystemState state)
     {
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
         _entityTypeHandle.Update(ref state);

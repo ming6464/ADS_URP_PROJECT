@@ -48,7 +48,8 @@ public struct BufferZombieBossSpawn : IBufferElementData
 public struct ZombieInfo : IComponentData
 {
     public int id;
-    public float hp;    
+    public float hp;
+    public float radius;
     public float speed;
     public float damage;
     public float attackRange;
