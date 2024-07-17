@@ -19,6 +19,7 @@ namespace _Game_.Scripts.Systems.Player
         private NativeQueue<Entity> _characterDieQueue;
         private EntityQuery _enQueryMove;
         private EntityQuery _enQueryCharacterMove;
+        private Entity _entityPlayerInfo;
         private bool _isInit;
         private float _characterMoveToWardChangePos;
         private PlayerProperty _playerProperty;
@@ -48,7 +49,7 @@ namespace _Game_.Scripts.Systems.Player
             _nextPointTypeHandle = state.GetComponentTypeHandle<NextPoint>();
             _entityTypeHandle = state.GetEntityTypeHandle();
             _enQueryCharacterTakeDamage = SystemAPI.QueryBuilder().WithAll<CharacterInfo,TakeDamage>()
-                .WithNone<Disabled, SetActiveSP>().Build();
+                .WithNone<Disabled, SetActiveSP,AddToBuffer>().Build();
             _characterDieQueue = new NativeQueue<Entity>(Allocator.Persistent);
             _enQueryMove = SystemAPI.QueryBuilder().WithAll<CharacterInfo, NextPoint>().WithNone<Disabled, SetActiveSP>()
                 .Build();
@@ -83,6 +84,7 @@ namespace _Game_.Scripts.Systems.Player
                 _playerProperty = SystemAPI.GetSingleton<PlayerProperty>();
                 _divisionAngle = _playerProperty.divisionAngle;
                 _characterMoveToWardChangePos = _playerProperty.speedMoveToNextPoint;
+                _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
             }
             _playerMoveInput = SystemAPI.GetSingleton<PlayerInput>();
 
@@ -101,7 +103,7 @@ namespace _Game_.Scripts.Systems.Player
                 _currentDirectMove = _playerMoveInput.directMove;
                 StateID stateID = _currentDirectMove.ComparisionEqual(float2.zero) ? StateID.None : StateID.Run;
                 foreach (var (characterInfo, entity) in SystemAPI.Query<RefRO<CharacterInfo>>().WithEntityAccess()
-                             .WithNone<Disabled,New,SetAnimationSP>())
+                             .WithNone<Disabled,SetAnimationSP>())
                 {
                     ecb.AddComponent(entity,new SetAnimationSP()
                     {
@@ -112,8 +114,8 @@ namespace _Game_.Scripts.Systems.Player
             else
             {
                 StateID stateID = _currentDirectMove.ComparisionEqual(float2.zero) ? StateID.None : StateID.Run;
-                foreach (var (characterInfo, entity) in SystemAPI.Query<RefRO<CharacterInfo>>().WithEntityAccess()
-                             .WithNone<Disabled,SetAnimationSP>().WithAll<New>())
+                
+                foreach (var(info,entity) in SystemAPI.Query<RefRO<CharacterInfo>>().WithEntityAccess().WithAll<New>().WithNone<Disabled,AddToBuffer>())
                 {
                     ecb.AddComponent(entity,new SetAnimationSP()
                     {
@@ -134,10 +136,43 @@ namespace _Game_.Scripts.Systems.Player
             var positionNearest = float3.zero;
             var moveToWard = _playerProperty.moveToWardMax;
             bool check = false;
-
+            float deltaTime = SystemAPI.Time.DeltaTime;
             if (_playerProperty.aimNearestEnemy)
             {
-                foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAny<ZombieInfo,ItemCanShoot>()
+                foreach (var (ltw,zombieInfo) in SystemAPI.Query<RefRO<LocalToWorld>,RefRO<ZombieInfo>>()
+                             .WithNone<Disabled, SetActiveSP,AddToBuffer>())
+                {
+
+                    var mulValue = math.remap(1, 50, 5, 2, math.distance(playerPosition, ltw.ValueRO.Position ));
+                    
+                    var posTarget = ltw.ValueRO.Position + zombieInfo.ValueRO.currentDirect * zombieInfo.ValueRO.speed * deltaTime * mulValue;
+                    
+                    float distance = math.distance(playerPosition, posTarget );
+                    
+                    if (distance <= distanceNearest)
+                    {
+                        if (_playerProperty.aimType == AimType.TeamAim)
+                        {
+                            if (MathExt.CalculateAngle(posTarget - playerPosition, new float3(0, 0, 1)) < _playerProperty.rotaAngleMax)
+                            {
+                                positionNearest = posTarget;
+                                distanceNearest = distance;
+                                check = true;
+                            }
+                            continue;
+                        }
+                    
+                        distanceNearest = distance;
+                        _targetNears.Add(new TargetInfo()
+                        {
+                            position = posTarget,
+                            distance = distance
+                        });
+                    }
+                }
+                
+                
+                foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAny<ItemCanShoot>()
                              .WithNone<Disabled, SetActiveSP,AddToBuffer>())
                 {
                     var posTarget = ltw.ValueRO.Position;
@@ -254,6 +289,11 @@ namespace _Game_.Scripts.Systems.Player
                     timeDelay = 4,
                 });
                 
+                // ecb.AddComponent(queue,new SetActiveSP()
+                // {
+                //     state = DisableID.Disable,
+                // });
+                
                 ecb.AddComponent<AddToBuffer>(queue);
             }
             ecb.Playback(_entityManager);
@@ -353,10 +393,8 @@ namespace _Game_.Scripts.Systems.Player
                     ecb.RemoveComponent<TakeDamage>(unfilteredChunkIndex,entity);
                     if (info.hp <= 0)
                     {
-                        var lt = lts[i];
-                        lt.Position = ltws[i].Position;
+                        ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entity);
                         ecb.RemoveComponent<Parent>(unfilteredChunkIndex,entity);
-                        lts[i] = lt;
                         characterDieQueue.Enqueue(entity);
                         if (!info.weaponEntity.Equals(default))
                         {

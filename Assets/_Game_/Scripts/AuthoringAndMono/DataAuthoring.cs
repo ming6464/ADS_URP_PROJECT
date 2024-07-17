@@ -12,8 +12,6 @@ namespace _Game_.Scripts.AuthoringAndMono
         public ObstacleSO obstacleSo;
         private class DataAuthoringBaker : Baker<DataAuthoring>
         {
-            
-            
             public override void Bake(DataAuthoring authoring)
             {
                 var entity = GetEntity(TransformUsageFlags.None);
@@ -28,7 +26,7 @@ namespace _Game_.Scripts.AuthoringAndMono
                     weaponBuffer.Add(new BufferWeaponStore()
                     {
                         id = weapon.id,
-                        entity = GetEntity(weapon.weaponPrefab,TransformUsageFlags.Dynamic),
+                        entity = GetEntity(weapon.weaponPrefab,TransformUsageFlags.None),
                         offset = weapon.offset,
                         damage = weapon.damage,
                         speed = weapon.speed,

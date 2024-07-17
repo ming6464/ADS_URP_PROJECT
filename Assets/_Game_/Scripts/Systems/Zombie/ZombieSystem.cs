@@ -202,8 +202,8 @@ public partial struct ZombieSystem : ISystem
         _physicsWorld = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         // Check event boss
-        foreach (var (zombieInfo, bossInfo, entity) in SystemAPI.Query<RefRO<ZombieInfo>, RefRO<BossInfo>>()
-                     .WithEntityAccess().WithNone<Disabled, AddToBuffer>())
+        foreach (var (zombieInfo, entity) in SystemAPI.Query<RefRO<ZombieInfo>>()
+                     .WithEntityAccess().WithAll<BossInfo>().WithNone<Disabled, AddToBuffer>())
         {
             if (_entityManager.HasBuffer<AnimationEventComponent>(entity))
             {
@@ -217,7 +217,7 @@ public partial struct ZombieSystem : ISystem
 
     private void HandleEvent(ref SystemState state, ref EntityCommandBuffer ecb, Entity entity, ZombieInfo zombieInfo)
     {
-        NativeList<ColliderCastHit> hits = new NativeList<ColliderCastHit>(Allocator.TempJob);
+        NativeList<ColliderCastHit> hits = new NativeList<ColliderCastHit>(Allocator.Persistent);
         foreach (var b in _entityManager.GetBuffer<AnimationEventComponent>(entity))
         {
             var stringHash = b.stringParamHash;
@@ -282,22 +282,21 @@ public partial struct ZombieSystem : ISystem
         }
 
         if (_characterSetTakeDamages.Length == 0) return;
-        var ecb = new EntityCommandBuffer(Allocator.TempJob);
+        var ecb = new EntityCommandBuffer(Allocator.Persistent);
         var playerPosition = SystemAPI.GetComponentRO<LocalToWorld>(_entityPlayerInfo).ValueRO.Position;
 
         BossAttack(ref state, ref ecb, playerPosition);
 
         ZombieNormalAttack(ref state, ref _takeDamageQueue, playerPosition);
 
-        HandleAttackedCharacter(ref state, ref ecb, _takeDamageQueue);
+        HandleAttackedCharacter(ref state, ref ecb);
 
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
 
     [BurstCompile]
-    private void HandleAttackedCharacter(ref SystemState state, ref EntityCommandBuffer ecb,
-        NativeQueue<TakeDamageItem> takeDamageQueue)
+    private void HandleAttackedCharacter(ref SystemState state, ref EntityCommandBuffer ecb)
     {
         NativeHashMap<int, float> characterTakeDamageMap =
             new NativeHashMap<int, float>(_takeDamageQueue.Count, Allocator.Temp);
@@ -356,7 +355,7 @@ public partial struct ZombieSystem : ISystem
 
         var jobBoss = new CheckZombieBossAttackPlayerJOB()
         {
-            playerPosition = playerPosition,
+            characterSetTakeDamages = _characterSetTakeDamages,
             ecb = ecb.AsParallelWriter(),
             entityTypeHandle = _entityTypeHandle,
             localToWorldTypeHandle = _ltwTypeHandle,
@@ -443,8 +442,8 @@ public partial struct ZombieSystem : ISystem
         public ComponentTypeHandle<LocalTransform> ltTypeHandle;
         public EntityCommandBuffer.ParallelWriter ecb;
         public EntityTypeHandle entityTypeHandle;
+        public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
         [ReadOnly] public ComponentTypeHandle<ZombieRuntime> zombieRunTimeTypeHandle;
-        [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
         [ReadOnly] public float deltaTime;
         [ReadOnly] public NativeList<float3> characterLtws;
 
@@ -468,7 +467,9 @@ public partial struct ZombieSystem : ISystem
                 lt.Position += direct * info.speed * deltaTime;
 
 
+                info.currentDirect = direct;
                 lts[i] = lt;
+                zombieInfos[i] = info;
                 if (zombieRunTimes[i].latestAnimState != StateID.Run)
                 {
                     ecb.AddComponent(unfilteredChunkIndex, entities[i], new SetAnimationSP()
@@ -503,7 +504,7 @@ public partial struct ZombieSystem : ISystem
 
                 var normalDir = math.normalize(nearestPosition - position);
                 
-                if (distanceNearest <= attackRange)
+                if (distanceNearest <= (attackRange / 2f))
                 {
                     normalDir *= 0.01f;
                 }
@@ -614,7 +615,6 @@ public partial struct ZombieSystem : ISystem
         }
     }
     
-    
 
     [BurstCompile]
     partial struct CheckDeadZoneJOB : IJobChunk
@@ -687,7 +687,7 @@ public partial struct ZombieSystem : ISystem
                 var runtime = zombieRuntimes[i];
 
                 if (time - runtime.latestTimeAttack < info.delayAttack) continue;
-
+                
                 if (math.distance(playerPosition, ltw.Position) > distanceCheck) continue;
 
                 bool checkAttack = false;
@@ -713,7 +713,7 @@ public partial struct ZombieSystem : ISystem
             }
         }
     }
-
+    
     [BurstCompile]
     partial struct SetUpNewZombieJOB : IJobChunk
     {
@@ -736,14 +736,15 @@ public partial struct ZombieSystem : ISystem
             }
         }
     }
-
-
+    
+    
     [BurstCompile]
     partial struct CheckZombieBossAttackPlayerJOB : IJobChunk
     {
         public ComponentTypeHandle<ZombieRuntime> zombieRuntimeTypeHandle;
         public EntityCommandBuffer.ParallelWriter ecb;
         public EntityTypeHandle entityTypeHandle;
+        [ReadOnly] public NativeList<CharacterSetTakeDamage> characterSetTakeDamages;
         [ReadOnly] public ComponentTypeHandle<ZombieInfo> zombieInfoTypeHandle;
         [ReadOnly] public ComponentTypeHandle<LocalToWorld> localToWorldTypeHandle;
         [ReadOnly] public float3 playerPosition;
@@ -763,8 +764,7 @@ public partial struct ZombieSystem : ISystem
                 var ltw = ltws[i];
                 var runtime = zombieRuntimes[i];
 
-
-                var distance = info.attackRange - math.distance(playerPosition, ltw.Position);
+                var distance = info.attackRange - GetDistanceToCharacterNearest(ltw.Position);;
                 if (distance >= 0)
                 {
                     var timeCheck = time - runtime.latestTimeAttack;
@@ -797,6 +797,24 @@ public partial struct ZombieSystem : ISystem
                     break;
                 }
             }
+        }
+
+        private double GetDistanceToCharacterNearest(float3 ltwPosition)
+        {
+            var distanceNearest = float.MaxValue;
+
+            foreach (var i in characterSetTakeDamages)
+            {
+                var dis = math.distance(ltwPosition, i.position);
+
+                if (dis < distanceNearest)
+                {
+                    distanceNearest = dis;
+                }
+                
+            }
+            
+            return distanceNearest;
         }
     }
 

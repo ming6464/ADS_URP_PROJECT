@@ -23,7 +23,7 @@ MonoBehaviour:
     damage: 20
     attackRange: 1.5
     delayAttack: 0.5
-    chasingRange: 3
+    chasingRange: 2
     radiusDamage: 0
     offsetAttackPosition:
       x: 0
@@ -39,7 +39,7 @@ MonoBehaviour:
     damage: 5
     attackRange: 1.5
     delayAttack: 0.5
-    chasingRange: 3
+    chasingRange: 2
     radiusDamage: 0
     offsetAttackPosition:
       x: 0
@@ -52,10 +52,10 @@ MonoBehaviour:
     hp: 12
     radius: 0.2
     speed: 3.8
-    damage: 0
+    damage: 10
     attackRange: 1.5
     delayAttack: 0.5
-    chasingRange: 3
+    chasingRange: 2
     radiusDamage: 0
     offsetAttackPosition:
       x: 0
@@ -65,12 +65,12 @@ MonoBehaviour:
     id: 3
     prefab: {fileID: 8005553429579729171, guid: df3e92f724aae794bb9225cefd668ccd,
       type: 3}
-    hp: 500
+    hp: 60000
     radius: 1.3
     speed: 2.5
     damage: 1000
     attackRange: 2.5
-    delayAttack: 1.5
+    delayAttack: 0.5
     chasingRange: 8
     radiusDamage: 2
     offsetAttackPosition:

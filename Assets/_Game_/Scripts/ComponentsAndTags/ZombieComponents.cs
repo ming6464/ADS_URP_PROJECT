@@ -63,6 +63,7 @@ public struct ZombieInfo : IComponentData
     public float delayAttack;
     public float chasingRange;
     public float3 directNormal;
+    public float3 currentDirect;
     public float radiusDamage;
     public float3 offsetAttackPosition;
 }

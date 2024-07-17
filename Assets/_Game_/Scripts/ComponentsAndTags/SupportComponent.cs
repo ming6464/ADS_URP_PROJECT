@@ -110,6 +110,11 @@ public struct New : IComponentData
     
 }
 
+public struct CanWeapon : IComponentData
+{
+    
+}
+
 public struct DataProperty : IComponentData
 {
     

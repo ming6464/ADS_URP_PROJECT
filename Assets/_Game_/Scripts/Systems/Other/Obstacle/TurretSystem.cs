@@ -11,7 +11,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
     public partial struct TurretSystem : ISystem
     {
         private NativeArray<BufferTurretObstacle> _bufferTurretObstacles;
-        private NativeList<float3> _enemyPositions;
+        private NativeList<TargetAimInfo> _targetAimInfos;
         private NativeQueue<BufferBulletSpawner> _bulletSpawnQueue;
         private EntityQuery _enQueryBarrelInfo;
         private Entity _entityWeaponAuthoring;
@@ -88,12 +88,17 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
         [BurstCompile]
         private void PutEventSpawnBullet(ref SystemState state)
         {
-            _enemyPositions.Clear();
+            _targetAimInfos.Clear();
             _bulletSpawnQueue.Clear();
-            foreach (var ltw in SystemAPI.Query<RefRO<LocalToWorld>>().WithAll<ZombieInfo>()
+            foreach (var (ltw,info) in SystemAPI.Query<RefRO<LocalToWorld>,RefRO<ZombieInfo>>()
                          .WithNone<Disabled, SetActiveSP>())
             {
-                _enemyPositions.Add(ltw.ValueRO.Position);
+                _targetAimInfos.Add(new TargetAimInfo()
+                {
+                    direct = info.ValueRO.currentDirect,
+                    position = ltw.ValueRO.Position,
+                    speed = info.ValueRO.speed,
+                });
             }
             
             _ltTypeHandle.Update(ref state);
@@ -104,7 +109,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
             var job = new BarreJOB()
             {
                 ltComponentType = _ltTypeHandle,
-                enemyPositions = _enemyPositions,
+                targetAimInfos = _targetAimInfos,
                 barrelInfoComponentType = _barrelInfoTypeHandle,
                 deltaTime = SystemAPI.Time.DeltaTime,
                 barrelRunTimeComponentType = _barrelRunTimeTypeHandle,
@@ -125,8 +130,8 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
         [BurstCompile]
         public void OnDestroy(ref SystemState state)
         {
-            if (_enemyPositions.IsCreated)
-                _enemyPositions.Dispose();
+            if (_targetAimInfos.IsCreated)
+                _targetAimInfos.Dispose();
             if (_bulletSpawnQueue.IsCreated)
                 _bulletSpawnQueue.Dispose();
             if (_bufferTurretObstacles.IsCreated)
@@ -143,7 +148,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
         [BurstCompile]
         private void Init(ref SystemState state)
         {
-            _enemyPositions = new NativeList<float3>(Allocator.Persistent);
+            _targetAimInfos = new NativeList<TargetAimInfo>(Allocator.Persistent);
             _enQueryBarrelInfo = SystemAPI.QueryBuilder().WithAll<BarrelInfo, BarrelRunTime>()
                 .WithNone<Disabled, SetActiveSP>().Build();
             _bulletSpawnQueue = new NativeQueue<BufferBulletSpawner>(Allocator.Persistent);
@@ -202,7 +207,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
             public ComponentTypeHandle<BarrelRunTime> barrelRunTimeComponentType;
             public NativeQueue<BufferBulletSpawner>.ParallelWriter bulletSpawnQueue;
             [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwComponentTypeHandle;
-            [ReadOnly] public NativeList<float3> enemyPositions;
+            [ReadOnly] public NativeList<TargetAimInfo> targetAimInfos;
             [ReadOnly] public ComponentTypeHandle<BarrelInfo> barrelInfoComponentType;
             [ReadOnly] public float deltaTime;
             [ReadOnly] public float time;
@@ -225,7 +230,7 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                     var info = barrelInfos[i];
                     var moveToWard = info.moveToWardMax;
                     var direct = math.forward();
-                    GetLocalTransformNearestEnemy(ltw.Position, info, ref direct, ref moveToWard);
+                    UpdateDataAim(ltw.Position, info, ref direct, ref moveToWard);
                     lt.Rotation = MathExt.MoveTowards(ltw.Rotation, quaternion.LookRotationSafe(direct, math.up()),
                         moveToWard * deltaTime);
                     lts[i] = lt;
@@ -251,23 +256,28 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                 }
             }
 
-            private void GetLocalTransformNearestEnemy(float3 pos, BarrelInfo info, ref float3 direct,
+            private void UpdateDataAim(float3 pos, BarrelInfo info, ref float3 direct,
                 ref float moveToWard)
             {
                 float distanceNearest = info.distanceAim;
                 float3 positionNearest = float3.zero;
                 bool check = false;
-                foreach (var enemyPos in enemyPositions)
+                float3 directTarget = float3.zero;
+                float speed = 0f;
+                
+                foreach (var enemyPos in targetAimInfos)
                 {
-                    var distance = math.distance(pos, enemyPos);
+                    var distance = math.distance(pos, enemyPos.position);
                     // var distance = math.abs(pos.z - enemyPos.z);
 
                     if (distance < distanceNearest)
                     {
-                        if (MathExt.CalculateAngle(enemyPos - pos, math.forward()) < 120)
+                        if (MathExt.CalculateAngle(enemyPos.position - pos, math.forward()) < 120)
                         {
                             distanceNearest = distance;
-                            positionNearest = enemyPos;
+                            positionNearest = enemyPos.position;
+                            speed = enemyPos.speed;
+                            directTarget = enemyPos.direct;
                             check = true;
                         }
                     }
@@ -275,8 +285,15 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
 
                 if (check)
                 {
-                    direct = MathExt.RotateVector(positionNearest - pos, new float3(0, -(70.0f / distanceNearest), 0));
-                    var ratio = 1 - math.clamp(distanceNearest * 1.0f / info.distanceAim, 0, 1);
+                    
+                    var mulValue = math.remap(1, 50, 5, 2, math.distance(pos, positionNearest ));
+                    
+                    var posTarget = positionNearest + directTarget * speed * deltaTime * mulValue;
+                    
+                    float distance = math.distance(pos, posTarget );
+                    
+                    direct = posTarget - pos;
+                    var ratio = 1 - math.clamp(distance * 1.0f / info.distanceAim, 0, 1);
                     
                     
                     moveToWard = math.lerp(info.moveToWardMin, info.moveToWardMax, ratio);
@@ -287,6 +304,14 @@ namespace _Game_.Scripts.Systems.Other.Obstacle
                     direct = math.forward();
                 }
             }
+        }
+
+
+        struct TargetAimInfo
+        {
+            public float3 position;
+            public float3 direct;
+            public float speed;
         }
 
         #endregion

@@ -1,4 +1,4 @@
-using _Game_.Scripts.Systems.Other.Obstacle;
+
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -7,7 +7,7 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 
-[BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup)),UpdateBefore(typeof(TurretSystem)),UpdateAfter(typeof(PlayerSpawnSystem))]
+[BurstCompile,UpdateInGroup(typeof(InitializationSystemGroup)),UpdateAfter(typeof(PlayerSpawnSystem))]
 public partial struct WeaponSystem : ISystem
 {
     private Entity _weaponEntityInstantiate;
@@ -63,7 +63,7 @@ public partial struct WeaponSystem : ISystem
 
     #endregion
     
-
+    [BurstCompile]
     public void OnDestroy(ref SystemState state)
     {
         if (_bulletSpawnQueue.IsCreated)
@@ -90,7 +90,8 @@ public partial struct WeaponSystem : ISystem
         UpdateDataWeapon(ref state);
         UpdateWeapon(ref state);
     }
-
+    
+    [BurstCompile]
     private void InitUpdate(ref SystemState state)
     {
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
@@ -109,7 +110,7 @@ public partial struct WeaponSystem : ISystem
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
-
+    [BurstCompile]
     private void UpdateDataWeapon(ref SystemState state)
     {
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
@@ -119,18 +120,19 @@ public partial struct WeaponSystem : ISystem
             switch (collection.ValueRO.type)
             {
                 case ItemType.Weapon:
-                    ecb.AddComponent(entity,new SetActiveSP()
+                    
+                    if (_idCurrentWeapon != collection.ValueRO.id)
                     {
-                        state = DisableID.Disable,
-                    });
-                    if(_idCurrentWeapon == collection.ValueRO.id) continue;
-                    ChangeWeapon(collection.ValueRO.id,ref ecb);
+                        ChangeWeapon(collection.ValueRO.id,ref ecb);
+                    }
+                    ecb.DestroyEntity(entity);
                     break;
             }
         }
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
+    [BurstCompile]
     private void ChangeWeapon(int id,ref EntityCommandBuffer ecb)
     {
         _idCurrentWeapon = id;
@@ -147,6 +149,7 @@ public partial struct WeaponSystem : ISystem
         _speed = weapon.speed;
         _isNewWeapon = true;
     }
+    [BurstCompile]
     private BufferWeaponStore GetWeapon(int id)
     {
         BufferWeaponStore weaponStore = new BufferWeaponStore();
@@ -161,58 +164,52 @@ public partial struct WeaponSystem : ISystem
         return weaponStore;
     }
 
+    [BurstCompile]
     private void UpdateWeapon(ref SystemState state)
     {
         EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         if (_isNewWeapon)
         {
-            foreach (var (wpInfo,parent, entity) in SystemAPI.Query<RefRO<WeaponInfo>,RefRO<Parent>>().WithEntityAccess()
-                         .WithNone<Disabled,SetActiveSP>())
+            foreach (var (weaponInfo,parent, entity) in SystemAPI.Query<RefRO<WeaponInfo>,RefRO<Parent>>().WithEntityAccess()
+                         .WithNone<Disabled,AddToBuffer,CanWeapon>())
             {
-                Entity weaponEntity = _entityManager.Instantiate(_weaponEntityInstantiate);
-                ecb.AddComponent(weaponEntity, new Parent() { Value = parent.ValueRO.Value });
-                ecb.AddComponent(weaponEntity, new LocalTransform() { Position = _offset, Rotation = quaternion.identity, Scale = 1 });
-                ecb.AddComponent(weaponEntity,new WeaponInfo()
-                {
-                    id = _idCurrentWeapon,
-                });
-                var characterInfo = _entityManager.GetComponentData<CharacterInfo>(parent.ValueRO.Value);
-                characterInfo.weaponEntity = weaponEntity;
-                ecb.SetComponent(parent.ValueRO.Value,characterInfo);
-                
                 ecb.RemoveComponent<Parent>(entity);
                 ecb.AddComponent(entity,new SetActiveSP()
                 {
                     state = DisableID.Disable,
                 });
+
+                InitCurrentWeapon(ref ecb, parent.ValueRO.Value);
             }
             _isNewWeapon = false;
         }
         
-        var buffer = _entityManager.GetBuffer<BufferCharacterNew>(_entityPlayer);
-        if (buffer.Length == 0)
+        foreach (var(info,entity) in SystemAPI.Query<RefRO<CharacterInfo>>().WithEntityAccess().WithAll<CanWeapon>().WithNone<Disabled,AddToBuffer>())
         {
-            ecb.Dispose();
-            return;
+            InitCurrentWeapon(ref ecb,entity);
+            ecb.RemoveComponent<CanWeapon>(entity);
         }
-        foreach (var b in buffer)
-        {
-            Entity weaponEntity = _entityManager.Instantiate(_weaponEntityInstantiate);
-            ecb.AddComponent(weaponEntity, new Parent() { Value = b.entity });
-            ecb.AddComponent(weaponEntity, new LocalTransform() { Position = _offset, Rotation = quaternion.identity, Scale = 1 });
-            ecb.AddComponent(weaponEntity,new WeaponInfo()
-            {
-                id = _idCurrentWeapon,
-            });
-            var characterInfo = _entityManager.GetComponentData<CharacterInfo>(b.entity);
-            characterInfo.weaponEntity = weaponEntity;
-            _entityManager.SetComponentData(b.entity,characterInfo);
-        }
-        buffer.Clear();
         ecb.Playback(_entityManager);
         ecb.Dispose();
     }
 
+    [BurstCompile]
+    private void InitCurrentWeapon(ref EntityCommandBuffer ecb, Entity character)
+    {
+        Entity weaponEntity = _entityManager.Instantiate(_weaponEntityInstantiate);
+        ecb.AddComponent(weaponEntity, new Parent() { Value = character });
+        ecb.AddComponent(weaponEntity, new LocalTransform() { Position = _offset, Rotation = quaternion.identity, Scale = 1 });
+        ecb.AddComponent(weaponEntity,new WeaponInfo()
+        {
+            id = _idCurrentWeapon,
+        });
+        var characterInfo = _entityManager.GetComponentData<CharacterInfo>(character);
+        characterInfo.weaponEntity = weaponEntity;
+        _entityManager.SetComponentData(character,characterInfo);
+    }
+
+
+    [BurstCompile]
     private void Shot(ref SystemState state)
     {
         if(!_pullTrigger) return;
@@ -244,6 +241,7 @@ public partial struct WeaponSystem : ISystem
         }
     }
     
+    [BurstCompile]
     partial struct PutEventSpawnBulletJOB : IJobChunk
     {
         public int bulletPerShot;

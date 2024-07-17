@@ -86,7 +86,7 @@ namespace _Game.Scripts.Systems.Zombie
                     {
                         addToBuffer.id = zombieInfo.id;
                         addToBuffer.entity = entity;
-                        ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entity);
+                        // ecb.RemoveComponent<LocalTransform>(unfilteredChunkIndex,entity);
                         ecb.AddComponent(unfilteredChunkIndex,entity,setActive);
                         ecb.AddComponent(unfilteredChunkIndex,entity,addToBuffer);
                     }

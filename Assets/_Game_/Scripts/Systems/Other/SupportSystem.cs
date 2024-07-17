@@ -3,6 +3,7 @@ using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
 using UnityEngine;
@@ -140,7 +141,7 @@ public partial class AnimationStateSystem : SystemBase
         [ReadOnly] public uint enemyLayer;
         [ReadOnly] public uint enemyDieLayer;
 
-        void Execute(in ZombieInfo zombieInfo,ref ZombieRuntime runtime, ref SetAnimationSP setAnimation,Entity entity,[EntityIndexInQuery]int indexQuery  , AnimatorParametersAspect parametersAspect,
+        void Execute(in ZombieInfo zombieInfo,ref LocalTransform lt,ref ZombieRuntime runtime, ref SetAnimationSP setAnimation,Entity entity,[EntityIndexInQuery]int indexQuery  , AnimatorParametersAspect parametersAspect,
             ref PhysicsCollider physicsCollider)
         {
             setAnimation.timeDelay -= timeDelta;
@@ -170,6 +171,9 @@ public partial class AnimationStateSystem : SystemBase
                         {
                             state = DisableID.Disable,
                         });
+                    }else if (setAnimation.timeDelay < 0.2f)
+                    {
+                        lt.Position = new float3(999,999,999);
                     }
                     break;
                 case StateID.Attack:
@@ -388,7 +392,7 @@ public partial struct HandlePoolZombie : ISystem
     [BurstCompile]
     private void Init(ref SystemState state)
     {
-        _countCheck = 200;
+        _countCheck = 300;
         _entityQuery = SystemAPI.QueryBuilder().WithAll<ZombieInfo, AddToBuffer, Disabled>().Build();
         _entityTypeHandle = state.GetEntityTypeHandle();
         _zombieInfoTypeHandle = state.GetComponentTypeHandle<ZombieInfo>();
@@ -435,7 +439,7 @@ public partial struct HandlePoolZombie : ISystem
         ecb.Dispose();
         if (_countCheck < (_zombieDieToPoolList.Length - _passCountZombieDie))
         {
-            _countCheck = _zombieDieToPoolList.Length - _passCountZombieDie + 100;
+            _countCheck = _zombieDieToPoolList.Length - _passCountZombieDie + 300;
         }
 
         _passCountZombieDie = _zombieDieToPoolList.Length;
@@ -683,7 +687,7 @@ public partial struct HandlePoolBullet : ISystem
 
         if (_countCheck < (_bufferBulletDisables.Length - _passCountWeaponDisable))
         {
-            _countCheck = _bufferBulletDisables.Length - _passCountWeaponDisable + 200;
+            _countCheck = _bufferBulletDisables.Length - _passCountWeaponDisable + 300;
         }
 
         _passCountWeaponDisable = _bufferBulletDisables.Length;

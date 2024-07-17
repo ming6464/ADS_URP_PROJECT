@@ -166,6 +166,7 @@ public partial struct ZombieSpawnSystem : ISystem
             offsetAttackPosition = data.offsetAttackPosition,
             priority = (int)data.priorityKey,
             priorityKey = data.priorityKey,
+            currentDirect = directNormal,
         };
     }
     

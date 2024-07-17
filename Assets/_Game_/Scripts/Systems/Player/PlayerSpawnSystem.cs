@@ -1,3 +1,4 @@
+using _Game_.Scripts.Systems.Player;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -5,7 +6,7 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 
-[BurstCompile, UpdateInGroup(typeof(InitializationSystemGroup))]
+[BurstCompile, UpdateInGroup(typeof(InitializationSystemGroup)),UpdateAfter(typeof(PlayerSpawnSystem)),UpdateBefore(typeof(CharacterSystem))]
 public partial struct PlayerSpawnSystem : ISystem
 {
     private byte _spawnPlayerState;
@@ -28,17 +29,23 @@ public partial struct PlayerSpawnSystem : ISystem
             SystemAPI.QueryBuilder().WithAll<CharacterInfo,LocalTransform>().WithNone<Disabled, SetActiveSP,AddToBuffer>().Build();
     }
 
+    [BurstCompile]
     public void OnUpdate(ref SystemState state)
-    
     {
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+        if(!CheckAndInit(ref state)) return;
+        UpdateCharacter(ref state);
+        ArrangeCharacter(ref state);
+    }
+
+    [BurstCompile]
+    private bool CheckAndInit(ref SystemState state)
+    {
         if (_spawnPlayerState < 2)
         {
             if (_spawnPlayerState == 0)
             {
+                EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
                 _playerProperty = SystemAPI.GetSingleton<PlayerProperty>();
-                var entityPlayerAuthoring =
-                    SystemAPI.GetSingletonEntity<PlayerProperty>();
                 var entityPlayer = ecb.CreateEntity();
                 ecb.AddComponent(entityPlayer, new PlayerInfo()
                 {
@@ -64,7 +71,7 @@ public partial struct PlayerSpawnSystem : ISystem
                 ecb.Playback(state.EntityManager);
                 ecb.Dispose();
                 _spawnPlayerState = 1;
-                return;
+                return false;
             }
             _parentCharacterEntity = SystemAPI.GetSingletonEntity<ParentCharacter>();
             _entityPlayerInfo = SystemAPI.GetSingletonEntity<PlayerInfo>();
@@ -73,13 +80,15 @@ public partial struct PlayerSpawnSystem : ISystem
             _spawnPlayerState = 2;
             _spaceGrid = _playerProperty.spaceGrid;
         }
-        UpdateCharacter(ref state, ref ecb);
-        ArrangeCharacter(ref state, ref ecb);
-        ecb.Playback(state.EntityManager);
-        ecb.Dispose();
+
+        return true;
     }
-    private void UpdateCharacter(ref SystemState state, ref EntityCommandBuffer ecb)
+
+
+    [BurstCompile]
+    private void UpdateCharacter(ref SystemState state)
     {
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
         int spawnChange = 0;
         if (!_spawnInit)
         {
@@ -105,9 +114,13 @@ public partial struct PlayerSpawnSystem : ISystem
         
         Spawn(ref state, ref ecb, spawnChange);
         
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
+        
     }
     
-    int CalculateNumberPlayer(Operation operation,int count)
+    [BurstCompile]
+    private int CalculateNumberPlayer(Operation operation,int count)
     {
         int spawnChange = 0;
         NativeArray<Entity> characterAlive;
@@ -140,6 +153,7 @@ public partial struct PlayerSpawnSystem : ISystem
         return spawnChange;
     }
     
+    [BurstCompile]
     private void Spawn(ref SystemState state, ref EntityCommandBuffer ecb, int count)
     {
         if(count == 0) return;
@@ -182,10 +196,6 @@ public partial struct PlayerSpawnSystem : ISystem
                 entitySet = _entityManager.Instantiate(_characterEntityInstantiate);
                 ecb.AddComponent<LocalToWorld>(entitySet);
                 
-                characterBuffer.Add(new BufferCharacterNew()
-                {
-                    entity = entitySet,
-                });
                 ecb.AddComponent(entitySet, new CharacterInfo()
                 {
                     index = i,
@@ -197,6 +207,7 @@ public partial struct PlayerSpawnSystem : ISystem
                 });
                 ecb.AddComponent(entitySet,lt);
                 ecb.AddComponent<New>(entitySet);
+                ecb.AddComponent<CanWeapon>(entitySet);
             }
         }
         else
@@ -212,8 +223,10 @@ public partial struct PlayerSpawnSystem : ISystem
         characterAlive.Dispose();
     }
 
-    private void ArrangeCharacter(ref SystemState state,ref EntityCommandBuffer ecb)
+    [BurstCompile]
+    private void ArrangeCharacter(ref SystemState state)
     {
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
         NativeArray<Entity> characterAlive = _enQueryCharacterAlive.ToEntityArray(Allocator.Temp);
         int length = characterAlive.Length;
         if(length == _passCountCharacter) return;
@@ -264,7 +277,11 @@ public partial struct PlayerSpawnSystem : ISystem
         playInfo.ValueRW.maxXGridCharacter = maxX;
         playInfo.ValueRW.maxYGridCharacter = maxY;
         characterAlive.Dispose();
-        
+        ecb.Playback(_entityManager);
+        ecb.Dispose();
+
+        #region Local Func
+
         float3 GetPositionLocal_L(int index, int maxCol, float2 space)
         {
             float3 grid = GetGridPos_L(index, maxCol);
@@ -294,5 +311,8 @@ public partial struct PlayerSpawnSystem : ISystem
             
             return grid;
         }
+
+        #endregion
+        
     }
 }
